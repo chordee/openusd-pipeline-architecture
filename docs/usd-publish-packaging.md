@@ -80,7 +80,7 @@ def PointInstancer "ForestTrees"
 
 ## 2. 同構目錄包裝單元（Isomorphic Packaging Unit）
 
-所有發布元素在磁碟上的交付邊界，必須以**目標目錄（Target Directory）**為核心實體邊界。
+所有發布元素在磁碟上的交付邊界，必須以**目標目錄**（Target Directory）為核心實體邊界。
 
 更關鍵的是「**同構性（Isomorphism）**」：無論是什麼具體物件，**資料夾內部的結構、子資料夾劃分與核心檔名一律固定不變**，唯有最外層的 Asset 或元素資料夾名稱不同。這樣做能讓 Pipeline 工具鏈解析時無需動態猜測檔名，且全體藝術家與 TD 皆能享受極高的一致性與易讀性。
 
@@ -414,7 +414,7 @@ over "ROOT"
 若某個特定鏡頭需要特定狀態（例如某顆鏡頭必須使用未損壞的 `v001` 道具），製作人員仍可在引用的路徑中直接指定具體版本號（`@assets/props/chair/v001/chair.usd@`），保留絕對的自由度。
 
 ### 3. 中游環節的版本穩定性
-在實際 Pipeline 經驗中，越是處於**流程中游（如 Animation、Simulation）**的項目，版本躍進的頻率反而越平緩：
+在實際 Pipeline 經驗中，越是處於**流程中游**（如 Animation、Simulation）的項目，版本躍進的頻率反而越平緩：
 - 一旦前期 Asset（Model/Rig）與 Layout 鏡頭定案，中游部門鎖定 `latest` 後，通常不會有自身製作以外的外部突發變更。
 - 這種穩定性讓日常廣泛依賴 `latest` 成為一種安全且高產能的最佳實踐。
 

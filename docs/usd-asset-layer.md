@@ -11,7 +11,9 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 > 3. **預設節點路徑**：
 >    - 預設模型幾何：`/ROOT/ModelDefault`
 >    - 預設材質外觀：`/ROOT/LookDefault`
-> 4. **雙維度 VariantSet 切換**：
+> 4. **雙維度 VariantSet 與按需自動啟動機制**：
+>    - **基準態（Baseline）**：以 `ModelDefault` 與 `LookDefault` 的唯一性作為標準基準。在只有單一幾何或外觀時保持結構最簡，不強制包裝多餘的 VariantSet。
+>    - **按需自動啟動**：一旦檢測到出現額外變體（如 `ModelLow`、`ModelHigh`，或 `LookRed`、`LookBlue`），Pipeline 自動化機制即刻啟動對應的 `model` 或 `look` VariantSet，並將既有的 `Default` 設為預設選取項，達成無感向下相容。
 >    - **Model 變體**：如 `ModelDefault`、`ModelLow`、`ModelHigh`，透過 `model` variant set 切換幾何複雜度。
 >    - **Look 變體**：如 `LookDefault`、`LookRed`、`LookBlue`，透過 `look` variant set 切換材質與著色效果。
 > 5. **版本控管的架構取捨**：經事先考量與權衡，VariantSet 專用於形態與外觀變體，版本迭代則統一採用目錄進版與 `latest` 機制，避免回溯修改上層註冊檔。詳見專題筆記：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)。
@@ -95,7 +97,17 @@ USD 的 Reference / Payload 機制會自動將來源檔的 `/ROOT` 映射為消�
 
 ## 3. 幾何圖層 (`model.usd`) 與 Model VariantSet
 
-模型部門獨立發佈幾何資料。當單一 Asset 需要提供不同精度（LOD）或外觀形態時，透過 `model` VariantSet 進行封裝：
+模型部門獨立發佈幾何資料。在 Pipeline 自動化架構中，幾何圖層遵循「**以 `ModelDefault` 唯一性為基準、按需自動啟動 VariantSet**」的設計：
+
+### 1. 基準態：`ModelDefault` 的唯一性
+- 在日常製作中，絕大多數一般道具（Props）僅需單一標準精度模型。
+- **極簡優先**：此時 `model.usd` 內部僅包含 `/ROOT/ModelDefault`，不強制生成空的或只有單一選項的 VariantSet 結構，保持圖層與記憶體開銷的極致輕量。
+- **預先對齊路徑**：即使尚未啟動 VariantSet，幾何 Prim 亦統一命名為 `ModelDefault`，為後續可能的升級預留錨點。
+
+### 2. 按需自動啟動：`ModelLow` / `ModelHigh` 誕生
+- 當鏡頭效能或特寫需求出現，建模師額外發布了非預設精度模型時（例如出現了 `modelLow/` 或 `modelHigh/`）：
+- **自動觸發封裝**：Pipeline 發布工具檢測到多個精度組件並存，**自動啟動 `model` VariantSet 封裝流程**。
+- **以 `Default` 為安全鎖定**：自動封裝 `variantSet "model"`，並強制將 `variants = { string model = "Default" }` 設為預設選取項，將新增的精度納入選項：
 
 ```usda
 #usda 1.0
@@ -203,7 +215,17 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 
 ## 4. 材質圖層 (`look.usd`) 與 Look VariantSet
 
-Lookdev 部門獨立發佈材質資料。透過 `look` VariantSet，可在不複製任何幾何快取的前提下，提供多種色彩或質感樣式：
+Lookdev 部門獨立發佈材質資料。材質層同樣貫徹「**以 `LookDefault` 唯一性為基準、按需自動啟動 VariantSet**」的設計：
+
+### 1. 基準態：`LookDefault` 的唯一性
+- 在未拆分色彩或塗裝變體前，Asset 僅有單一標準外觀。
+- **無負擔綁定**：`look.usd` 僅定義 `/ROOT/LookDefault`，並將材質直接綁定至 `/ROOT/ModelDefault`，不強制生成空的 VariantSet。
+- **唯一性基準**：以 `LookDefault` 作為預設材質與著色方案的絕對基準。
+
+### 2. 按需自動啟動：`LookRed` / `LookBlue` 誕生
+- 當劇情、場景陳設或藝術指導要求提供多款塗裝時（例如發布了 `lookRed/` 或 `lookBlue/`）：
+- **自動觸發封裝**：Pipeline 自動化組裝工具檢測到多個 Look 組件並存，**自動啟動 `look` VariantSet 封裝流程**。
+- **以 `LookDefault` 為安全鎖定**：自動封裝 `variantSet "look"`，並強制設定 `variants = { string look = "LookDefault" }`。既有鏡頭由於預設回落至 `LookDefault`，畫面外觀 100% 保持穩定，達成零風險的平滑升級：
 
 ```usda
 #usda 1.0
