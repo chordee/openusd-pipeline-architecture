@@ -167,6 +167,19 @@ class TestProjectRootVariable(unittest.TestCase):
         result = self.processor.processReferencePath(rel_path, f"{TEST_BASE_DIR}/any/layer.usd", True)
         self.assertEqual(result, '../modelDefault/v001/model.usd')
 
+    def test_process_layer_injects_variable_and_preserves_existing(self):
+        self.processor._configs = {
+            'projectrootvariable_project_root': TEST_BASE_DIR
+        }
+        self.processor.beginSave(None, None, None, 0, None)
+
+        fake_layer = types.SimpleNamespace(expressionVariables={'SHOW_NAME': 'show_A'})
+        modified = self.processor.processLayer(fake_layer)
+
+        self.assertTrue(modified)
+        self.assertEqual(fake_layer.expressionVariables.get('PROJECT_ROOT'), TEST_BASE_DIR)
+        self.assertEqual(fake_layer.expressionVariables.get('SHOW_NAME'), 'show_A')
+
 
 if __name__ == '__main__':
     unittest.main()
