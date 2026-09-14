@@ -232,13 +232,14 @@ Layout 與場景陳設組在製作環境（Environment）時，是 Pipeline 中�
 | **第二防線（流程前置工具）** | Scene Checker / Layer Inspector | 輸出前掃描 Stage 圖層清單，檢查 Explicit Layer Save Path 是否符合規範 |
 | **第二防線（流程前置工具）** | 未顯式化圖層提早預警 | 檢出無 Save Path 的匿名 SOP/Merge 分支並即時提示藝術家修正 |
 | **第三防線（ROP 基礎設定）** | Save Path Mode | 強制鎖定為 **Relative to Output File**，收斂於 `./layers/` |
-| **第三防線（Output Processor）** | 終端路徑合法性守衛 | 攔截違規外溢路徑並拋出例外中斷輸出，確保 0 髒檔進入發布庫 |
+| **第三防線（Output Processor）** | 終端路徑合法性守衛 | 掛載 [`portablereferences.py`](../tools/outputprocessors/README.md) 確保包內相對路徑與邊界收斂，攔截違規外溢 |
 | **發布驗證（磁碟驗收）** | Post-Export 磁碟目錄掃描 | 目標輸出資料夾之外，不得有任何關聯圖層外溢 |
 
 ---
 
-## 🔗 相關手冊導讀
+## 🔗 相關手冊與工具導讀
 - **[USD 架構設計體系總覽與導讀](../README.md)**：全 Pipeline 架構地圖與六大核心鐵律
 - **[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)**：通用目錄封裝規範、內相對外絕對與進版解析
+- **[Houdini Solaris Output Processors 實作工具庫](../tools/outputprocessors/README.md)**：官方參考腳本（`portablereferences.py`、`projectrootvariable.py`）
 - **[USD Environment 與 Set Dressing 場景陳設架構設計](usd-environment-setdressing.md)**：Layout / Set Dressing 虛擬組裝與點雲實例化架構
 - **[USD Shot Layers 鏡頭分層與覆寫架構](usd-shot-layers.md)**：鏡頭頂層四大部門圖層順序與覆寫權重機制

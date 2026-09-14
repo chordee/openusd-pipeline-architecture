@@ -339,6 +339,12 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
   - **根據 OpenUSD Composition 規則，最強層（最外層 Wrapper）所宣告的 `expressionVariables` 會直接覆寫所有弱層（下游所有圖層）的同名變數！**
   - 這意味著**只需在最外層指定一次新路徑，底下一整批成千上萬個 USD 圖層中引用的 `${PROJ_ROOT}` 將瞬間一口氣全局切換為新路徑**，達成極致的靈活性與可維護性。
 
+#### 官方參考實作與工具
+本專案提供完整的 Solaris USD Output Processor 實作腳本與測試：
+* **[Houdini Solaris Output Processors 實作工具庫](../tools/outputprocessors/README.md)**：
+  * [`portablereferences.py`](../tools/outputprocessors/portablereferences.py)：自動推導 Package Root 邊界，將包內向上跳層（`@../modelDefault/...@`）及子目錄參照轉換為相對路徑，並注入發布審計 Metadata。
+  * [`projectrootvariable.py`](../tools/outputprocessors/projectrootvariable.py)：自動將包外專案目錄前綴改寫為 `` `"${PROJECT_ROOT}/..."` `` 運算式，並寫入 `expressionVariables`。
+
 ---
 
 ## 5. 跨平臺的 `latest` 實現機制

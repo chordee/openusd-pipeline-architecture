@@ -82,3 +82,14 @@
 | **Animator / Rigging TD** | [USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)、[USD Skel 骨架動畫設定指南](docs/usd-skel-guide.md) | 掌握 `geo` + `skel` + `animation` 三分法，避免輸出全幾何快取，規範 SkelRoot 邊界。 |
 | **FX Artist / TD** | [USD FX Layer 鏡頭特效層架構設計](docs/usd-fx-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md) | 掌握 `/ROOT/FX/<element_name>` 註冊名掛載、獨立元素自帶 `/ROOT`、以及角色隱藏接管機制。 |
 | **Lighting / Render TD** | [USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)、[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md) | 掌握頂層權限覆寫、Light Linking、跨部門稀疏材質微調、與算圖版本鎖定（Pinning）。 |
+
+---
+
+## 🛠️ Pipeline 工具與參考實作庫
+
+本專案不僅提供理論架構，亦提供工業級的實作工具腳本，供工作室直接引入或作為開發基準：
+
+- **[Houdini Solaris Output Processors 工具庫](tools/outputprocessors/README.md)**：
+  - **`portablereferences.py`**：自動辨識 Package Root 邊界，將包內向上跳層（`@../modelDefault/...@`）及子目錄參照改寫為相對路徑，並寫入發布追蹤後設資料。
+  - **`projectrootvariable.py`**：將全域專案目錄絕對路徑動態改寫為 USD Stage Expression Variable（`` `"${PROJECT_ROOT}/..."` ``），支援一鍵全局遷移。
+  - 附帶完整純 Python 自動化單元測試。
