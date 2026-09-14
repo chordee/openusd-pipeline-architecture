@@ -16,7 +16,7 @@
 
 | 筆記名稱 | 核心探討範疇 | 關鍵架構概念 |
 | :--- | :--- | :--- |
-| **[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)** | 鏡頭總成、強弱權重與覆寫機制 | 四大部門圖層順序（$L > FX > A > E$）、`Master = Overrides + Base`、跨部門稀疏覆寫 |
+| **[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)** | 鏡頭總成、強弱權重與覆寫機制 | 四大部門圖層順序（`L > FX > A > E`）、`Master = Overrides + Base`、跨部門稀疏覆寫 |
 | **[USD Asset Layer 架構設計](docs/usd-asset-layer.md)** | 單一發布 Asset 內部結構 | 模型/材質雙圖層 Sublayer、`ModelDefault`/`LookDefault`、雙維度 VariantSet、`/ROOT` 解耦哲學 |
 | **[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)** | 世界舞台與場景陳設組裝 | Layout 與 Set Dressing 組合、虛擬組裝（零幾何實體）、`PointInstancer` 點雲數據消耗 |
 | **[USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)** | 角色骨架與道具時序動態 | 骨架三合一解耦（`geo` + `skel` + `animation`）、Transform 時序動畫、數 MB 極致輕量儲存 |

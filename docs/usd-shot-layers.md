@@ -2,7 +2,7 @@
 
 在 OpenUSD 的鏡頭級生產中，**Shot Layer Stacking（鏡頭圖層堆疊）** 與 **Department Overrides（部門內部與跨部門覆寫）** 是協同作業的核心骨幹。
 
-本篇完整規範了四大部門圖層的 Sublayer 權重秩序（$L > FX > A > E$）、命名空間邊界、各部門內部的 `Master = Overrides + Base` 雙層結構，以及較強部門如何透過非破壞性的稀疏覆寫（Sparse Overrides）達成跨部門意見貫穿。
+本篇完整規範了四大部門圖層的 Sublayer 權重秩序（`L > FX > A > E`）、命名空間邊界、各部門內部的 `Master = Overrides + Base` 雙層結構，以及較強部門如何透過非破壞性的稀疏覆寫（Sparse Overrides）達成跨部門意見貫穿。
 
 ---
 
@@ -363,7 +363,7 @@ over "ROOT"
 
 ## 7. 跨部門覆寫的合法方向矩陣
 
-依據 Sublayer 堆疊權重規則（$\text{Lighting} > \text{FX} > \text{Anim} > \text{Env}$），覆寫方向具有**單向性**：
+依據 Sublayer 堆疊權重規則（`Lighting > FX > Anim > Env`），覆寫方向具有**單向性**：
 
 | 發起覆寫的部門 | 可合法覆寫的目標部門與路徑 | 禁止/無效的覆寫方向 |
 | :--- | :--- | :--- |
