@@ -5,8 +5,7 @@ language: "zh-TW"
 tone_instructions: "請務必使用繁體中文 (Traditional Chinese) 進行所有溝通、程式碼審查意見與摘要回覆。避免使用簡體字。名詞規範：Pipeline/pipeline、Asset/asset、Shot/鏡頭、Layer/圖層、Override/覆寫、Publish/發布、Cache/快取。"
 
 reviews:
-  # 只針對 tools/ 目錄下的檔案進行審查，排除所有文檔及其他根目錄設定
+  # 只針對 tools/ 目錄下的檔案（含腳本、測試與文件）進行審查
   path_filters:
     - "tools/**"
-    - "!**/*.md"
     - "!**/__pycache__/**"
