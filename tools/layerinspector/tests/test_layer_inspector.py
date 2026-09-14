@@ -182,6 +182,19 @@ class TestLayerInspector(unittest.TestCase):
         report = LayerInspector(self.stage).full_report()
         self.assertIn("D:/projects/show_A/existing.usd", report["summary"]["pendingWrites"])
 
+        # 若為 IsFileFromDisk 但沒有 realPath (例如記憶體匿名圖層)，即使有殘留 HoudiniSavePath 也不應視為寫盤目標
+        anon_disk_layer = FakeLayer("anon:disk_no_source", anonymous=True, real_path="")
+        anon_disk_layer.customLayerData = {
+            "HoudiniSaveControl": "IsFileFromDisk",
+            "HoudiniSavePath": "./layers/stale.usd",
+        }
+        desc_anon = LayerInspector(self.stage).describe(anon_disk_layer)
+        self.assertFalse(desc_anon["willWriteFile"])
+
+        self.stage._used_layers.append(anon_disk_layer)
+        report2 = LayerInspector(self.stage).full_report()
+        self.assertNotIn("./layers/stale.usd", report2["summary"]["pendingWrites"])
+
     def test_path_violations_detection(self):
         # 違規 1：相對路徑向上溢出
         bad_layer1 = FakeLayer("anon:bad_geo1", anonymous=True)

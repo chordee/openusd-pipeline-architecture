@@ -170,10 +170,10 @@ class LayerInspector:
         editor_nodes, stale_ids = self._node_paths(meta.get(self.EDITOR_NODES_KEY))
         creator_node = self._node_path(meta.get(self.CREATOR_NODE_KEY))
 
-        # 判定是否會寫盤：Explicit 需有 save_path；IsFileFromDisk 需有 realPath (或 save_path)
+        # 判定是否會寫盤：Explicit 需有 save_path；IsFileFromDisk 需有來源 realPath
         will_write = (
             (save_control == "Explicit" and bool(save_path))
-            or (save_control == "IsFileFromDisk" and bool(layer.realPath or save_path))
+            or (save_control == "IsFileFromDisk" and bool(layer.realPath))
         )
 
         # 判定路徑合規性：若為 Explicit 圖層，驗證其 save_path 是否存在且收斂於子目錄內
@@ -207,9 +207,9 @@ class LayerInspector:
 
     def full_report(self) -> dict:
         layers = self.report()
-        # 整理寫盤路徑 (savePath 優先，若為 IsFileFromDisk 且無 savePath 則使用 realPath)
+        # 整理寫盤路徑：Explicit 寫入 savePath；IsFileFromDisk 覆寫來源 realPath
         pending_writes = [
-            d["savePath"] or d["realPath"]
+            d["savePath"] if d["saveControl"] == "Explicit" else d["realPath"]
             for d in layers
             if d["willWriteFile"]
         ]
