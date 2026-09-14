@@ -11,6 +11,8 @@ the default) — with ``resolve_nodes=False`` this module needs only ``pxr``.
 """
 
 import json
+import posixpath
+import re
 from pathlib import Path
 from typing import Optional, Union
 
@@ -147,14 +149,17 @@ class LayerInspector:
         if not path:
             return False
         raw = path.path if hasattr(path, "path") else str(path)
-        norm = raw.replace("\\", "/")
-        # 允許 ./layers/ 或 layers/ 或 ./sublayers/ 或 sublayers/ 開頭，不允許向上溢出 ../ 或根路徑 /
-        return (
-            norm.startswith("./layers/")
-            or norm.startswith("layers/")
-            or norm.startswith("./sublayers/")
-            or norm.startswith("sublayers/")
-        )
+        raw = raw.strip()
+        if not raw:
+            return False
+        raw_posix = raw.replace("\\", "/")
+        # 拒絕絕對路徑 (POSIX 根目錄 / 或 Windows 磁碟機代號如 C:)
+        if raw_posix.startswith("/") or re.match(r"^[a-zA-Z]:", raw_posix):
+            return False
+        norm = posixpath.normpath(raw_posix)
+        parts = norm.split("/")
+        # 必須以 layers 或 sublayers 為首層子目錄，且不能逃逸 (..)，且必須包含有效檔名
+        return parts[0] in ("layers", "sublayers") and len(parts) > 1 and bool(parts[-1])
 
     # ---------- describe ----------
 
@@ -171,9 +176,9 @@ class LayerInspector:
             or (save_control == "IsFileFromDisk" and bool(layer.realPath or save_path))
         )
 
-        # 判定路徑合規性：若為 Explicit 寫盤圖層，驗證其 save_path 是否位於子目錄內
+        # 判定路徑合規性：若為 Explicit 圖層，驗證其 save_path 是否存在且收斂於子目錄內
         path_valid = True
-        if save_control == "Explicit" and bool(save_path):
+        if save_control == "Explicit":
             path_valid = self._is_valid_explicit_path(save_path)
 
         return {
@@ -252,13 +257,14 @@ class LayerInspector:
                 print(f"  - 建立節點: {creator} (DisplayName: {d['displayName']})")
                 print("    建議：請於該節點後方連接 Configure Layer 節點指定 Save Path (例如 ./layers/<geo>.usd)。")
 
-        # 檢測警示：未依規範收斂於子目錄的 Explicit 路徑違規
+        # 檢測警示：未依規範收斂於子目錄的 Explicit 路徑違規或缺失 Save Path
         if violations:
-            print("\n[!] 警告：發現未合規收斂於子目錄 (./layers/) 的 Explicit 圖層路徑：")
+            print("\n[!] 警告：發現未合規收斂於子目錄 (./layers/) 或未指派 Save Path 的 Explicit 圖層：")
             for v in violations:
                 creator = v.get("creatorNode") or "未知節點"
-                print(f"  - 違規路徑: {v['savePath']} (節點: {creator})")
-                print("    建議：請修改 Configure Layer 的 Save Path，將檔案收斂至 ./layers/ 子目錄內。")
+                save_p = v["savePath"] or "<未指定路徑 (Missing Save Path)>"
+                print(f"  - 違規路徑: {save_p} (節點: {creator})")
+                print("    建議：請為 Configure Layer 指定合法 Save Path，收斂至 ./layers/ 或 ./sublayers/ 子目錄內。")
 
         # 檢測壞鏈
         if missing:

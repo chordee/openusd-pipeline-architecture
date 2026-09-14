@@ -183,20 +183,85 @@ class TestLayerInspector(unittest.TestCase):
         self.assertIn("D:/projects/show_A/existing.usd", report["summary"]["pendingWrites"])
 
     def test_path_violations_detection(self):
-        # 違規路徑 (不在 ./layers/ 或 ./sublayers/ 下)
-        bad_layer = FakeLayer("anon:bad_geo", anonymous=True)
-        bad_layer.customLayerData = {
+        # 違規 1：相對路徑向上溢出
+        bad_layer1 = FakeLayer("anon:bad_geo1", anonymous=True)
+        bad_layer1.customLayerData = {
             "HoudiniSavePath": "../tmp/bad.usd",
-            "HoudiniSaveControl": "Explicit"
+            "HoudiniSaveControl": "Explicit",
         }
-        desc = LayerInspector(self.stage).describe(bad_layer)
-        self.assertFalse(desc["isPathValid"])
+        desc1 = LayerInspector(self.stage).describe(bad_layer1)
+        self.assertFalse(desc1["isPathValid"])
 
-        self.stage._used_layers.append(bad_layer)
+        # 違規 2：路徑穿越逃逸 (layers/../../tmp/a.usd)
+        bad_layer2 = FakeLayer("anon:bad_geo2", anonymous=True)
+        bad_layer2.customLayerData = {
+            "HoudiniSavePath": "layers/../../tmp/a.usd",
+            "HoudiniSaveControl": "Explicit",
+        }
+        desc2 = LayerInspector(self.stage).describe(bad_layer2)
+        self.assertFalse(desc2["isPathValid"])
+
+        # 違規 3：Explicit 但缺少 HoudiniSavePath (None 或空字串)
+        bad_layer3 = FakeLayer("anon:bad_geo3", anonymous=True)
+        bad_layer3.customLayerData = {
+            "HoudiniSaveControl": "Explicit",
+            # 無 HoudiniSavePath
+        }
+        desc3 = LayerInspector(self.stage).describe(bad_layer3)
+        self.assertFalse(desc3["isPathValid"])
+
+        bad_layer4 = FakeLayer("anon:bad_geo4", anonymous=True)
+        bad_layer4.customLayerData = {
+            "HoudiniSavePath": "   ",
+            "HoudiniSaveControl": "Explicit",
+        }
+        desc4 = LayerInspector(self.stage).describe(bad_layer4)
+        self.assertFalse(desc4["isPathValid"])
+
+        # 違規 5：絕對路徑 (POSIX 根目錄或 Windows 磁碟機代號)
+        bad_layer5 = FakeLayer("anon:bad_geo5", anonymous=True)
+        bad_layer5.customLayerData = {
+            "HoudiniSavePath": "/layers/geo.usd",
+            "HoudiniSaveControl": "Explicit",
+        }
+        self.assertFalse(LayerInspector(self.stage).describe(bad_layer5)["isPathValid"])
+
+        bad_layer6 = FakeLayer("anon:bad_geo6", anonymous=True)
+        bad_layer6.customLayerData = {
+            "HoudiniSavePath": "C:/layers/geo.usd",
+            "HoudiniSaveControl": "Explicit",
+        }
+        self.assertFalse(LayerInspector(self.stage).describe(bad_layer6)["isPathValid"])
+
+        # 合規路徑：./layers/、layers/sub/、sublayers/
+        good_layer1 = FakeLayer("anon:good_geo1", anonymous=True)
+        good_layer1.customLayerData = {
+            "HoudiniSavePath": "./layers/geo.usd",
+            "HoudiniSaveControl": "Explicit",
+        }
+        self.assertTrue(LayerInspector(self.stage).describe(good_layer1)["isPathValid"])
+
+        good_layer2 = FakeLayer("anon:good_geo2", anonymous=True)
+        good_layer2.customLayerData = {
+            "HoudiniSavePath": "sublayers/nested/anim.usd",
+            "HoudiniSaveControl": "Explicit",
+        }
+        self.assertTrue(LayerInspector(self.stage).describe(good_layer2)["isPathValid"])
+
+        # 驗證 full_report
+        self.stage._used_layers.extend([bad_layer1, bad_layer2, bad_layer3, good_layer1])
         report = LayerInspector(self.stage).full_report()
         self.assertTrue(report["summary"]["hasPathViolations"])
-        self.assertEqual(len(report["pathViolations"]), 1)
-        self.assertEqual(report["pathViolations"][0]["savePath"], "../tmp/bad.usd")
+        # 找出違規項目，應有 3 個
+        violations = report["pathViolations"]
+        self.assertEqual(len(violations), 3)
+        save_paths = [v["savePath"] for v in violations]
+        self.assertIn("../tmp/bad.usd", save_paths)
+        self.assertIn("layers/../../tmp/a.usd", save_paths)
+        self.assertIn(None, save_paths)
+
+        # 驗證 print_summary 執行不會丟出例外
+        LayerInspector(self.stage).print_summary()
 
     def test_to_json_serializes_asset_path_object(self):
         # HoudiniSavePath 若為 Sdf.AssetPath 物件，to_json 不應丟出 TypeError
