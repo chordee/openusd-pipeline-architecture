@@ -93,3 +93,7 @@
   - **`portablereferences.py`**：自動辨識 Package Root 邊界，將包內向上跳層（`@../modelDefault/...@`）及子目錄參照改寫為相對路徑，並寫入發布追蹤後設資料。
   - **`projectrootvariable.py`**：將全域專案目錄絕對路徑動態改寫為 USD Stage Expression Variable（`` `"${PROJECT_ROOT}/..."` ``），支援一鍵全局遷移。
   - 附帶完整純 Python 自動化單元測試。
+- **[Houdini Solaris Layer Inspector 檢測工具庫](tools/layerinspector/README.md)**：
+  - **`layer_inspector.py`**：輸出前置檢查 Stage 圖層狀態，辨識隱式（Implicit）與顯式（Explicit）圖層、反查建立圖層的肇因 LOP 節點，並檢測無效 Sublayer 壞鏈。
+  - 支援 Python Shell 終端排版報告（`print_summary()`）與 JSON 格式輸出。
+
