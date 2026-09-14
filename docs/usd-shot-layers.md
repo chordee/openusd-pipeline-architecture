@@ -9,7 +9,7 @@
 > [!important] 30 秒核心原則
 > 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。
 > 2. **LIVRPS Sublayer 強弱順序**：頂層 `subLayers` 順序決定意見權重（Index 越小權限越強）：
->    $$\text{Lighting (最強)} > \text{FX (次強)} > \text{Animation (中等)} > \text{Environment (最弱)}$$
+>    `Lighting (最強) > FX (次強) > Animation (中等) > Environment (最弱)`
 > 3. **各部門內部雙層堆疊**：四大主要圖層內部普遍採用 `Master → Overrides → Base` 結構；`overrides.usd` 本身作為聚合容器，再 Sublayer 各任務微型覆寫檔案。
 > 4. **跨部門稀疏覆寫（Sparse Overrides）**：較強部門的 Override 圖層**不受限於自身的 Scene Tree**。只要透過 USD `over "/ROOT/..."` 語法，即可直接非破壞性地覆寫較弱部門的屬性（如 Lighting 覆寫道具材質、FX 隱藏角色幾何以接管破碎）。
 > 5. **覆寫單向性**：覆寫方向嚴格遵守權重矩陣，僅允許「上層覆寫下層」，禁止或無效化逆向覆寫。

@@ -37,7 +37,7 @@
 
 ### 2. Sublayer 強弱順序與意見貫穿（LIVRPS / Layer Stacking）
 - 鏡頭頂層 `subLayers` 順序決定意見權重（Index 越小意見越強）：
-  $$\text{Lighting (0, 最強)} > \text{FX (1, 次強)} > \text{Animation (2, 中等)} > \text{Environment (3, 最弱)}$$
+  `Lighting (0, 最強) > FX (1, 次強) > Animation (2, 中等) > Environment (3, 最弱)`
 - 頂層具備最高仲裁權，可在不觸碰下層快取的前提下，達成非破壞性微調（Non-destructive Overrides）。
 
 ### 3. 部門內部階層化與跨部門稀疏覆寫（Sparse Overrides）
