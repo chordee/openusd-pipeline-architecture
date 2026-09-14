@@ -4,7 +4,8 @@
 
 雖然 Animation Layer 呈現了整個鏡頭最複雜生動的表演（角色走動、表情、道具互動、鏡頭運動），但在工業級 USD Pipeline 中，**Animation Layer 實際輸出的硬碟佔用量極小（通常僅數 MB）**。這得益於 USD 將動態資料與實體幾何徹底解耦的設計。
 
-> [!important] 30 秒核心架構觀念
+> [!IMPORTANT]
+> **30 秒核心架構觀念**
 > 1. **兩大元素分類**：
 >    - **骨架角色動畫（Skeletal Character Animation）**：拆分為 `geo`、`skel` 與 `animation` 三部分。
 >    - **幾何 Transform 動畫（Rigid Transform / Prop Animation）**：引用 Asset 後僅輸出時序空間矩陣。

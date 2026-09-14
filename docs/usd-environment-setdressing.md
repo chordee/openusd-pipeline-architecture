@@ -4,7 +4,8 @@
 
 Environment 圖層的核心成員並非直接建立的幾何多邊形，而是由**「主要 Asset 配置（Layout）」**與**「各式場景陳設（Set Dressing）」**組合而成。
 
-> [!important] 30 秒核心架構思維
+> [!IMPORTANT]
+> **30 秒核心架構思維**
 > 1. **直接成員**：主要地標與建築的 Layout 配置，以及由粗至細的各類 Set Dressing 圖層。
 > 2. **Set Dressing 的 Asset 化性質（Asset-like）**：同一場景（Sequence）的多個鏡頭通常共用相同的陳設環境，因此 Set Dressing 在 Pipeline 中常被當作類似 Asset（Assembly / Set）的獨立可重用單元發佈與版控。
 > 3. **無實體幾何（Zero Heavy Geometry）**：Set Dressing 圖層內部幾乎**不包含真正的多邊形實體**，而是 100% 透過 `references` 或 `payload` 引用已發佈的獨立 Asset，因此硬碟佔用極為輕量（通常僅有幾 KB 到數 MB）。
@@ -135,7 +136,8 @@ def Xform "ROOT"
 
 * **存檔特性**：即使包含十萬棵樹木散佈，此檔案僅需儲存幾十萬個浮點數（二進位 `.usd` 下約數 MB 到幾十 MB），而不會像傳統格式那樣把幾何網格複製十萬次產生上百 GB 的肥大快取。
 
-> [!tip] Pipeline 解耦最佳實踐：Points Primitive 獨立發布為 Pure USD 單元
+> [!TIP]
+> **Pipeline 解耦最佳實踐：Points Primitive 獨立發布為 Pure USD 單元**
 > 若將海量點位陣列直接寫死在 `layout.usd` 主圖層中，每次微調散佈疏密都必須迫使整顆鏡頭的 Layout 總成進版，引發下游連鎖更新。
 > **解耦作法**：
 > 1. 將 `PointInstancer` 的純點雲 Primitive（`positions`, `orientations`, `scales`, `protoIndices`）獨立發布為專屬的 **Pure USD Unit**（如 `scatter_forest/`）。

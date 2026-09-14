@@ -4,7 +4,8 @@
 
 Asset 架構的核心目標是**「模型與外觀解耦、統一命名空間、透過 VariantSet 提供多樣性切換」**。
 
-> [!important] 30 秒核心原則
+> [!IMPORTANT]
+> **30 秒核心原則**
 > 1. **統一 `/ROOT` 命名空間**：Asset 檔案內部所有模型與材質一律掛載在 `/ROOT` 底下（`defaultPrim = "ROOT"`，`kind = "component"`）。
 > 2. **Asset 雙核心圖層組裝**：一個完整的 `asset.usd` 本身即是由 `model.usd`（幾何）與 `look.usd`（材質）兩者 Sublayer 組成。
 > 3. **預設節點路徑**：
@@ -153,7 +154,8 @@ def Mesh "Body_Proxy" (
 ) { /* 幾千面簡化網格，供 Viewport 即時預覽 */ }
 ```
 
-> [!important] Purpose 規範：兩者齊全否則 Default
+> [!IMPORTANT]
+> **Purpose 規範：兩者齊全否則 Default**
 > 1. **必須對稱齊全**：若在 Asset 內部為幾何宣告了 `purpose`，**`render` 與 `proxy` 兩者必須同時具備**。
 > 2. **嚴禁單邊缺失**：如果只建立了 `render` 而未提供 `proxy`，當 Viewport 切換至 Proxy 模式時該物件將完全隱形；反之若只有 `proxy`，渲染農場將算不到該幾何。
 > 3. **無 Proxy 則一律 Default**：若該 Asset 製作上並未刻意拆分代理網格，幾何的 `purpose` **必須保持為 `default`（或不宣告）**，讓 Viewport 與渲染器皆能正確顯示，杜絕顯示不同步。
@@ -193,7 +195,8 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 | **`assembly`** | 大型場景集合（如 Set Dressing `livingroom.usd`） | 跨鏡頭的重要複合單元，支援整體階層的 DrawMode 降級顯示。 |
 | **`subcomponent`** | Asset 內部的細部組件（如椅子的一隻腳） | 供結構內部標記，通常不對外暴露。 |
 
-> [!caution] Pipeline 工具鏈鐵律：盡力維護 `usdkind`
+> [!CAUTION]
+> **Pipeline 工具鏈鐵律：盡力維護 `usdkind`**
 > 若上游建模、綁定或發布工具遺失了 `kind` 宣告，或將幾何誤標在非 Model 容器下，USD 的 ModelAPI 將完全失效——導致 Viewport 無法以 Component 為單位選取物件，且 `drawMode = "bounds"` 也將無法啟動。因此，**Pipeline 輸出工具（Solaris ROP、Publish Hook、DCC 導出器）必須在任何時候，盡全力驗證並維護合規的 `kind` 標記！**
 
 ---

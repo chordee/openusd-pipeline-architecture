@@ -6,7 +6,8 @@
 
 ---
 
-> [!important] 30 秒核心原則
+> [!IMPORTANT]
+> **30 秒核心原則**
 > 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。
 > 2. **LIVRPS Sublayer 強弱順序**：頂層 `subLayers` 順序決定意見權重（Index 越小權限越強）：
 >    `Lighting (最強) > FX (次強) > Animation (中等) > Environment (最弱)`
@@ -386,11 +387,13 @@ over "ROOT"
    - Override 檔案內通常只有幾十行純 ASCII 文字（`over`、屬性變更或時間樣本），不夾帶沉重的 Mesh 或快取，傳輸與解析極快。
 
 ### 防坑指南
-> [!warning] 嚴禁在下層預寫高層屬性
+> [!WARNING]
+> **嚴禁在下層預寫高層屬性**
 > - **問題**：若環境組在 `environment.usd` 順便建了測試燈光，該光源會殘留至最終合成中，干擾燈光師工作。
 > - **解法**：嚴守資料邊界，環境圖層只允許在 `/ROOT/Environment` 建立幾何與靜態材質。
 
-> [!tip] 命名空間隔離的優勢
+> [!TIP]
+> **命名空間隔離的優勢**
 > 透過 `/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting` 明確切割分支，各部門發佈各自的 usd 時，永遠不會發生節點名稱碰撞（Name Collision），合成時只需由頂層以 `over` 定義 cross-branch 的互動或覆寫。
 
 ---

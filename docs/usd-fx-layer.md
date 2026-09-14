@@ -4,7 +4,8 @@
 
 為了達成跨部門 Pipeline 的高效協同，FX Layer 採用**「元素級解耦封裝＋Shot 級 Payload / Reference 組裝」**的設計模式。
 
-> [!important] 核心架構原則
+> [!IMPORTANT]
+> **核心架構原則**
 > 1. **Shot FX 容器路徑**：Shot 的 `fx.usd` 內統一在 `/ROOT/FX/` 底下掛載各個特效元素。
 > 2. **專案註冊命名（Registered Element Name）**：`/ROOT/FX/` 下的 Primitive 名稱直接對應特效在 Pipeline（Tracking / Pipeline Database）中註冊的元素名稱（例如 `explosion_hero`、`fire_ground`）。
 > 3. **獨立元素自身的 `/ROOT` 基準**：每個特效元素在自身內部**一律以 `/ROOT` 作為根節點**，其底下再細分幾何、體積、粒子與專屬材質。

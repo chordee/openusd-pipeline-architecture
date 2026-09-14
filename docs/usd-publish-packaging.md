@@ -4,7 +4,8 @@
 
 ---
 
-> [!important] 30 秒核心原則（全 Pipeline 發布元素通用）
+> [!IMPORTANT]
+> **30 秒核心原則（全 Pipeline 發布元素通用）**
 > 1. **目錄即包裝單元與同構內部結構（Isomorphic Packaging）**：
 >    - 無論是什麼 Asset（如 `chair`、`table`、`car`），**資料夾內部的檔案結構與命名完全統一**！
 >    - 入口檔案一律單純命名為 `asset.usd`（各版次目錄內）與動態入口 `asset_latest.usd`（Asset 根目錄內），嚴禁在內部檔名摻雜具體 Asset 名稱。
@@ -110,7 +111,8 @@ def PointInstancer "ForestTrees"
     └── v002/
 ```
 
-> [!important] Sub 物件無 latest 與版本推進連動原則
+> [!IMPORTANT]
+> **Sub 物件無 latest 與版本推進連動原則**
 > 1. **Sub 物件不設獨立 latest 入口**：
 >    - `modelDefault/`、`lookDefault/`、`textureDefault/` 屬於單元物件 Asset 內部的私有組件（Sub 物件），嚴禁對外暴露獨立的 `latest` 指標。
 >    - 這能徹底杜絕外部下游環節繞過 Asset 總成、直接引用到未經外觀驗收的孤立幾何或半成品 Shader。
@@ -157,7 +159,8 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
     └── v002/density.0001.vdb
 ```
 
-> [!important] FX Element 進版連動機制與龐大快取隔離
+> [!IMPORTANT]
+> **FX Element 進版連動機制與龐大快取隔離**
 > - **只有 element entry 會有 latest**：全元素目錄下唯有頂層的 `element_latest.usd` 作為對外發布與掛載指標；底下的 `layers/`、`materials/` 等 sub 單元**一律不設獨立 latest**。
 > - **Sub 單元進版推進 Element Entry 進版**：特效師每次重新解算體積（生成新版體積圖層）或更新專用著色器（`materials/v002/`），Pipeline 直接推進 `element.usd` 整體進版（生成 `v002/element.usd`），內部以相對路徑精準鎖定各 sub 單元版本，並自動維護頂層 `element_latest.usd` 指向 `v002/element.usd`。
 > - **龐大快取空間隔離與 USD 輕量包裹**：特效解算的重型二進位快取（Geo Cache 或數百 GB 的 OpenVDB 序列）體量龐大，**實體檔案輸出至獨立規劃的高速快取空間（如專用快取伺服器或 scratch 磁區），不直接存放在專案目錄內**。發布時透過 **`Value Clips`**（幾何）或 **`OpenVDBAsset / Volume`** Schema 包裹為單一輕量 `.usd` 圖層，最終的 FX Element Entry 依然正規發布進專案目錄（`publish/fx/elements/...`）並於系統註冊。詳見：[USD FX Layer 鏡頭特效層架構設計](usd-fx-layer.md)。
@@ -392,7 +395,8 @@ over "ROOT"
 | **Stage 記憶體開銷** | **累積膨脹**。<br>VariantSet 會將數十個歷史版本的定義都載入記憶體結構中，版本越多 Stage 解析負擔越大。 | **極致輕量**。<br>Stage 僅解析 `latest` 指向的那一個單一版本。 |
 | **維護成本** | **連鎖更新**。<br>上游 Asset 每次加版，下游必須全部重新簽入以適應新的 Variant 選項。 | **局部自理**。<br>每個 Asset 只需維護自身當前的 `latest` 指標。 |
 
-> [!tip] 架構取捨的核心定位
+> [!TIP]
+> **架構取捨的核心定位**
 > **VariantSet 專注於「內容形態變體」（如高低模 LOD、紅藍色材質）；而時間序列的進版控管則交由獨立目錄與 `latest` 指標維護，兩者職責分明。**
 
 ---
