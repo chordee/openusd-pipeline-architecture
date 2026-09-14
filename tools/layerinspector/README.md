@@ -44,10 +44,11 @@ inspector = LayerInspector(
 
 ### 主要方法
 
-- **`print_summary()`**：在 Houdini Python Shell 或終端列印清楚易讀的排版報告，標註未顯式化的 SOP 圖層警告與壞鏈。
-- **`full_report()`**：回傳完整的字典報告（包含 `layers`、`unresolvedSublayers` 與 `summary` 統計）。
-- **`to_json(indent=2)`**：回傳格式化 JSON 字串，適合整合進 Studio 的自動化驗證 Hook 或 CI 流程。
+- **`print_summary()`**：在 Houdini Python Shell 或終端列印清楚易讀的排版報告，自動標註未顯式化的 SOP 圖層警告、未收斂於子目錄（`./layers/`）的違規 Explicit 路徑、以及 Sublayer 壞鏈。
+- **`full_report()`**：回傳完整的字典報告（包含 `layers`、`unresolvedSublayers`、`pathViolations` 與 `summary` 統計）。
+- **`to_json(indent=2)`**：回傳安全轉型的格式化 JSON 字串，適合整合進 Studio 的自動化驗證 Hook 或 CI 流程。
 - **`unresolved_sublayers()`**：回傳所有打不開的無效 Sublayer 清單。
+
 
 ---
 

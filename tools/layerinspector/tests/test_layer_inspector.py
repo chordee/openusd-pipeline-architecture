@@ -167,18 +167,64 @@ class TestLayerInspector(unittest.TestCase):
         parsed = json.loads(json_str)
         self.assertEqual(parsed["summary"]["total"], 2)
 
-    def test_print_summary(self):
-        import io
-        from contextlib import redirect_stdout
+    def test_describe_is_file_from_disk_uses_real_path(self):
+        # 即使沒有 HoudiniSavePath，只要有 realPath 就應列入寫盤清單
+        disk_layer = FakeLayer("D:/projects/show_A/existing.usd", real_path="D:/projects/show_A/existing.usd")
+        disk_layer.customLayerData = {
+            "HoudiniSaveControl": "IsFileFromDisk"
+        }
+        desc = LayerInspector(self.stage).describe(disk_layer)
+        self.assertTrue(desc["willWriteFile"])
+        self.assertFalse(desc["implicit"])
 
+        # 驗證 full_report 的 pendingWrites 包含 realPath
+        self.stage._used_layers.append(disk_layer)
+        report = LayerInspector(self.stage).full_report()
+        self.assertIn("D:/projects/show_A/existing.usd", report["summary"]["pendingWrites"])
+
+    def test_path_violations_detection(self):
+        # 違規路徑 (不在 ./layers/ 或 ./sublayers/ 下)
+        bad_layer = FakeLayer("anon:bad_geo", anonymous=True)
+        bad_layer.customLayerData = {
+            "HoudiniSavePath": "../tmp/bad.usd",
+            "HoudiniSaveControl": "Explicit"
+        }
+        desc = LayerInspector(self.stage).describe(bad_layer)
+        self.assertFalse(desc["isPathValid"])
+
+        self.stage._used_layers.append(bad_layer)
+        report = LayerInspector(self.stage).full_report()
+        self.assertTrue(report["summary"]["hasPathViolations"])
+        self.assertEqual(len(report["pathViolations"]), 1)
+        self.assertEqual(report["pathViolations"][0]["savePath"], "../tmp/bad.usd")
+
+    def test_to_json_serializes_asset_path_object(self):
+        # HoudiniSavePath 若為 Sdf.AssetPath 物件，to_json 不應丟出 TypeError
+        asset_layer = FakeLayer("D:/projects/asset.usd")
+        asset_layer.customLayerData = {
+            "HoudiniSavePath": FakeAssetPath("./layers/asset.usd", "D:/projects/layers/asset.usd"),
+            "HoudiniSaveControl": "Explicit"
+        }
+        self.stage._used_layers.append(asset_layer)
         inspector = LayerInspector(self.stage)
-        buf = io.StringIO()
-        with redirect_stdout(buf):
-            inspector.print_summary()
-        output = buf.getvalue()
+        json_output = inspector.to_json()
+        parsed = json.loads(json_output)
+        self.assertIn("layers", parsed)
 
-        self.assertIn("Houdini Solaris Layer Inspector", output)
-        self.assertIn("總圖層數: 2", output)
+    def test_implicit_determined_by_save_control(self):
+        # 即使圖層 anonymous，只要有 Explicit 就不是 implicit
+        anon_explicit = FakeLayer("anon:explicit", anonymous=True)
+        anon_explicit.customLayerData = {
+            "HoudiniSaveControl": "Explicit",
+            "HoudiniSavePath": "./layers/geo.usd"
+        }
+        desc = LayerInspector(self.stage).describe(anon_explicit)
+        self.assertFalse(desc["implicit"])
+
+        # 即使有實體 realPath，只要無 SaveControl 就是 implicit (Houdini 預設 fold 入 parent)
+        disk_implicit = FakeLayer("D:/projects/disk.usd", real_path="D:/projects/disk.usd")
+        desc_disk = LayerInspector(self.stage).describe(disk_implicit)
+        self.assertTrue(desc_disk["implicit"])
 
 
 if __name__ == '__main__':

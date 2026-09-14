@@ -141,6 +141,21 @@ class LayerInspector:
                     )
         return missing
 
+    @staticmethod
+    def _is_valid_explicit_path(path: Optional[Union[str, Sdf.AssetPath]]) -> bool:
+        """檢查 Explicit Save Path 是否符合子目錄收斂規範（必須在 ./layers/ 或 ./sublayers/ 下）。"""
+        if not path:
+            return False
+        raw = path.path if hasattr(path, "path") else str(path)
+        norm = raw.replace("\\", "/")
+        # 允許 ./layers/ 或 layers/ 或 ./sublayers/ 或 sublayers/ 開頭，不允許向上溢出 ../ 或根路徑 /
+        return (
+            norm.startswith("./layers/")
+            or norm.startswith("layers/")
+            or norm.startswith("./sublayers/")
+            or norm.startswith("sublayers/")
+        )
+
     # ---------- describe ----------
 
     def describe(self, layer: Sdf.Layer, index: int = -1) -> dict:
@@ -148,23 +163,31 @@ class LayerInspector:
         save_path = meta.get(self.SAVE_PATH_KEY)
         save_control = meta.get(self.SAVE_CONTROL_KEY)
         editor_nodes, stale_ids = self._node_paths(meta.get(self.EDITOR_NODES_KEY))
-        # A layer with no save control is "Implicit" in Houdini's terms: it is
-        # folded into its parent's file, carries no save path, and its
-        # GetDisplayName() is a bare "LOP". The node that created it is the only
-        # thing identifying it — that is what Houdini's own Scene Graph Layers
-        # panel labels these rows with.
         creator_node = self._node_path(meta.get(self.CREATOR_NODE_KEY))
+
+        # 判定是否會寫盤：Explicit 需有 save_path；IsFileFromDisk 需有 realPath (或 save_path)
+        will_write = (
+            (save_control == "Explicit" and bool(save_path))
+            or (save_control == "IsFileFromDisk" and bool(layer.realPath or save_path))
+        )
+
+        # 判定路徑合規性：若為 Explicit 寫盤圖層，驗證其 save_path 是否位於子目錄內
+        path_valid = True
+        if save_control == "Explicit" and bool(save_path):
+            path_valid = self._is_valid_explicit_path(save_path)
+
         return {
             "index": index,
             "identifier": layer.identifier,
             "displayName": layer.GetDisplayName(),
             "creatorNode": creator_node,
             "isSopLayer": bool(meta.get(self.SOP_LAYER_KEY)),
-            "implicit": layer.anonymous,
+            "implicit": save_control is None,
             "realPath": layer.realPath or "",
             "savePath": save_path,
             "saveControl": save_control,
-            "willWriteFile": bool(save_path) and save_control in self.WRITING_CONTROLS,
+            "willWriteFile": will_write,
+            "isPathValid": path_valid,
             "isRootLayer": layer == self.stage.GetRootLayer(),
             "isSessionLayer": layer == self.stage.GetSessionLayer(),
             "dirty": layer.dirty,
@@ -179,17 +202,30 @@ class LayerInspector:
 
     def full_report(self) -> dict:
         layers = self.report()
+        # 整理寫盤路徑 (savePath 優先，若為 IsFileFromDisk 且無 savePath 則使用 realPath)
+        pending_writes = [
+            d["savePath"] or d["realPath"]
+            for d in layers
+            if d["willWriteFile"]
+        ]
+        # 違規路徑清單 (Explicit 圖層但未收斂於子目錄)
+        path_violations = [
+            {"identifier": d["identifier"], "savePath": d["savePath"], "creatorNode": d["creatorNode"]}
+            for d in layers
+            if d["saveControl"] == "Explicit" and not d["isPathValid"]
+        ]
         return {
             "layers": layers,
             "unresolvedSublayers": self.unresolved_sublayers(),
+            "pathViolations": path_violations,
             "summary": {
                 "total": len(layers),
                 "implicit": sum(1 for d in layers if d["implicit"]),
                 "explicit": sum(1 for d in layers if not d["implicit"]),
-                "pendingWrites": [d["savePath"] for d in layers if d["willWriteFile"]],
+                "pendingWrites": pending_writes,
+                "hasPathViolations": len(path_violations) > 0,
             },
         }
-
 
     def print_summary(self) -> None:
         """在終端或 Houdini Python Shell 列印易讀的圖層治理摘要報告。"""
@@ -197,6 +233,7 @@ class LayerInspector:
         summary = report["summary"]
         layers = report["layers"]
         missing = report["unresolvedSublayers"]
+        violations = report.get("pathViolations", [])
 
         print("=" * 70)
         print(" [Houdini Solaris Layer Inspector 治理檢測報告]")
@@ -213,7 +250,15 @@ class LayerInspector:
             for d in sop_implicits:
                 creator = d.get("creatorNode") or "未知節點"
                 print(f"  - 建立節點: {creator} (DisplayName: {d['displayName']})")
-                print("    建議：請於該節點後方連接 Configure Layer 節點指定 Save Path。")
+                print("    建議：請於該節點後方連接 Configure Layer 節點指定 Save Path (例如 ./layers/<geo>.usd)。")
+
+        # 檢測警示：未依規範收斂於子目錄的 Explicit 路徑違規
+        if violations:
+            print("\n[!] 警告：發現未合規收斂於子目錄 (./layers/) 的 Explicit 圖層路徑：")
+            for v in violations:
+                creator = v.get("creatorNode") or "未知節點"
+                print(f"  - 違規路徑: {v['savePath']} (節點: {creator})")
+                print("    建議：請修改 Configure Layer 的 Save Path，將檔案收斂至 ./layers/ 子目錄內。")
 
         # 檢測壞鏈
         if missing:
@@ -225,7 +270,9 @@ class LayerInspector:
         print("=" * 70)
 
     def to_json(self, indent: Optional[int] = 2) -> str:
-        return json.dumps(self.full_report(), indent=indent, ensure_ascii=False)
+        # 對完整的 full_report 套用 _jsonify，確保 Sdf.AssetPath 等型別均能安全轉為 JSON
+        safe_data = _jsonify(self.full_report())
+        return json.dumps(safe_data, indent=indent, ensure_ascii=False)
 
 
 def layers_to_json(stage: Usd.Stage, indent: Optional[int] = 2, **kwargs) -> str:
