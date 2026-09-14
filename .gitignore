@@ -1,0 +1,18 @@
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor & IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Obsidian vault specific files
+.obsidian/
+.trash/
+
+# Python / build caches
+__pycache__/
+*.py[cod]

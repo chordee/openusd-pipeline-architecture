@@ -1,0 +1,273 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 740" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="assetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="envGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="animGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#78350f" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="fxGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#881337" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="shotGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#581c87" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="pkgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#155e75" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#0e7490" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- Markers -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#60a5fa" />
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#c084fc" />
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif; font-size: 20px; font-weight: 700; fill: #f8fafc; }
+    .subtitle { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif; font-size: 12px; fill: #94a3b8; }
+    .card-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif; font-size: 14px; font-weight: 700; }
+    .card-badge { font-family: monospace; font-size: 10px; font-weight: 600; }
+    .text-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif; font-size: 11px; fill: #cbd5e1; }
+    .text-mono { font-family: "SFMono-Regular", Consolas, Menlo, monospace; font-size: 11px; fill: #e2e8f0; }
+    .text-dim { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif; font-size: 10px; fill: #64748b; }
+    .box { rx: 8px; ry: 8px; stroke-width: 1.5; }
+    .inner-box { rx: 6px; ry: 6px; fill: #0f172a; stroke-width: 1; opacity: 0.85; }
+    .flow-line { fill: none; stroke: #64748b; stroke-width: 1.5; stroke-dasharray: 4 3; marker-end: url(#arrow); }
+    .solid-line { fill: none; stroke: #94a3b8; stroke-width: 1.8; marker-end: url(#arrow); }
+    .blue-line { fill: none; stroke: #60a5fa; stroke-width: 1.8; marker-end: url(#arrow-blue); }
+    .purple-line { fill: none; stroke: #c084fc; stroke-width: 2; marker-end: url(#arrow-purple); }
+  </style>
+
+  <!-- Background Base -->
+  <rect width="1100" height="740" rx="14" fill="url(#bgGrad)" stroke="#334155" stroke-width="1.5" />
+
+  <!-- Header -->
+  <g transform="translate(35, 32)">
+    <text class="title" x="0" y="0">USD 生產 Pipeline 架構全景導讀地圖 (Pipeline Architecture Map)</text>
+    <text class="subtitle" x="0" y="20">模組化 Asset 封裝 ── 虛擬輕量組裝 ── 跨部門稀疏覆寫 ── 全域版本確定性</text>
+  </g>
+
+  <!-- ================= 1. Asset 構建階段 (Asset Phase) ================= -->
+  <g transform="translate(35, 75)">
+    <rect class="box" width="220" height="420" fill="url(#assetGrad)" stroke="#3b82f6" />
+    <text class="card-title" x="14" y="26" fill="#93c5fd">1. Asset Layer</text>
+    <rect x="140" y="12" width="66" height="18" rx="4" fill="#1e40af" />
+    <text class="card-badge" x="146" y="25" fill="#dbeafe">COMPONENT</text>
+
+    <!-- Model Box -->
+    <g transform="translate(14, 42)">
+      <rect class="inner-box" width="192" height="90" stroke="#3b82f6" stroke-opacity="0.4" />
+      <text class="text-mono" x="10" y="20" fill="#60a5fa">model.usd</text>
+      <text class="text-dim" x="10" y="36">幾何拓樸與網格快取</text>
+      <path d="M 10 44 L 182 44" stroke="#1e293b" />
+      <text class="text-body" x="10" y="60">VariantSet: <tspan class="text-mono" fill="#93c5fd">model</tspan></text>
+      <text class="text-dim" x="10" y="76">• Default  • Low  • High</text>
+    </g>
+
+    <!-- Look Box -->
+    <g transform="translate(14, 144)">
+      <rect class="inner-box" width="192" height="90" stroke="#3b82f6" stroke-opacity="0.4" />
+      <text class="text-mono" x="10" y="20" fill="#60a5fa">look.usd</text>
+      <text class="text-dim" x="10" y="36">著色器與材質綁定 (上層)</text>
+      <path d="M 10 44 L 182 44" stroke="#1e293b" />
+      <text class="text-body" x="10" y="60">VariantSet: <tspan class="text-mono" fill="#93c5fd">look</tspan></text>
+      <text class="text-dim" x="10" y="76">• LookDefault • Red • Blue</text>
+    </g>
+
+    <!-- Master Asset Assembly -->
+    <g transform="translate(14, 250)">
+      <rect class="inner-box" width="192" height="152" stroke="#60a5fa" stroke-width="1.5" />
+      <text class="text-mono" x="10" y="22" fill="#bfdbfe" font-weight="bold">asset.usd (Master)</text>
+      <text class="text-dim" x="10" y="38">Sublayers: [ look, model ]</text>
+      
+      <rect x="10" y="48" width="172" height="92" rx="4" fill="#020617" />
+      <text class="text-mono" x="18" y="68" fill="#38bdf8">/ROOT</text>
+      <text class="text-dim" x="58" y="68">(kind = component)</text>
+      <text class="text-mono" x="24" y="90" fill="#94a3b8">├── ModelDefault/</text>
+      <text class="text-mono" x="24" y="110" fill="#94a3b8">└── LookDefault/</text>
+      <text class="text-dim" x="24" y="128">（抽象通用根節點）</text>
+    </g>
+  </g>
+
+  <!-- Flow Lines from Asset to Production -->
+  <path class="blue-line" d="M 255 350 L 290 350 L 290 145 L 305 145" />
+  <path class="blue-line" d="M 255 350 L 290 350 L 290 280 L 305 280" />
+
+  <!-- ================= 2. 鏡頭生產部門 (Department Production) ================= -->
+  
+  <!-- 2A. Environment & Set Dressing -->
+  <g transform="translate(315, 75)">
+    <rect class="box" width="250" height="135" fill="url(#envGrad)" stroke="#10b981" />
+    <text class="card-title" x="14" y="24" fill="#a7f3d0">2. 環境與陳設 (Env &amp; Set)</text>
+    <rect x="195" y="10" width="42" height="18" rx="4" fill="#065f46" />
+    <text class="card-badge" x="201" y="23" fill="#d1fae5">ENV</text>
+
+    <text class="text-mono" x="14" y="48" fill="#6ee7b7">environment.usd</text>
+    <text class="text-dim" x="110" y="48">/ROOT/Environment</text>
+
+    <rect x="14" y="58" width="222" height="64" rx="4" fill="#020617" />
+    <text class="text-body" x="22" y="76">• <tspan class="text-mono" fill="#f8fafc">Layout</tspan>: 地形/主要建築 (Payload)</text>
+    <text class="text-body" x="22" y="94">• <tspan class="text-mono" fill="#f8fafc">SetDressing</tspan>: 虛擬組裝 (零實體幾何)</text>
+    <text class="text-dim" x="22" y="110">  └ PointInstancer: 僅消耗座標矩陣數據</text>
+  </g>
+
+  <!-- 2B. Animation Layer -->
+  <g transform="translate(315, 220)">
+    <rect class="box" width="250" height="135" fill="url(#animGrad)" stroke="#f59e0b" />
+    <text class="card-title" x="14" y="24" fill="#fde68a">3. 動畫部門 (Animation)</text>
+    <rect x="195" y="10" width="42" height="18" rx="4" fill="#92400e" />
+    <text class="card-badge" x="201" y="23" fill="#fef3c7">ANIM</text>
+
+    <text class="text-mono" x="14" y="48" fill="#fcd34d">animation.usd</text>
+    <text class="text-dim" x="105" y="48">/ROOT/Anim</text>
+
+    <rect x="14" y="58" width="222" height="64" rx="4" fill="#020617" />
+    <text class="text-body" x="22" y="75">• <tspan class="text-mono" fill="#f8fafc">SkelRoot</tspan>: geo + skel + animation 三分</text>
+    <text class="text-dim" x="32" y="90">  (僅輸出 Joint 時序旋轉，節省 99% 容量)</text>
+    <text class="text-body" x="22" y="108">• <tspan class="text-mono" fill="#f8fafc">Transform</tspan>: 道具與 ShotCam 時序</text>
+  </g>
+
+  <!-- 2C. FX Layer -->
+  <g transform="translate(315, 365)">
+    <rect class="box" width="250" height="130" fill="url(#fxGrad)" stroke="#f43f5e" />
+    <text class="card-title" x="14" y="24" fill="#fecdd3">4. 特效模擬 (FX Layer)</text>
+    <rect x="205" y="10" width="32" height="18" rx="4" fill="#9f1239" />
+    <text class="card-badge" x="212" y="23" fill="#ffe4e6">FX</text>
+
+    <text class="text-mono" x="14" y="48" fill="#fda4af">fx.usd</text>
+    <text class="text-dim" x="65" y="48">/ROOT/FX/&lt;element_name&gt;</text>
+
+    <rect x="14" y="58" width="222" height="60" rx="4" fill="#020617" />
+    <text class="text-body" x="22" y="76">• 獨立元素自帶 <tspan class="text-mono" fill="#f8fafc">/ROOT</tspan> 基底 (解耦封裝)</text>
+    <text class="text-body" x="22" y="94">• Payload: VDB 體積 / 粒子點雲快取</text>
+    <text class="text-dim" x="22" y="108">• 支援時序接管隱藏角色 Mesh</text>
+  </g>
+
+  <!-- ================= 3. 鏡頭堆疊與跨部門覆寫 (Shot Composition) ================= -->
+  <g transform="translate(605, 75)">
+    <rect class="box" width="460" height="420" fill="url(#shotGrad)" stroke="#a855f7" />
+    <text class="card-title" x="16" y="26" fill="#e9d5ff">5. 鏡頭合成與跨部門覆寫 (Shot Composition &amp; Overrides)</text>
+    <rect x="382" y="12" width="64" height="18" rx="4" fill="#6b21a8" />
+    <text class="card-badge" x="389" y="25" fill="#f3e8ff">SHOT STACK</text>
+
+    <!-- Sublayer Stack Box -->
+    <g transform="translate(16, 42)">
+      <rect x="0" y="0" width="428" height="236" rx="6" fill="#020617" stroke="#7e22ce" stroke-width="1" />
+      <text class="text-mono" x="14" y="24" fill="#c084fc" font-weight="bold">shot.usda (Sublayer Stacking 權限由上而下遞減)</text>
+      
+      <!-- Layer 1: Lighting -->
+      <rect x="14" y="34" width="400" height="42" rx="4" fill="#3b0764" stroke="#d8b4fe" />
+      <text class="text-mono" x="24" y="52" fill="#faf5ff" font-weight="bold">Index 0: lighting.usd</text>
+      <text class="text-dim" x="175" y="52">【最強意見 / 最終仲裁】</text>
+      <text class="text-body" x="24" y="68">/ROOT/Lighting 光源、RenderSettings、全場 Lookdev 最終 Override</text>
+
+      <!-- Layer 2: FX -->
+      <rect x="14" y="82" width="400" height="42" rx="4" fill="#4c0519" stroke="#fda4af" stroke-opacity="0.6" />
+      <text class="text-mono" x="24" y="100" fill="#fff1f2">Index 1: fx.usd</text>
+      <text class="text-dim" x="145" y="100">【次強意見】可接管覆寫角色動畫可見度</text>
+      <text class="text-body" x="24" y="116">掛載 /ROOT/FX/explosion_hero 等獨立元素快取</text>
+
+      <!-- Layer 3: Anim -->
+      <rect x="14" y="130" width="400" height="42" rx="4" fill="#451a03" stroke="#fde68a" stroke-opacity="0.6" />
+      <text class="text-mono" x="24" y="148" fill="#fffbeb">Index 2: animation.usd</text>
+      <text class="text-dim" x="175" y="148">【中等意見】可覆寫環境道具 Transform</text>
+      <text class="text-body" x="24" y="164">/ROOT/Anim/Characters 角色動態與 ShotCam 鏡頭動態</text>
+
+      <!-- Layer 4: Env -->
+      <rect x="14" y="178" width="400" height="46" rx="4" fill="#022c22" stroke="#6ee7b7" stroke-opacity="0.6" />
+      <text class="text-mono" x="24" y="196" fill="#f0fdf4">Index 3: environment.usd</text>
+      <text class="text-dim" x="190" y="196">【最弱意見 / 舞台基底】</text>
+      <text class="text-body" x="24" y="214">/ROOT/Environment 靜態背景、地形、建築與 Set Dressing 道具陳設</text>
+    </g>
+
+    <!-- Department Overrides Architecture -->
+    <g transform="translate(16, 290)">
+      <rect x="0" y="0" width="428" height="114" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1" stroke-dasharray="3 3" />
+      <text class="card-title" x="14" y="22" fill="#d8b4fe">各部門階層結構：Master = Overrides + Base</text>
+      <text class="text-body" x="14" y="42">每個部門主檔內部由 <tspan class="text-mono" fill="#f8fafc">overrides.usd</tspan>（強）覆蓋在 <tspan class="text-mono" fill="#f8fafc">base.usd</tspan>（弱）之上。</text>
+      
+      <rect x="14" y="52" width="400" height="50" rx="4" fill="#020617" />
+      <text class="text-body" x="22" y="70"><tspan fill="#ec4899" font-weight="bold">跨部門稀疏覆寫 (Sparse Overrides)：</tspan> 較強部門不限於自身樹狀節點！</text>
+      <text class="text-dim" x="22" y="88">例：Lighting 可直接宣告 <tspan class="text-mono" fill="#e2e8f0">over "/ROOT/Environment/Props/Table"</tspan> 非破壞微調材質。</text>
+    </g>
+  </g>
+
+  <!-- Connections to Shot Stack -->
+  <path class="solid-line" d="M 565 142 L 619 142" />
+  <path class="solid-line" d="M 565 287 L 619 210" />
+  <path class="solid-line" d="M 565 430 L 619 250" />
+
+  <!-- ================= 4. 全 Pipeline 通用封裝與進版規範 (Universal Standards) ================= -->
+  <g transform="translate(35, 515)">
+    <rect class="box" width="1030" height="195" fill="url(#pkgGrad)" stroke="#06b6d4" />
+    <text class="card-title" x="20" y="26" fill="#67e8f9">6. 全 Pipeline 通用發布封裝、路徑邊界與進版規範 (Universal Packaging &amp; Resolution)</text>
+    <rect x="910" y="12" width="100" height="18" rx="4" fill="#0e7490" />
+    <text class="card-badge" x="918" y="25" fill="#cffafe">STANDARDS</text>
+
+    <!-- Standard 1: Packaging Unit -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="232" height="135" rx="6" fill="#020617" stroke="#0891b2" stroke-width="1" />
+      <text class="text-mono" x="14" y="22" fill="#38bdf8" font-weight="bold">A. 目錄即包裝單元</text>
+      <text class="text-dim" x="14" y="38">Packaging Unit (目錄邊界)</text>
+      <text class="text-body" x="14" y="60">• 所有發布元素 (Asset/FX/Anim)</text>
+      <text class="text-body" x="14" y="78">  均以目標輸出目錄為封裝實體</text>
+      <text class="text-body" x="14" y="96">• 具備不可分割之發布原子性</text>
+      <text class="text-dim" x="14" y="118">  (隨包快取、子圖層整體移轉)</text>
+    </g>
+
+    <!-- Standard 2: Implicit Isolation -->
+    <g transform="translate(268, 42)">
+      <rect x="0" y="0" width="232" height="135" rx="6" fill="#020617" stroke="#0891b2" stroke-width="1" />
+      <text class="text-mono" x="14" y="22" fill="#38bdf8" font-weight="bold">B. Solaris Implicit 禁錮</text>
+      <text class="text-dim" x="14" y="38">Strict Layer Isolation</text>
+      <text class="text-body" x="14" y="60">• Solaris 產生的隱式圖層必須</text>
+      <text class="text-body" x="14" y="78">  100% 寫入目標資料夾或子目錄</text>
+      <text class="text-body" x="14" y="98" fill="#f87171" font-weight="bold">✕ 嚴禁任何快取外溢至外部</text>
+      <text class="text-dim" x="14" y="118">  (防止跨機渲染農場缺檔損壞)</text>
+    </g>
+
+    <!-- Standard 3: Path Rules -->
+    <g transform="translate(516, 42)">
+      <rect x="0" y="0" width="246" height="135" rx="6" fill="#020617" stroke="#0891b2" stroke-width="1" />
+      <text class="text-mono" x="14" y="22" fill="#38bdf8" font-weight="bold">C. 內相對、外絕對</text>
+      <text class="text-dim" x="14" y="38">Path Resolution Boundary</text>
+      <text class="text-body" x="14" y="60">• <tspan fill="#4ade80">包內互連</tspan>: 一律相對路徑</text>
+      <text class="text-mono" x="24" y="76" fill="#86efac">@./layers/sub.usd@</text>
+      <text class="text-body" x="14" y="96">• <tspan fill="#60a5fa">包外引用</tspan>: 一律全域絕對路徑</text>
+      <text class="text-mono" x="24" y="112" fill="#93c5fd">@/projects/assets/...@</text>
+      <text class="text-dim" x="14" y="126">  (移動發布包不壞鏈，邊界分明)</text>
+    </g>
+
+    <!-- Standard 4: Versioning & Resolver -->
+    <g transform="translate(778, 42)">
+      <rect x="0" y="0" width="232" height="135" rx="6" fill="#020617" stroke="#0891b2" stroke-width="1" />
+      <text class="text-mono" x="14" y="22" fill="#38bdf8" font-weight="bold">D. Latest 與 Resolver 鎖定</text>
+      <text class="text-dim" x="14" y="38">Versioning &amp; Version Pinning</text>
+      <text class="text-body" x="14" y="58">• 不用 VariantSet 控版 (免回改)</text>
+      <text class="text-body" x="14" y="76">• 全元素進版維持 <tspan class="text-mono" fill="#f8fafc">latest.usd</tspan></text>
+      <text class="text-dim" x="14" y="92">  (Linux: Symlink / Win: Wrapper)</text>
+      <text class="text-body" x="14" y="110">• <tspan fill="#c084fc">Asset Resolver</tspan>: 算圖時自動</text>
+      <text class="text-dim" x="14" y="126">  逆向鎖定歷史核准版本 (Pinning)</text>
+    </g>
+  </g>
+</svg>
