@@ -262,17 +262,17 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 這是確保 USD Asset 包兼具「獨立可攜性」與「全域靈活性」的終極架構法則：
 
 ```text
-                               ┌─── 目標發布資料夾 (Package Boundary) ───┐
-                               │                                         │
-                               │  asset.usd                              │
-                               │    │                                    │
-    【內部參照：相對路徑】        │    ├──► subLayers = [                   │
-    移動發布包時鏈結依然有效       │    │      @./modelDefault/model.usd@,   │
-                               │    │      @./lookDefault/look.usd@      │
-                               │    │    ]                               │
-                               │    └──► payload = @./layers/sub.usd@    │
-                               │                                         │
-                               └─────────────────────────────────────────┘
+                               ┌─── 目標發布資料夾 Asset Package (Package Boundary) ───┐
+                               │                                                       │
+                               │  v###/asset.usd                                       │
+                               │    │                                                  │
+    【內部參照：包內相對路徑】   │    ├──► subLayers = [                                 │
+    向上跳一層仍在包裝邊界內     │    │      @../modelDefault/v###/modelDefault.usd@,    │
+    移動發布包時鏈結依然有效     │    │      @../lookDefault/v###/lookDefault.usd@       │
+                               │    │    ]                                             │
+                               │    └──► payload = @./layers/sub.usd@                  │
+                               │                                                       │
+                               └───────────────────────────────────────────────────────┘
                                                  │
     【外部參照：Expression Variable 替換】          │
     Output Processor 自動改寫專案目錄前綴           ▼
@@ -280,10 +280,12 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ```
 
 ### 1. 包內參照 → 必須為相對路徑（Relative Paths）
-* **範圍**：所有同樣位於目標資料夾內部的 USD layer 彼此之間的引用（例如 `asset.usd` 引用同目錄下的 `modelDefault`、`lookDefault` 或 `./layers/`）。
-* **語法**：一律採用 `@./...@` 開頭的相對路徑。
+* **範圍**：所有同樣位於目標資料夾內部的 USD layer 彼此之間的引用。
+* **相對路徑邊界（Package Root）**：
+  - **同級或子目錄**：採用 `@./...@`（例如引用同目錄下的 `./layers/`）。
+  - **版次總裝向上解析**：因為各版本 `asset.usd` 位於 `v###/` 子資料夾，在引用同 Asset 內部的 `modelDefault/` 與 `lookDefault/` 時，**必然會向上跳一層採用 `@../...@`**。只要路徑解析後仍在當前 Asset 根目錄邊界（Package Boundary）內，即為完全合規之包內相對參照。
 * **優勢**：
-  - 整份發布資料夾可隨意在硬碟間複製、移動、存檔或提供給外部外包工作室。
+  - 整份 Asset 發布資料夾（包含 `v###/`、`modelDefault/`、`lookDefault/`、`textureDefault/`）可隨意在硬碟間複製、移動、存檔或交付外部外包，內部相對路徑 100% 保持自洽有效。
   - 不依賴固定的磁碟機代號或掛載路徑（Mount point），跨 Windows（`D:/`）與 Linux（`/mnt/`）無縫共用。
 
 ### 2. 包外參照 → Stage Expression Variable（`${PROJ_ROOT}`）

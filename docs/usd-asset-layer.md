@@ -366,5 +366,5 @@ Asset 發布同樣必須遵守全 Pipeline 通用的封裝鐵律：
 1. **目錄即包裝單元（同構內部結構）**：以 Asset 目錄（如 `publish/assets/props/chair/`）為獨立封裝單位，內部結構與檔名一律固定為 `asset_latest.usd`、`modelDefault/`、`lookDefault/`、`textureDefault/` 等，嚴禁在內部檔名摻雜個別 Asset 名稱。
 2. **Solaris Implicit Layer 禁錮**：若 Asset 於 Solaris 產出，所有導出的隱式圖層必須限制在該目錄及其子目錄（如 `./layers/`）內，嚴禁外溢。
 3. **內相對、外絕對（Expression Variable 替換）**：
-   - **包內互連**：`asset.usd` 堆疊 `@./lookDefault/...@` 與 `@./modelDefault/...@` 一律採用相對路徑，貼圖引用包內 `@./textureDefault/...@` 亦為相對路徑。
+   - **包內互連**：各版次 `v###/asset.usd` 堆疊 `@../lookDefault/...@` 與 `@../modelDefault/...@` 一律採用相對路徑（向上跳一層仍在 Asset Package 邊界內），貼圖引用包內 `@../textureDefault/...@` 亦為相對路徑，保障整顆 Asset 資料夾可完整隨意搬遷。
    - **包外引用**：若引用全域共用材質庫或全域 HDRI，輸出時由 Solaris Output Processor 自動改寫為 `@${PROJ_ROOT}/...@`，保障專案可隨意遷移或跨公司交接。

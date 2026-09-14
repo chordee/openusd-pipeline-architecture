@@ -59,7 +59,7 @@ over "ROOT"
             {
                 # 1. 引用 Asset 端的幾何 (geo，指向最新發布之模型)
                 def "Geo" (
-                    references = @${PROJ_ROOT}/publish/assets/characters/hero/modelDefault/modelDefault_latest.usd@</ROOT/ModelDefault>
+                    references = @${PROJ_ROOT}/publish/assets/characters/hero/asset_latest.usd@</ROOT/ModelDefault>
                 ) {}
 
                 # 2. 引用 Rig 端的靜態骨架 (skel，指向最新發布之骨架)
