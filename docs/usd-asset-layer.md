@@ -2,7 +2,7 @@
 
 在整體 USD Pipeline 架構中，**Asset Layer（Asset 圖層）** 是構建所有場景（Environment、Animation、FX）的最基礎單元。
 
-Asset 架構的核心目標是**「模型與外觀解耦、統一命名空間、透過 VariantSet 提供多樣性切換」**。
+Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、透過 VariantSet 提供多樣性切換**」。
 
 > [!IMPORTANT]
 > **30 秒核心原則**

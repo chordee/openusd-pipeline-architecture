@@ -2,7 +2,7 @@
 
 在鏡頭（Shot）的 USD 階層中，FX Layer（`fx.usd`）位於 `/ROOT/FX`，負責彙整所有動態模擬效果（如爆炸、火焰、粒子、流體、剛體碎屑）。
 
-為了達成跨部門 Pipeline 的高效協同，FX Layer 採用**「元素級解耦封裝＋Shot 級 Payload / Reference 組裝」**的設計模式。
+為了達成跨部門 Pipeline 的高效協同，FX Layer 採用「**元素級解耦封裝＋Shot 級 Payload / Reference 組裝**」的設計模式。
 
 > [!IMPORTANT]
 > **核心架構原則**
@@ -164,7 +164,7 @@ over "ROOT"
 
 特效模擬產生的快取資料（如高解析度 Pyro 煙火解算的 OpenVDB 序列、數百萬剛體碎塊或流體幾何的 Geo Cache / Alembic / bgeo.sc）動輒數十 GB 甚至數 TB。若將這些巨量二進位檔案直接寫入一般專案主目錄（Project Root），會造成專案儲存空間暴增、備份負擔沉重且降低整體 Pipeline 的 I/O 效率。
 
-因此，Pipeline 嚴格實施**「實體快取空間隔離＋USD 輕量包裹＋Entry 專案目錄發布」**的三層架構：
+因此，Pipeline 嚴格實施「**實體快取空間隔離＋USD 輕量包裹＋Entry 專案目錄發布**」的三層架構：
 
 ```text
 ┌────────────────────────────────────────────────────────┐

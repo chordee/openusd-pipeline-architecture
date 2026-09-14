@@ -2,7 +2,7 @@
 
 在 USD 影視與動畫生產 Pipeline 中，**Environment、Layout、Lighting 與 FX 部門**需要頻繁載入海量發布元素來搭建與擺放場景。
 
-傳統 DCC 工具常將「Asset 檢索」與「軟體內節點生成」緊密揉雜，甚至封裝出專有節點，導致跨 DCC 難以移植或破壞 USD 圖層結構。本架構旨在建立一套**「瀏覽檢索與載入行為分離」**、**「100% 依循 OpenUSD 原生組合弧」**、且具備**「自由命名掛載路徑」**與**「Class Inherits 標籤廣播」**的工業級 Asset Loader 規範。
+傳統 DCC 工具常將「Asset 檢索」與「軟體內節點生成」緊密揉雜，甚至封裝出專有節點，導致跨 DCC 難以移植或破壞 USD 圖層結構。本架構旨在建立一套「**瀏覽檢索與載入行為分離**」、「**100% 依循 OpenUSD 原生組合弧**」、且具備「**自由命名掛載路徑**」與「**Class Inherits 標籤廣播**」的工業級 Asset Loader 規範。
 
 ---
 
@@ -136,7 +136,7 @@ def Xform "Chair_02" (
 
 ## 5. 預設 `inherit` 多重標籤分類機制（Class Inherits）
 
-在複雜鏡頭中，下游部門（特別是 Lighting 與 Lookdev）常需對全場特定類別的 Asset 或元素進行**「批量屬性覆寫」**或**「全域分組控制」**。Loader 導入了標準的 **`inherit`** 標籤規範：
+在複雜鏡頭中，下游部門（特別是 Lighting 與 Lookdev）常需對全場特定類別的 Asset 或元素進行「**批量屬性覆寫**」或「**全域分組控制**」。Loader 導入了標準的 **`inherit`** 標籤規範：
 
 ### 1. 預設規範：`/__CLASS__/{專案註冊名稱}`
 當透過 Loader 載入名為 `chair` 的 Asset 時，Loader 預設自動在 Prim 上注入該 Asset 的 Class 繼承：

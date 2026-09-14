@@ -2,7 +2,7 @@
 
 在 Houdini Solaris（LOP）架構中，節點網路在記憶體中建構 Stage 時，會因應節點操作即時衍生出大量的記憶體虛擬圖層 **Implicit Layers（隱式圖層）**。
 
-許多藝術家在點擊 USD ROP 輸出時，經常遭遇「莫名其妙導出一大堆碎檔（`.usd`）」、「路徑外溢散落在專案目錄各處」等災難。本篇旨在澄清 Implicit Layer 的生成本質，建立從 **「主動 Flatten」**、**「Configure Layer 顯式化（Explicit）」** 到 **「Save Paths Relative to Output 防禦收斂」** 的完整治理體系。
+許多藝術家在點擊 USD ROP 輸出時，經常遭遇「莫名其妙導出一大堆碎檔（`.usd`）」、「路徑外溢散落在專案目錄各處」等災難。本篇旨在澄清 Implicit Layer 的生成本質，建立從 「**主動 Flatten**」、「**Configure Layer 顯式化（Explicit）**」 到 「**Save Paths Relative to Output 防禦收斂**」 的完整治理體系。
 
 ---
 
@@ -89,7 +89,7 @@ USD ROP (Output Processor)
 
 1. **明確指定 Save Path**：
    - 在節點參數中的 **Save Path** 欄位填入明確的相對路徑（例如 `./layers/prop_geometry.usd`）。
-   - 這樣一來，該圖層不再是「未知的隱式圖層」，而是**「具備明確身分的顯式圖層（Explicit Layer）」**。
+   - 這樣一來，該圖層不再是「未知的隱式圖層」，而是「**具備明確身分的顯式圖層（Explicit Layer）**」。
 2. **自訂檔案命名與語意**：
    - 發布出來的檔案不再是匿名亂數，而是具備清楚業務含義的子圖層檔案（如 `table_mesh.usd`、`materials.usd`）。
 3. **消除 ROP 的猜測行為**：
@@ -136,7 +136,7 @@ USD ROP (Output Processor)
 
 ### 4.3 最佳實踐：三層縱深防禦體系 (Three-Tier Defense Architecture)
 
-因此，工業級 Pipeline 的最佳解法絕非單靠終端的 Output Processor 攔截，而是建立**「源頭教育 → 流程前置檢視 → 終端守衛」**的三層縱深防禦體系：
+因此，工業級 Pipeline 的最佳解法絕非單靠終端的 Output Processor 攔截，而是建立「**源頭教育 → 流程前置檢視 → 終端守衛**」的三層縱深防禦體系：
 
 ```
 [第一道防線：製作人員教育 (源頭治理)]

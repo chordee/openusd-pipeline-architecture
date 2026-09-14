@@ -2,7 +2,7 @@
 
 在鏡頭（Shot）的四大基礎層中，**Environment Layer（`environment.usd`）** 是最底層的世界舞台（`/ROOT/Environment`）。
 
-Environment 圖層的核心成員並非直接建立的幾何多邊形，而是由**「主要 Asset 配置（Layout）」**與**「各式場景陳設（Set Dressing）」**組合而成。
+Environment 圖層的核心成員並非直接建立的幾何多邊形，而是由「**主要 Asset 配置（Layout）**」與「**各式場景陳設（Set Dressing）**」組合而成。
 
 > [!IMPORTANT]
 > **30 秒核心架構思維**
@@ -36,7 +36,7 @@ Environment 圖層的核心成員並非直接建立的幾何多邊形，而是�
 
 ## 2. Set Dressing 的「虛擬組裝」特性
 
-Set Dressing 圖層本質上是一份**「空間座標與引用清單」**。它告訴 USD：「在座標 $(x, y, z)$ 放一把已發佈的椅子，在旋轉 $(\theta_x, \theta_y, \theta_z)$ 放一張已發佈的桌子」。
+Set Dressing 圖層本質上是一份「**空間座標與引用清單**」。它告訴 USD：「在座標 $(x, y, z)$ 放一把已發佈的椅子，在旋轉 $(\theta_x, \theta_y, \theta_z)$ 放一張已發佈的桌子」。
 
 ### 範例：室內家具陳設 (`setdressing_livingroom.usda`)
 
