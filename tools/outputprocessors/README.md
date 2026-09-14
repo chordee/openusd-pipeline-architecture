@@ -99,13 +99,27 @@
 在 Houdini 中載入自訂 Output Processor 有兩種標準方式：
 
 ### 方式 A：透過 Houdini Package（推薦）
-在個人或工作室共用的 Houdini packages 目錄（例如 `~/houdini20.5/packages/` 或 `$HOUDINI_USER_PREF_DIR/packages/`）建立 `pipeline_usd.json`：
+在個人或工作室共用的 Houdini packages 目錄（例如 `~/houdini20.5/packages/` 或 `$HOUDINI_USER_PREF_DIR/packages/`）建立 `pipeline_usd.json`。
 
+若將腳本置於 `husdplugins/outputprocessors` 標準結構下，可將根路徑加入 `HOUDINI_PATH`：
 ```json
 {
     "env": [
         {
-            "HUSD_PLUGINS_PATH": {
+            "HOUDINI_PATH": {
+                "value": "D:/dev/openusd-pipeline-architecture/tools",
+                "description": "Solaris Pipeline Tools"
+            }
+        }
+    ]
+}
+```
+或在支援 `HOUDINI_HUSDPLUGINS_PATH` 的版本中，直接指定包含 `outputprocessors/` 的外掛目錄：
+```json
+{
+    "env": [
+        {
+            "HOUDINI_HUSDPLUGINS_PATH": {
                 "value": "D:/dev/openusd-pipeline-architecture/tools/outputprocessors",
                 "description": "Solaris USD Output Processors"
             }
@@ -115,7 +129,7 @@
 ```
 
 ### 方式 B：透過環境變數 `HOUDINI_PATH`
-將本目錄加進 `HOUDINI_PATH` 中：
+將包含 `husdplugins/outputprocessors/` 的上層目錄加進 `HOUDINI_PATH` 中：
 ```bash
 # Windows
 set HOUDINI_PATH=D:\dev\openusd-pipeline-architecture\tools;%HOUDINI_PATH%
@@ -123,7 +137,7 @@ set HOUDINI_PATH=D:\dev\openusd-pipeline-architecture\tools;%HOUDINI_PATH%
 # Linux
 export HOUDINI_PATH=/path/to/openusd-pipeline-architecture/tools:$HOUDINI_PATH
 ```
-*注意：Houdini 預設會在 `HOUDINI_PATH` 下尋找 `husdplugins/outputprocessors/*.py`。若使用此方式，建議建立目錄符號連結或將腳本置於 `husdplugins/outputprocessors` 資料夾結構內。*
+*注意：Houdini 預設會在 `HOUDINI_PATH` 下搜尋 `husdplugins/outputprocessors/*.py`。若欲直接以 `HOUDINI_PATH` 載入，建議於部署時建立目錄符號連結（Symlink）或映射至 `husdplugins/outputprocessors` 目錄結構。*
 
 ---
 

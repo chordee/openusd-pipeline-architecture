@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import getpass
 import time
 
@@ -7,6 +8,7 @@ import hou
 import husd.outputprocessor as base
 
 PARAM_PACKAGE_ROOT = 'portablereferences_package_root'
+CASE_INSENSITIVE = sys.platform.startswith('win')
 _WINDOWS_DRIVE_ROOT_RE = re.compile(r'^[A-Za-z]:$')
 _VERSION_DIR_RE = re.compile(r'^v\d+$', re.IGNORECASE)
 
@@ -15,6 +17,10 @@ def _normalize(path):
     if not path:
         return ''
     return hou.text.normpath(path).replace('\\', '/').rstrip('/')
+
+
+def _match_key(path):
+    return path.casefold() if CASE_INSENSITIVE else path
 
 
 class PortableReferences(base.OutputProcessor):
@@ -76,7 +82,7 @@ class PortableReferences(base.OutputProcessor):
         else:
             self.package_root = ''
 
-        self.package_root_key = (self.package_root.rstrip('/') + '/').lower() if self.package_root else ''
+        self.package_root_key = _match_key(self.package_root.rstrip('/') + '/') if self.package_root else ''
 
     def processReferencePath(self, asset_path, referencing_layer_path, asset_is_layer):
         # Python procedurals 由 USD plugin 解析，非檔案路徑，予以跳過
@@ -88,7 +94,7 @@ class PortableReferences(base.OutputProcessor):
 
         # 展開並正規化絕對路徑
         abs_asset_path = hou.text.normpath(hou.text.abspath(asset_path, self.output_dir)).replace('\\', '/')
-        abs_asset_key = abs_asset_path.lower()
+        abs_asset_key = _match_key(abs_asset_path)
 
         # 判斷是否落在 Package Root 邊界範圍內
         if not abs_asset_key.startswith(self.package_root_key):
