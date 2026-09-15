@@ -37,7 +37,7 @@
     ]
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
 }
 ```
@@ -75,7 +75,7 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Environment" ( kind = "group" )
     {
@@ -104,7 +104,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Anim"
     {
@@ -144,7 +144,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "FX"
     {
@@ -164,7 +164,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Lighting"
     {

@@ -22,7 +22,7 @@
 
 ```text
 【獨立特效元素入口：element_latest.usd】         【Shot FX 圖層：fx.usd】
-defaultPrim = "ROOT"                       def Xform "ROOT" {
+defaultPrim = "ROOT"                       over "ROOT" {
 /ROOT                                          def Scope "FX" {
 ├── Volumes/                                       def Xform "explosion_hero" (
 │   └── density                                        payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
@@ -90,7 +90,7 @@ defaultPrim = "ROOT"                       def Xform "ROOT" {
     ]
 )
 
-over "ROOT" (
+def Xform "ROOT" (
     kind = "component"
 )
 {
@@ -142,7 +142,7 @@ Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元�
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     # 1. 體積資料 (Pyro / Smoke / Fire)
     def Scope "Volumes"
@@ -207,7 +207,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     # 1. 特效自身材質庫 (Materials / Shaders)
     #    僅涵蓋 FX 原生、不存在於任何已發布 Asset 的外觀（體積、火焰、煙塵…）
@@ -237,7 +237,21 @@ def Xform "ROOT"
 > - **FX 材質層不得為原型補寫 `material:binding`**。這既多餘，又會與 Asset 自身的綁定形成意見競爭。
 > - FX Element 的 `materials/` sub 單元，職責僅限於**FX 原生、不存在於任何已發布 Asset 的外觀**——體積密度、火焰、煙塵等。
 >
-> **例外情境需特別留意**：若 FX 確實需要改寫原型 Asset 的外觀（最典型的是破碎產生的新生內部斷面需要專屬材質），那是一次**刻意的跨封裝覆寫**，會直接撞上「Asset 內部 Mesh 的 direct binding 恆強於外部 ancestor binding」這條規則——單純在原型 Prim 上寫 `over` + `material:binding` **不會生效**。正確作法需改用 `UsdShadeMaterialBindingAPI` 的 collection-based binding 搭配 `bindMaterialAs = "strongerThanDescendants"`，此部分待全 Pipeline 的材質綁定強度規範統一後補齊。
+> **確有覆寫需求時的正確作法**：若 FX 需要改寫原型 Asset 的整體外觀（最典型的是破碎產生的新生內部斷面需專屬材質），依 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)，合規 Asset 的綁定一律寫在自身 `/ROOT`，該意見經 Payload 弧抵達原型 Prim；FX 材質層只需在**同一顆原型 Prim** 上寫出綁定，依 LIVRPS 秩序（`Local > Payload`）即可穩定勝出：
+>
+> ```usda
+> # materials/v002/material.usd
+> over "Particles" { over "Debris" { over "Prototypes"
+> {
+>     over "Chunk_A"
+>     {
+>         # 本層意見為 Local，恆強於原型 Asset 經 Payload 帶入的自身綁定
+>         rel material:binding = </ROOT/Materials/M_FractureInterior>
+>     }
+> } } }
+> ```
+>
+> 此覆寫為**整顆原型換材質**。若需分面保留原外觀、僅置換斷面，則屬 `GeomSubset` 層級的覆寫，需由原型 Asset 端預先發布對應的 subset 分割，FX 方能對其綁定。
 
 如此一來，材質重構（拆分、改名、換 Shader）只需推進 `materials/v002/`，`element.usd` 改鎖新版本即可，`layers/v001/volume_pyro.usd` 完全不必重新發佈。
 
@@ -291,7 +305,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Volumes"
     {
@@ -334,7 +348,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Particles"
     {
@@ -393,7 +407,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "FX" (
         kind = "group"

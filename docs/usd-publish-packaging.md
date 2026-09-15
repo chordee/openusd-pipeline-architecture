@@ -132,20 +132,29 @@ def PointInstancer "ForestTrees"
 >    - 這保證了歷史每個版本 `asset.usd` 的內部結構完全不可變（Immutable），且外部消費端永遠只需對接唯一的 `asset_latest.usd`。
 
 > [!CAUTION]
-> **`/ROOT` 的 `def` 責任歸屬：總裝層用 `over`，sub 圖層必須 `def`**
-> `over` **不會建立 Prim**。若一個封裝包內所有圖層（總裝層與全部 sub 圖層）都以 `over "ROOT"` 撰寫，合成後 `/ROOT` 將**從未被定義**：`UsdPrim.IsDefined()` 回傳 false，預設的 Stage 遍歷述詞會直接跳過它，`defaultPrim` 亦無法解析到有效 Prim，整個發布包在下游等同空殼。
+> **Pipeline `/ROOT` 鐵律：根節點為 Pipeline 專有，部門輸出一律不得動它**
+> 1. **`/ROOT` 由總裝層獨佔定義**：`/ROOT` 及其 `kind` 元數據屬於全域流程的資產，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）以 `def Xform "ROOT"` 宣告一次**。
+> 2. **嚴禁部門輸出寫入 `/ROOT` 意見**：各部門發布的 sub 圖層（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）**只得在自身專屬分支（`/ROOT/ModelDefault`、`/ROOT/Volumes`…）之下作業**；對 `/ROOT` 本身僅能使用 `over "ROOT"` 作為純命名空間容器，**不得宣告 `kind`、不得寫入任何屬性**。
+> 3. **`over` 不會建立 Prim**：若整包圖層皆為 `over "ROOT"` 而無任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。因此總裝層的 `def` 責任**絕不可省略**。
+
+依此鐵律，全 Pipeline 的 `/ROOT` 寫法統一如下：
+
+| 圖層角色 | 產生者 | `/ROOT` 寫法 | 說明 |
+| :--- | :--- | :--- | :--- |
+| **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | Pipeline | `def Xform "ROOT" ( kind = "..." )` | 唯一的定義點，同時宣告 `kind` |
+| **Shot 總裝層**（`shot.usd`） | Pipeline | `def Xform "ROOT"` | 鏡頭層唯一的定義點 |
+| **Asset / FX sub 圖層**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `over "ROOT"`（純容器，零屬性零元數據） | 僅作為進入自身分支的命名空間通道 |
+| **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | 部門輸出 | `over "ROOT"` | 同上，各自只經營 `/ROOT/<部門分支>` |
+| **`latest` 包裝層**（`asset_latest.usd`、`element_latest.usd`） | Pipeline | `over "ROOT"` 或留空 | 純指標層，不帶入任何場景意見 |
+| **各部門 `overrides` 容器** | 部門輸出 | `over "ROOT"` | 純堆疊與覆寫，不定義 |
+
+> [!TIP]
+> **此鐵律連帶帶來三項結構性效益**
+> - **`kind` 只被寫一次**：由 Pipeline 在總裝層統一宣告，杜絕各部門各自標記導致的階層不一致，確保 ModelAPI 與 `drawMode` 恆常可用。
+> - **Sub 物件在結構上就無法被單獨消費**：單獨開啟 `modelDefault.usd` 時 `/ROOT` 未被定義、遍歷不到，使「嚴禁下游繞過總成直接引用 sub 物件」從紙上約定升級為結構性保障。
+> - **藝術家零心智負擔**：部門只需專注於自身分支，`/ROOT` 的存在與否、`kind` 該標什麼，全數由 Pipeline 承擔。
 >
-> 因此全 Pipeline 統一規範：
->
-> | 圖層角色 | 寫法 | 說明 |
-> | :--- | :--- | :--- |
-> | **Sub 圖層**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | `def Xform "ROOT"` | 由最底層的內容圖層負責實際定義 Prim |
-> | **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | `over "ROOT" ( kind = "..." )` | 僅疊加 `kind` 等元數據，不重複定義 |
-> | **`latest` 包裝層**（`asset_latest.usd`、`element_latest.usd`） | `over "ROOT"` 或留空 | 純指標層，不應帶入任何場景意見 |
-> | **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | `def Xform "ROOT"` | 各部門圖層皆為獨立發布單元，須自帶定義 |
-> | **Shot 總裝層**（`shot.usd`）與各部門 `overrides` 容器 | `over "ROOT"` | 純堆疊與覆寫，不定義 |
->
-> 發布前 QC 必須驗證：每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`。
+> 發布前 QC 必檢兩項：**（a）** 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`；**（b）** 部門輸出的 sub 圖層在 `/ROOT` 上不得殘留任何屬性或元數據意見。
 
 ### 範例 B：FX Element 發布包目錄結構（以 `explosion_hero` 為例）
 FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
@@ -242,6 +251,24 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 2. **階段二：完整性與安全性檢驗（Validation）**：
    - 包含檔案完整性、USD SdfLayer 依賴性檢查、相對路徑合規性、以及是否有未經處理的外溢隱式圖層。
    - 若任何檢查失敗，直接清理暫存目錄並報錯終止，**正式專案結構 100% 保持純淨**。
+
+   **Pre-flight QC 強制檢查項清單**：
+
+   | 檢查項 | 判定標準 | 對應鐵律 |
+   | :--- | :--- | :--- |
+   | **幾何零材質** | 幾何發布單元（`modelDefault/`、FX `layers/`）內不得存在任何 `Material` / `Shader` Prim | [材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract) |
+   | **幾何零綁定** | 幾何發布單元內不得出現任何 `material:binding`，含 `GeomSubset` 上的分面綁定 | 同上 |
+   | **綁定 `over` 命中** | look / material 圖層內每個 `over` 路徑，合成後皆對應到 `IsDefined()` 為真的 Prim | 同上 |
+   | **`/ROOT` 已被定義** | 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True` | [`/ROOT` 鐵律](#2-同構目錄包裝單元isomorphic-packaging-unit) |
+   | **`/ROOT` 未被部門污染** | 部門輸出的 sub 圖層，在 `/ROOT` 上不得殘留任何屬性或元數據意見（含 `kind`） | 同上 |
+   | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
+   | **`kind` 階層連續** | Model Prim 的祖先鏈皆為 `group` / `assembly`，中間無缺漏 | [`usdkind` 治理](usd-asset-layer.md) |
+
+   > [!CAUTION]
+   > **幾何零材質、零綁定必須由工具強制剝除，不可仰賴人工紀律**
+   > Houdini、Maya 等 DCC 的 USD 匯出器**預設就會在 Mesh 上寫入 direct binding**。因此幾何發布 Hook 必須在輸出時主動移除所有 `material:binding` 與 `Material` / `Shader` Prim，QC 僅作為最後一道把關。
+   >
+   > 一旦有 Asset 夾帶了 direct binding 流入專案，該 Asset 的**所有下游覆寫都會靜默失效**——不報錯、不警告，只是畫面沒變，且極難歸因。務必守在發布關口。
 3. **階段三：原子移轉（Atomic Promotion / Move）**：
    - 唯有在發布流程所有邏輯**完全跑完並驗證通過後**，發布引擎才將暫存目錄以檔案系統原子操作（`move` / `rename`）移轉至專案所屬的正式資料夾結構中。
    - 同步更新頂層的 `_latest.usd` 入口指標，並將該版本目錄設為唯讀（Read-Only）。

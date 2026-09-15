@@ -157,7 +157,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Environment" (
         kind = "group"

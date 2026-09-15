@@ -48,7 +48,7 @@ SkelRoot ──┼── 2. skel (Skeleton) ──► 由【Rig 環節】提供 
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Anim"
     {
@@ -116,7 +116,7 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Anim"
     {
