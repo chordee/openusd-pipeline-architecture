@@ -2,7 +2,7 @@
 
 在鏡頭的四大部門圖層中，**Lighting Layer（`lighting.usd`）** 位於 `/ROOT/Lighting`，是 `subLayers` 堆疊中權重最強的一層。
 
-其餘三個部門各自面對「資產化、發布單元、巨量快取」的問題，Lighting 則不同——它幾乎不產生體積，卻**握有全場最終覆寫權**。因此本篇的重心不在資料管理，而在**權限的行使與節制**，以及 Lighting 獨有的兩項機制：**Light Linking** 與 **Light Rig 的跨鏡頭複用**。
+其餘三個部門各自面對「Asset 化、發布單元、巨量快取」的問題，Lighting 則不同——它幾乎不產生體積，卻**握有全場最終覆寫權**。因此本篇的重心不在資料管理，而在**權限的行使與節制**，以及 Lighting 獨有的兩項機制：**Light Linking** 與 **Light Rig 的跨鏡頭複用**。
 
 ---
 
@@ -210,7 +210,7 @@ over "ROOT"
 
 ## 4. HDRI 與貼圖路徑治理
 
-`DomeLight` 的環境貼圖是 Lighting 唯一會引用的外部二進位資產。
+`DomeLight` 的環境貼圖是 Lighting 唯一會引用的外部二進位 Asset。
 
 > [!CAUTION]
 > **貼圖路徑不適用 Stage Expression Variable**

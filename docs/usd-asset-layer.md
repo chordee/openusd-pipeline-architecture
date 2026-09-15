@@ -427,7 +427,7 @@ over "Table_01" (
 > | `Model/Body` | `Model`（較淺） | 較遠的祖先，**靜默落敗** ✗ |
 > | `Model/Body` | 實例根 ＋ collection binding | 機制專為此設計，**覆寫勝** ✓ |
 >
-> 中間那列是真正的坑：寫了、不報錯、畫面沒變。因此 QC 應**偵測並報告**「覆寫意見淺於既有綁定」的情形，詳見 [Pipeline 驗證篇](usd-pipeline-validation.md)。
+> 中間那列是真正的坑：寫了、不報錯、畫面沒變。因此 QC 應**偵測並報告**覆寫意見淺於既有綁定之情形，詳見 [Pipeline 驗證篇](usd-pipeline-validation.md)。
 
 ### 3. 材質包的綁定寫法
 
