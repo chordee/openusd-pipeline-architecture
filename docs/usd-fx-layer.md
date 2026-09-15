@@ -84,6 +84,7 @@ defaultPrim = "ROOT"                       over "ROOT" {
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
+    timeCodesPerSecond = 24
 )
 
 def Xform "ROOT" (

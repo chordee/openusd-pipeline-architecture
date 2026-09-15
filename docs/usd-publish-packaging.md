@@ -15,10 +15,11 @@
 >    - **包內互連 → 相對路徑（`@./...@`）**：確保單一發布包搬移或跨平臺時不壞鏈。
 >    - **包外引用 → 專案 Expression Variable（``@`"${PROJECT_ROOT}/..."`@``）**：所有引用專案目錄的絕對路徑，在輸出時由 **Houdini Solaris Output Processor** 自動改寫為 Stage Expression Variable（如 `${PROJECT_ROOT}`），並於 Layer Metadata 中預設宣告。未來專案目錄搬遷或交付客戶時，**只需在頂層重新指定變數或以 Wrapper Layer 包裹，即可一口氣全局替換所有層的路徑**，零檔案修改。
 > 4. **Pure USD 單元**：發布目標純粹為 USD，內容與結構放寬限制，專供靈活應付額外自訂操作與特殊工具鏈。
-> 5. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口。全平臺**統一採用 `subLayers` 包裝圖層**（不使用 Symlink），且包裝圖層必須完整複製版本層的全部 Layer Metadata。
-> 6. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本在**位元組層級**的不可變性（Immutability）。惟**合成結果**因跨包引用 `latest` 仍會漂移，歷史確定性須倚賴 Asset Resolver 鎖定。
-> 7. **Asset Resolver 逆向鎖定（Version Pinning）**：日常製作引用 `latest` 享受自動更新；農場算圖或定剪交付時，由自訂 Asset Resolver 讀取審批快照，動態將 `latest` 鎖定為具體歷史版本，保障 100% 可重現性。
-> 8. **暫存輸出與發布後移轉註冊（Staging & Atomic Promotion）**：所有 USD 元件在發布時，一律先輸出至獨立的**暫存資料夾（Staging / Scratch Directory）**；直到所有檔案寫入、QC 驗證與依賴校驗完全跑完，Pipeline 才以原子操作搬移至專案正式流程結構內並完成資料庫註冊，徹底杜絕半成品外溢污染專案。
+> 5. **Stage Metadata 全專案一致**：`metersPerUnit`、`upAxis`、`timeCodesPerSecond` 必須全專案統一且於每個發布單元入口層明確宣告。**USD 對三者完全不做自動轉換**——被引用層的宣告會被忽略，尺度與座標系錯誤不會報錯，只會靜默錯到底。
+> 6. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口。全平臺**統一採用 `subLayers` 包裝圖層**（不使用 Symlink），且包裝圖層必須完整複製版本層的全部 Layer Metadata。
+> 7. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本在**位元組層級**的不可變性（Immutability）。惟**合成結果**因跨包引用 `latest` 仍會漂移，歷史確定性須倚賴 Asset Resolver 鎖定。
+> 8. **Asset Resolver 逆向鎖定（Version Pinning）**：日常製作引用 `latest` 享受自動更新；農場算圖或定剪交付時，由自訂 Asset Resolver 讀取審批快照，動態將 `latest` 鎖定為具體歷史版本，保障 100% 可重現性。
+> 9. **暫存輸出與發布後移轉註冊（Staging & Atomic Promotion）**：所有 USD 元件在發布時，一律先輸出至獨立的**暫存資料夾（Staging / Scratch Directory）**；直到所有檔案寫入、QC 驗證與依賴校驗完全跑完，Pipeline 才以原子操作搬移至專案正式流程結構內並完成資料庫註冊，徹底杜絕半成品外溢污染專案。
 
 ---
 
@@ -277,8 +278,11 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
    | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色 Asset 結構](usd-asset-layer.md#7-角色-asset-結構character-asset) |
    | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 必須明確宣告 `elementSize`，否則 imaging 端無法切分每點影響數 | 同上 |
-   | **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其所包裹的版本層逐項相同 | [`latest` 實現機制](#5-latest-動態入口的實現機制) |
-   | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#8-asset-resolver-的逆向鎖定機制version-pinning) |
+   | **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其所包裹的版本層逐項相同 | [`latest` 實現機制](#6-latest-動態入口的實現機制) |
+   | **Stage Metadata 全專案一致** | 每個發布單元入口層的 `metersPerUnit`、`upAxis`、`timeCodesPerSecond` 皆已宣告且與專案設定相同 | [Stage Metadata 規範](#3-stage-metadata-全域規範單位座標系與時間軸) |
+   | **幾何數值符合專案單位** | 匯入之外包／第三方 Asset 的實際尺度已換算驗證，不倚賴 metadata 宣告 | 同上 |
+   | **時序單元已宣告範圍** | 動畫、FX Element 等時序發布單元皆已宣告 `startTimeCode` / `endTimeCode`，且涵蓋手把影格 | 同上 |
+   | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#9-asset-resolver-的逆向鎖定機制version-pinning) |
    | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
 
    > [!CAUTION]
@@ -294,7 +298,118 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 ---
 
-## 3. Solaris 輸出子目錄安排與邊界收斂
+## 3. Stage Metadata 全域規範（單位、座標系與時間軸）
+
+以下三項 Layer Metadata 必須**全專案統一，且在每一個發布單元的入口層明確宣告**。它們看似瑣碎，卻是跨部門協作中最常見、也最難歸因的災難來源。
+
+| Metadata | 作用 | USD 預設值 |
+| :--- | :--- | :--- |
+| `metersPerUnit` | 一個 Stage 單位代表幾公尺 | `0.01`（公分） |
+| `upAxis` | 世界座標的上方向 | **`"Z"`** |
+| `timeCodesPerSecond` | 一秒鐘包含幾個 timeCode | `24` |
+
+> [!CAUTION]
+> **核心認知：USD 對這三項「完全不做自動轉換」**
+> 這是最關鍵、也最反直覺的一點。當一顆 Asset 被 Reference / Payload 引入鏡頭時：
+> - **被引用層的 `metersPerUnit` 與 `upAxis` 會被完全忽略**——Stage 只採用 **root layer** 的宣告。
+> - USD **不會**依兩者差異縮放幾何，**也不會**旋轉座標系。
+>
+> 因此這兩項 metadata 的性質是「**宣告**」而非「**轉換指令**」。一顆以公尺建模（數值 `1.8` 代表 1.8 公尺）的角色，被引入公分制專案後，USD 不會報錯、不會警告，它就是變成 **1.8 公分高**。
+>
+> **發布時必須確保幾何數值本身即符合專案單位**，不得倚賴 metadata 宣告來救。外包交付、第三方資產庫與跨專案複用是此類災難的三大來源，必須於匯入關口換算並驗證。
+
+### 1. 單位與座標系（`metersPerUnit` / `upAxis`）
+
+專案啟動時擇定一組數值，全體發布單元一律沿用。本文件全篇範例採用的組合為：
+
+```usda
+#usda 1.0
+(
+    metersPerUnit = 0.01     # 公分制
+    upAxis = "Y"
+)
+```
+
+> [!WARNING]
+> **`upAxis` 的預設值是 `"Z"`，不是 `"Y"`**
+> 任何未明確宣告 `upAxis` 的入口層，USD 均視為 Z-up。若專案採 Y-up 而某個發布單元漏了宣告，該單元被單獨開啟時即整個躺倒 90 度。此為 [`latest` 包裝圖層](#6-latest-動態入口的實現機制)遺漏 metadata 時最常見的症狀。
+
+> [!TIP]
+> **Camera 的 `focalLength` 與 aperture 受 `metersPerUnit` 牽動**
+> 依 `UsdGeomCamera` 慣例，`focalLength`、`horizontalAperture`、`verticalAperture` 的單位為 **scene unit 的十分之一**：
+> - `metersPerUnit = 0.01`（公分）→ 十分之一公分 = 1 mm → `focalLength = 35.0` 即為 35mm ✓ **與直覺一致**
+> - `metersPerUnit = 1`（公尺）→ 十分之一公尺 = 10 cm → 35mm 鏡頭須寫成 `focalLength = 0.35`
+>
+> 亦即「焦距直接填 35」只在**公分制**專案下才成立。改採公尺制時，全部鏡頭數值都要重算——這是單位選定後難以回頭的原因之一。
+
+### 2. 時間軸（`timeCodesPerSecond`）
+
+> [!CAUTION]
+> **`timeCodesPerSecond` 不一致會引發「隱式時間縮放」**
+> 當某個 sublayer 宣告的 `timeCodesPerSecond` 與 root layer 不同時，USD 會依兩者比值自動對該 sublayer 的時間樣本施加縮放：
+>
+> ```text
+> scale = root layer 的 timeCodesPerSecond ÷ sublayer 的 timeCodesPerSecond
+> ```
+>
+> 例如 root 為 `24`、sublayer 為 `25`，則該 sublayer 全部時間樣本被乘上 `24/25`。**動畫不會壞掉、不會報錯，只是整體速率偏移 4%**——這種錯誤在畫面上幾乎看不出來，卻會在對嘴、對點與剪輯階段引爆，且極難歸因。
+>
+> 唯一的根治方式是**全專案統一宣告同一個值**，並列入發布前 QC。
+
+**`framesPerSecond` 與 `timeCodesPerSecond` 的關係**：
+- `timeCodesPerSecond` 是**實際的時間單位**，參與上述縮放計算。
+- `framesPerSecond` 僅為播放端的提示（Playback Hint），不影響合成。
+- 若只宣告了 `framesPerSecond` 而未宣告 `timeCodesPerSecond`，USD 會回落採用前者。
+
+**建議兩者一併宣告且數值相同**，避免任何倚賴回落行為的模糊地帶：
+
+```usda
+#usda 1.0
+(
+    timeCodesPerSecond = 24
+    framesPerSecond = 24
+)
+```
+
+### 3. 時間範圍（`startTimeCode` / `endTimeCode`）
+
+僅在 **root layer** 上生效，供 DCC 與播放器決定預設時間軸範圍。
+
+| 發布單元 | 是否宣告 | 宣告者 |
+| :--- | :---: | :--- |
+| 鏡頭總成（`shot.usd`） | **必須** | Pipeline，依鏡頭的正式長度 |
+| 時序發布單元（動畫、FX Element、快取包裹層） | **必須** | 發布工具，依實際解算範圍 |
+| 靜態 Asset（道具、材質包、幾何包） | 不需要 | —— |
+
+> [!TIP]
+> **手把影格（Handles）應納入宣告範圍**
+> 動畫與 FX 的實際輸出通常包含鏡頭前後各數格手把，供剪輯與運動模糊使用。`startTimeCode` / `endTimeCode` 應涵蓋**含手把的完整範圍**，而非鏡頭的正式長度——否則下游開啟時會被截斷，手把等同不存在。鏡頭正式長度與手把長度的分界，應另行記錄於製作管理系統。
+
+### 4. 跨時間軸掛載：`SdfLayerOffset`
+
+當需要將某個圖層的時間軸整體平移或縮放時（如 FX 快取解算於 `1-120` 但需掛載至鏡頭的 `1001-1120`，或重複利用一段循環動畫），使用 `SdfLayerOffset`：
+
+```usda
+#usda 1.0
+(
+    subLayers = [
+        @./layers/explosion_cache.usd@ (offset = 1000)        # 時間軸平移 1000 格
+        @./layers/loop_walk.usd@ (offset = 24; scale = 0.5)   # 平移並放慢一倍
+    ]
+)
+```
+
+- `offset` 的單位是 **root layer 的 timeCode**。
+- `references` 與 `payload` 同樣支援時間偏移。
+- **`scale` 請審慎使用**：它會改變時間樣本的疏密，與上述隱式時間縮放疊加後極難推算。若只是要對齊起始格，一律只用 `offset`。
+
+> [!IMPORTANT]
+> **優先在發布端對齊時間軸，而非在掛載端偏移**
+> `SdfLayerOffset` 是補救手段。FX 與動畫的發布單元應**直接以鏡頭的實際影格編號輸出**，讓下游零偏移掛載。散落各處的 `offset` 會使「這一格對應到哪一格」變得需要逐層推算，除錯成本極高。
+
+---
+
+## 4. Solaris 輸出子目錄安排與邊界收斂
 
 > 📖 關於 Solaris 記憶體圖層成因、Flatten 機制、Explicit 轉換與各部門防禦 SOP，請見專題手冊：[USD Solaris Implicit Layer 治理與輸出指南](usd-solaris-implicit-layer.md)。
 
@@ -317,7 +432,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 ---
 
-## 4. 路徑引用雙重標準與 Stage Expression Variable 專案路徑替換
+## 5. 路徑引用雙重標準與 Stage Expression Variable 專案路徑替換
 
 這是確保 USD Asset 包兼具「獨立可攜性」與「全域靈活性」的終極架構法則：
 
@@ -432,7 +547,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 ---
 
-## 5. `latest` 動態入口的實現機制
+## 6. `latest` 動態入口的實現機制
 
 在 USD 生產 Pipeline 中，所有基本元素都會經歷頻繁的版本迭代（`v001`, `v002`, `v003`...）。每次進版時，均自動維護一個 `latest` 入口：
 
@@ -458,7 +573,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 選用包裝圖層而非 Symlink 的三項理由：
 
 1. **跨平臺無條件可用**：純 USD 官方原生機制，不需要任何作業系統底層權限（Windows 建立 Symlink 通常需要 UAC 或開發者模式）。Symlink 跨 SMB/CIFS 的行為則取決於伺服器設定與 Windows 用戶端策略，無法保證。
-2. **Asset Resolver 得以攔截**：包裝圖層是一個**真實存在的 Layer**，Resolver 看得見、攔得住。Symlink 在 AR 解析時很可能直接被 realpath 為 `v003/asset.usd`，Resolver **根本沒有機會介入**——[逆向鎖定機制](#8-asset-resolver-的逆向鎖定機制version-pinning)將因此失效。
+2. **Asset Resolver 得以攔截**：包裝圖層是一個**真實存在的 Layer**，Resolver 看得見、攔得住。Symlink 在 AR 解析時很可能直接被 realpath 為 `v003/asset.usd`，Resolver **根本沒有機會介入**——[逆向鎖定機制](#9-asset-resolver-的逆向鎖定機制version-pinning)將因此失效。
 3. **行為單一**：兩種實作在 Resolver 眼中是完全不同的攔截點，並存會使同一套鎖定邏輯無法涵蓋。
 
 > [!NOTE]
@@ -505,7 +620,7 @@ over "ROOT"
 
 ---
 
-## 6. 重大架構抉擇：為什麼不使用 VariantSet 控制版本？
+## 7. 重大架構抉擇：為什麼不使用 VariantSet 控制版本？
 
 在學習 USD 時，官方文檔常提到可用 VariantSet 來提供變體選擇。但在多部門協同的 Pipeline 架構中，經事先考量與權衡取捨，決定不採用 VariantSet 作為版本控管手段。主要權衡分析如下：
 
@@ -545,7 +660,7 @@ sets/livingroom/v003/set.usd
 
 跨包若一律鎖定具體版次，將引發**版本雪崩**：建模修一次破面 → 引用該 Asset 的所有 Set Dressing、綁定角色、鏡頭總成全部必須重新發布一輪，且層層相乘。此成本在實務上不可承受。
 
-因此全 Pipeline 一致採取「**日常漂移、關鍵時刻鎖定**」：跨包引用維持 `latest` 以享受無感更新，歷史確定性則由 [Asset Resolver 逆向鎖定](#8-asset-resolver-的逆向鎖定機制version-pinning)在送算與審批時達成。
+因此全 Pipeline 一致採取「**日常漂移、關鍵時刻鎖定**」：跨包引用維持 `latest` 以享受無感更新，歷史確定性則由 [Asset Resolver 逆向鎖定](#9-asset-resolver-的逆向鎖定機制version-pinning)在送算與審批時達成。
 
 > [!CAUTION]
 > **由此推導出的三項後果，必須讓團隊確實知悉**
@@ -559,7 +674,7 @@ sets/livingroom/v003/set.usd
 
 ---
 
-## 7. 製作流程的人因行為與穩定性
+## 8. 製作流程的人因行為與穩定性
 
 ### 1. 預設使用 `latest`
 在實際製作中，製作人員在組裝 Shot（例如 Layout 引用家具、Lighting 引用動畫快取）時，**絕大多數都會選擇引用 `latest.usd`**：
@@ -576,7 +691,7 @@ sets/livingroom/v003/set.usd
 
 ---
 
-## 8. Asset Resolver 的逆向鎖定機制（Version Pinning）
+## 9. Asset Resolver 的逆向鎖定機制（Version Pinning）
 
 雖然日常製作使用 `latest` 極為便利，但它隱含一個巨大風險：**不可重現性（Non-deterministic Reproducibility）**。
 - **風險情境**：燈光師在週五調好光準備算圖，結果週末 Asset 部門更新了 `latest`，農場在週日渲染時自動抓取了未經驗證的新版 Asset，導致全鏡頭跑版。
@@ -608,7 +723,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
 
 > [!IMPORTANT]
 > **這是 `latest` 必須採用包裝圖層而非 Symlink 的根本原因**
-> 包裝圖層讓 `asset_latest.usd` 成為一個**真實存在的路徑**，Resolver 得以在 `Resolve()` 攔截它。若改用 Symlink，AR 在解析時很可能直接將其 realpath 為 `v003/asset.usd`，Resolver **根本看不到 `latest` 這個字串**，逆向鎖定完全失效。詳見 [§5 `latest` 實現機制](#5-latest-動態入口的實現機制)。
+> 包裝圖層讓 `asset_latest.usd` 成為一個**真實存在的路徑**，Resolver 得以在 `Resolve()` 攔截它。若改用 Symlink，AR 在解析時很可能直接將其 realpath 為 `v003/asset.usd`，Resolver **根本看不到 `latest` 這個字串**，逆向鎖定完全失效。詳見 [§5 `latest` 實現機制](#6-latest-動態入口的實現機制)。
 
 ### 2. 情境傳遞：使用 `ArResolverContext`，而非環境變數
 
@@ -661,7 +776,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
 
 > [!WARNING]
 > **四、路徑鍵值應保留 `${PROJECT_ROOT}` 變數形式**
-> 若清單以**已展開的絕對路徑**為鍵，專案目錄一經搬遷或交付客戶，全部歷史鎖定清單即同時失效——這與 [Expression Variable 機制](#4-路徑引用雙重標準與-stage-expression-variable-專案路徑替換)的設計初衷直接矛盾。保留變數形式，鎖定清單才能隨專案一起遷移。
+> 若清單以**已展開的絕對路徑**為鍵，專案目錄一經搬遷或交付客戶，全部歷史鎖定清單即同時失效——這與 [Expression Variable 機制](#5-路徑引用雙重標準與-stage-expression-variable-專案路徑替換)的設計初衷直接矛盾。保留變數形式，鎖定清單才能隨專案一起遷移。
 
 > [!NOTE]
 > **鎖定機制保證的是**「**USD 組合結果的確定性**」，**不是**「**畫面的完全重現**」
@@ -670,7 +785,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
 
 ---
 
-## 9. USDA 代碼具體範例
+## 10. USDA 代碼具體範例
 
 以下展示一個兼具封裝標準與外部引用的完整主檔案（`explosion_hero.usda`）：
 
@@ -680,6 +795,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
+    timeCodesPerSecond = 24
 )
 
 def Xform "ROOT" (
@@ -703,7 +819,7 @@ def Xform "ROOT" (
 
 ---
 
-## 10. 全元素載入與場景陳設：Asset Loader 架構
+## 11. 全元素載入與場景陳設：Asset Loader 架構
 
 在鏡頭組裝與陳設中，**Layout、Environment、Lighting 與 FX 部門**需頻繁載入海量元素來擺放場景。為確保載入行為既具備高度自由度，又嚴格維持 OpenUSD 的純粹性與資料衛生，Pipeline 設計了專門的 **Asset Loader** 工具體系：
 
@@ -717,7 +833,7 @@ def Xform "ROOT" (
 
 ---
 
-## 11. Pipeline 規範對照總表
+## 12. Pipeline 規範對照總表
 
 | 檢驗項目 | 規範標準 | 驗證機制 / 實作方式 |
 | :--- | :--- | :--- |

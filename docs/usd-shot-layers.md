@@ -27,7 +27,9 @@
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
-    startTimeCode = 1
+    timeCodesPerSecond = 24
+    framesPerSecond = 24
+    startTimeCode = 1        # 含前後手把的完整範圍
     endTimeCode = 100
     subLayers = [
         @./layers/lighting.usd@,     # [0] 最強：燈光、渲染設定與全場外觀覆寫

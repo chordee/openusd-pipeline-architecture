@@ -27,9 +27,9 @@
 
 ---
 
-## 🏛️ 全 Pipeline 貫穿的八大架構共通鐵律
+## 🏛️ 全 Pipeline 貫穿的九大架構共通鐵律
 
-本目錄下所有專題設計，均無一例外地嚴格遵守以下八大基礎鐵律：
+本目錄下所有專題設計，均無一例外地嚴格遵守以下九大基礎鐵律：
 
 ### 1. 統一根節點 `/ROOT`、語意命名解耦，且結構性意見為 Pipeline 工程專有
 - **所有發布單元（Asset、Set Dressing、FX Element、Shot）頂層一律以 `/ROOT` 為唯一根節點**；總裝層與各 sub 物件包一致採用 `/ROOT`，不另立命名，使工具鏈得以無條件鎖定。
@@ -65,14 +65,21 @@
 - **跨平臺適配**：全平臺統一採用 `subLayers = [@./v###/asset.usd@]` 包裝圖層，不使用 Symlink——共用儲存上只存在單一檔案，且唯有真實 Layer 才能被 Asset Resolver 攔截。包裝圖層必須完整複製版本層的 Layer Metadata，否則 `upAxis` 等設定將回落至預設值。
 - **歷史確定性**：日常製作預設引用 `asset_latest.usd` 享受無感更新；提交渲染與發布時，由自訂 **Asset Resolver** 於 `Resolve()` 攔截並重寫路徑，將 `asset_latest` 逆向鎖定為具體歷史版本。情境以 `ArResolverContext` 攜帶；鎖定清單須**遞移涵蓋整棵依賴樹**，且鎖定情境下找不到清單必須 fail loud。此機制保證的是 **USD 組合結果的確定性**，畫面完全重現尚須貼圖、快取與渲染器版本各自的封存策略。
 
-### 7. 材質綁定契約：幾何零材質、零綁定
+### 7. Stage Metadata 全專案一致：USD 不做任何自動轉換
+- **三項必須統一並於每個發布單元入口層宣告**：`metersPerUnit`、`upAxis`、`timeCodesPerSecond`。
+- **最反直覺之處**：Asset 被 Reference / Payload 引入時，**被引用層的宣告會被完全忽略**，Stage 只採用 root layer 的值。USD **不會**依差異縮放幾何、**也不會**旋轉座標系——這兩項是「宣告」而非「轉換指令」。以公尺建模的角色引入公分制專案，會靜默地變成 1.8 公分高。
+- **`upAxis` 預設為 `"Z"`**：Y-up 專案若有單元漏宣告，單獨開啟即整個躺倒 90 度。
+- **`timeCodesPerSecond` 不一致會引發隱式時間縮放**：sublayer 與 root layer 數值不同時，USD 依比值自動縮放時間樣本，動畫不報錯、不壞掉，僅整體速率偏移——極難歸因。
+- **發布時須確保幾何數值本身即符合專案單位**，不得倚賴 metadata 宣告來救。詳見：[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)。
+
+### 8. 材質綁定契約：幾何零材質、零綁定
 - **幾何發布單元一律不得攜帶材質**：`modelDefault/`、FX `layers/` 等幾何包內，**嚴禁出現任何 `Material` / `Shader` Prim，亦嚴禁宣告任何 `material:binding`**（含 `GeomSubset` 上的分面綁定）；外觀 100% 交由 look / material 圖層全權決定。
 - **為什麼是鐵律**：依 OpenUSD 規則，後代 Prim 的 direct binding 恆強於祖先的繼承意見，且**與圖層強弱完全無關**。幾何只要夾帶了 direct binding，上游無論站在多強的圖層，其覆寫都會**靜默失效**——此即多數 Pipeline「材質覆寫寫了卻沒反應」的根因。
 - **維持零綁定後的自然秩序**：覆寫能力回歸 LIVRPS，形成「鏡頭覆寫（Local）> 類別廣播（Inherits）> Asset 預設（References）」的正確優先序，無需任何額外機制。
 - **綁定寫在 `/ROOT`**：使下游覆寫點收斂於實例根 Prim，Lighting 與 Loader 無須知悉 Asset 內部 Mesh 結構，`model` variant 切換亦自動承接。
 - **由發布 Hook 強制剝除**：DCC 匯出器預設就會在 Mesh 上寫入 direct binding，故必須於輸出時主動移除，QC 僅為最後把關。詳見：[USD Asset Layer 架構設計](docs/usd-asset-layer.md)。
 
-### 8. Purpose 對稱完整性、ModelAPI DrawMode 與 `usdkind` 治理
+### 9. Purpose 對稱完整性、ModelAPI DrawMode 與 `usdkind` 治理
 - **Purpose 兩者齊備原則**：幾何若定義 `purpose`，`render` 與 `proxy` 必須兩者齊全；無 Proxy 代理網格則一律保持為 `default`，防止 Viewport 與農場渲染顯示不同步。
 - **Viewport 降載首選 ModelAPI DrawMode**：`purpose` 為全域性切換，而 **USD ModelAPI 的 `drawMode`**（`bounds`, `cards`）可針對個別 Component 或 Assembly 獨立降級顯示，是釋放 Viewport 與顯存壓力的最核心手段。
 - **Pipeline 嚴格維護 `usdkind`**：ModelAPI 的階層選取與 DrawMode 機制 100% 依賴 `kind` 元數據（`component`, `group`, `assembly`）。Pipeline 所有輸出與驗證工具必須在任何時候全力維護 `kind` 規則，確保 ModelAPI 能力正常運作。詳見：[USD Asset Layer 架構設計](docs/usd-asset-layer.md)。

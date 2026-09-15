@@ -481,6 +481,7 @@ over "Table_01" (
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
+    timeCodesPerSecond = 24
 )
 
 def Xform "ROOT" (
@@ -514,6 +515,7 @@ def Xform "ROOT" (
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
+    timeCodesPerSecond = 24
 )
 
 def Xform "ROOT" (
@@ -613,6 +615,7 @@ def Xform "ROOT" (
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
+    timeCodesPerSecond = 24
 )
 
 def SkelRoot "ROOT" (
