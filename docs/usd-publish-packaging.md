@@ -140,8 +140,9 @@ def PointInstancer "ForestTrees"
 > 1. **全 Pipeline 一律以 `/ROOT` 為根**：總裝層與各 sub 物件包**一致採用 `/ROOT`**，不另立命名。此為既有的 [`/ROOT` 解耦哲學](usd-asset-layer.md)之延伸——全工作室只有一套根節點約定，所有自動化工具得以無條件鎖定 `/ROOT`，無須分支判斷。**唯一例外為鏡頭的渲染設定 `/Render`**，其刻意置於 `/ROOT` 之外，理由詳見 [Shot Layers 篇 §4](usd-shot-layers.md)。
 > 2. **sub 物件以 Reference 嫁接**：每個 sub 物件包（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）皆為**自成一體的封裝單元**，內部以 `def Xform "ROOT"` 定義自身的根，並在其下經營自身分支。部門只對自己的包負責，**無須、亦不得**知悉總裝層的存在。
 > 3. **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與各 sub 物件包的嫁接決策，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）宣告**。sub 物件包內**嚴禁出現 `kind`、嚴禁出現 `variantSets`**——這兩者定義的是該單元在全域流程中的身分與形態組合，屬 Pipeline 職權。
-> 4. **嚴禁在 `/ROOT` 寫入非白名單意見**：sub 物件包除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。唯一例外為**材質包的 `material:binding`**——契約明訂該綁定必須落在 `/ROOT` 且必須隨 look 版本走，無法由他處產生，詳見 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)。
-> 5. **`over` 不會建立 Prim**：`over "ROOT"` 僅適用於純覆寫用途的圖層（Shot 部門圖層、`overrides` 容器、`latest` 包裝層）。若一個發布包內完全沒有任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。
+> 4. **嚴禁在 `/ROOT` 寫入非白名單意見**：sub 物件包除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。白名單僅含一項——**`UsdCollectionAPI` 的 collection**，因其為「單元對自身內容的自述」，且經 Reference 嫁接後路徑會自動重映射至掛載位置。
+> 5. **`xformOp` 一律嚴禁，`SkelRoot` 為唯一型別例外**：發布單元的根若帶有 transform，消費端擺放時將與自身的 `xformOp` **疊加成雙重變換**。Asset 的根必須恆為 identity，擺放是消費端的職權。唯一的型別例外是角色的 `/ROOT` 為 `SkelRoot`——那是 Hydra 解算 Skinning 的邊界，型別本身即要求在該位置。
+> 6. **`over` 不會建立 Prim**：`over "ROOT"` 僅適用於純覆寫用途的圖層（Shot 部門圖層、`overrides` 容器、`latest` 包裝層）。若一個發布包內完全沒有任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。
 
 > [!WARNING]
 > **防護靠的是內容限制，不是命名**
@@ -154,7 +155,7 @@ def PointInstancer "ForestTrees"
 | 圖層角色 | 產生者 | `/ROOT` 寫法 | 說明 |
 | :--- | :--- | :--- | :--- |
 | **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | Pipeline | `def Xform "ROOT" ( kind = "..." ; variantSets ; references )` | 總裝的根，獨佔 `kind` 與 `variantSets`，以 Reference 嫁接各 sub 物件包 |
-| **Asset / FX sub 物件包**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `def Xform "ROOT"`（零 `kind`、零 `variantSets`） | 自身封裝包的根，只經營自身分支 |
+| **Asset / FX sub 物件包**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `def Xform "ROOT"`（零 `kind`、零 `variantSets`、零 `xformOp`） | 自身封裝包的根，只經營自身分支；`/ROOT` 上僅得宣告 `collection` |
 | **Shot 總裝層**（`shot.usd`） | Pipeline | `def Xform "ROOT"` | 鏡頭層的根 |
 | **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | 部門輸出 | `over "ROOT"` | 以 Sublayer 疊入鏡頭，純覆寫，各自只經營 `/ROOT/<部門分支>` |
 | **`latest` 包裝層**（`asset_latest.usd`、`element_latest.usd`） | Pipeline | `over "ROOT"` 或留空 | 純指標層，不帶入任何場景意見 |
@@ -168,7 +169,7 @@ def PointInstancer "ForestTrees"
 > - **VariantSet 得以收攏至總裝層**：`subLayers` 無法寫在 variant 區塊內，Reference 則可，使變體封裝完全由 Pipeline 掌管，部門只需單純交付各自的內容包。
 > - **意見強弱語意不變**：同一 Prim 上的多筆 `references` 依清單順序定強弱（越前面越強），與原先 `subLayers` 完全一致。
 >
-> 發布前 QC 必檢三項：**（a）** 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`；**（b）** sub 物件包的 `/ROOT` 上不得出現 `kind`、`variantSets` 或任何非白名單屬性（白名單僅含材質包的 `material:binding`）；**（c）** Shot 部門圖層不得在 `/ROOT` 上殘留任何屬性或元數據意見。
+> 發布前 QC 必檢三項：**（a）** 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`；**（b）** sub 物件包的 `/ROOT` 上不得出現 `kind`、`variantSets`、`xformOp` 或任何非白名單屬性（白名單僅含 `collection`）；**（c）** Shot 部門圖層不得在 `/ROOT` 上殘留任何屬性或元數據意見。
 
 ### 範例 B：FX Element 發布包目錄結構（以 `explosion_hero` 為例）
 FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：

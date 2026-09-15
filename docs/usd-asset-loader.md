@@ -186,7 +186,7 @@ class "__CLASS__"
     class "wooden_props"
     {
         # 【正確】意見往下走，落在 Asset 內部的具體目標 Prim 上
-        over "ModelDefault"
+        over "Model"
         {
             over "Frame"
             {
@@ -213,21 +213,21 @@ class "__CLASS__"
 > **一、綁定優先序會被反轉——這是最需要警覺的一項**
 > OpenUSD 的材質綁定解析是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」，**組合弧強弱只在同一顆 Prim 上有意義**。因此當意見分處不同層級時：
 >
-> | 綁定所在 Prim | 來源 | 對 `/…/OfficeChair_01/ModelDefault/Frame` 而言 |
+> | 綁定所在 Prim | 來源 | 對 `/…/OfficeChair_01/Model/Frame` 而言 |
 > | :--- | :--- | :--- |
-> | `…/OfficeChair_01/ModelDefault/Frame` | Class 往下走 | **最近祖先，勝出** |
+> | `…/OfficeChair_01/Model/Frame` | Class 往下走 | **最近祖先，勝出** |
 > | `…/OfficeChair_01` | Lighting 個別覆寫（Local） | 較遠，落敗 |
 > | `…/OfficeChair_01` | Asset 自身 `lookDefault`（References） | 較遠，落敗 |
 >
 > 亦即：**Class 往下走之後，其意見會無條件壓過 Lighting 在實例根所做的個別微調**，與 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)所定的「鏡頭覆寫 > 類別廣播 > Asset 預設」優先序**恰好相反**。
 >
-> **因應原則**：Lighting 若需推翻某個實例的 Class 廣播，**必須在同一深度**（即該實例的 `ModelDefault/Frame`）寫出覆寫，靠 Local 強於 Inherits 取勝；不可期待在實例根覆寫就能壓過。此點必須明確告知燈光組，否則會出現「改了沒反應」的狀況。
+> **因應原則**：Lighting 若需推翻某個實例的 Class 廣播，**必須在同一深度**（即該實例的 `Model/Frame`）寫出覆寫，靠 Local 強於 Inherits 取勝；不可期待在實例根覆寫就能壓過。此點必須明確告知燈光組，否則會出現「改了沒反應」的狀況。
 
 > [!WARNING]
 > **二、與 Asset 內部結構產生耦合**
-> 往下走意味著 Class 必須知道 `ModelDefault/Frame` 這類路徑，這與 `/ROOT` 解耦哲學有所拉扯，且 `model` variant 切換為 `ModelLow` 時路徑即改變、廣播隨之落空。
+> 往下走意味著 Class 必須知道 `Model/Frame` 這類路徑，這與 `/ROOT` 解耦哲學有所拉扯，且 `model` variant 切換為 `ModelLow` 時路徑即改變、廣播隨之落空。
 >
-> **因應原則**：廣播只應錨定於**架構保證存在的穩定路徑**（如規範明訂的 `ModelDefault` 分支），或改以 `GeomSubset` 的 `familyName` 等跨 Asset 一致的約定為目標。嚴禁錨定個別 Asset 的隨意命名。
+> **因應原則**：廣播只應錨定於**架構保證存在的穩定路徑**（如規範明訂的 `Model` 分支），或改以 `GeomSubset` 的 `familyName` 等跨 Asset 一致的約定為目標。嚴禁錨定個別 Asset 的隨意命名。
 
 > [!WARNING]
 > **三、`over` 落空是靜默的**

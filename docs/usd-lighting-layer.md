@@ -100,7 +100,49 @@ def RectLight "KeyLight" (
 >
 > 導入前應以實際使用的渲染器驗證下列情境：標準 Prim、`instanceable` 實例、`PointInstancer` 原型。**尤其後兩者，連結行為往往與直覺不同**。
 
-### 3. 與 `PointInstancer` 的互動
+### 3. 以單元自述的 collection 作為連結目標
+
+上方範例的 `excludes` 直接寫死 `</ROOT/FX/explosion_hero>`——燈光層因此必須知道該元素被掛在哪、內部長什麼樣。更穩健的作法是**由單元自己宣告 collection**，燈光端指向語意單位而非手打路徑。
+
+發布單元得在自身總裝層的 `/ROOT` 宣告 collection（此為 [`/ROOT` 白名單](usd-publish-packaging.md)的唯一項目）：
+
+```usda
+# fx/elements/explosion_hero/v002/element.usd
+def Xform "ROOT" (
+    kind = "component"
+    prepend apiSchemas = ["CollectionAPI:fxVolumes"]
+)
+{
+    uniform token collection:fxVolumes:expansionRule = "expandPrims"
+    prepend rel collection:fxVolumes:includes = </ROOT>
+}
+```
+
+經 Reference 嫁接後，**collection 的 target 會自動重映射至掛載位置**——`/ROOT` 變成 `/ROOT/FX/explosion_hero`，成員查詢隨之正確。單元內部改結構時由單元自己維護 collection，燈光端不受影響。
+
+> [!CAUTION]
+> **但 `excludes` 不支援指向另一個 collection**
+> `collection:lightLink:excludes` 只能指向 **Prim 路徑**；指向另一個 collection（如 `…/explosion_hero.collection:fxVolumes`）**不會產生任何作用**——USD 不報錯，該元素照樣被照亮。
+>
+> 因此單元自述的 collection **無法直接串接為連結目標**，必須由工具接手：
+>
+> ```text
+> FX 元素包     →  於自身 /ROOT 宣告 collection:fxVolumes（單元自述）
+>       ↓ Reference
+> 鏡頭合成      →  collection 自動重映射至 /ROOT/FX/explosion_hero
+>       ↓
+> Lighting 工具 →  讀取該 collection、展開為 Prim 路徑清單
+>       ↓
+> lighting.usd  →  將展開結果寫入 collection:lightLink:excludes
+> ```
+>
+> 解耦效果仍然達成——**燈光師選的是「那顆 FX 元素」這個語意單位，而非手打路徑**；代價是多一道工具展開，而非純宣告式串接。
+
+> [!NOTE]
+> **Master 圖層無須宣告 collection**
+> collection 屬於**知道自己內容的那一方**。`shot.usd` 僅是把各單元疊起來，沒有任何自述需求；各單元自己帶來的 collection 已經足夠。
+
+### 4. 與 `PointInstancer` 的互動
 
 承 [Set Dressing 篇的覆寫契約](usd-environment-setdressing.md)：`PointInstancer` 的個別實例不是 Prim，**無法被單獨連結或排除**。
 
