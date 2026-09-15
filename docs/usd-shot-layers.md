@@ -83,15 +83,15 @@ over "ROOT"
 {
     def Scope "Environment" ( kind = "group" )
     {
-        # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usd 之 </ROOT>）
+        # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usda 之 </ROOT>）
         def Xform "Terrain" (
-            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usd"`@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usda"`@</ROOT>
         ) {}
         
         def Scope "Props" ( kind = "group" )
         {
             def Xform "Table_01" (
-                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usd"`@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usda"`@</ROOT>
             ) {}
         }
     }
@@ -117,7 +117,7 @@ over "ROOT"
             # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
             def "Hero" (
                 prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usd"`@</ROOT>
+                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usda"`@</ROOT>
             )
             {
                 # 動畫層唯一產出：純動態時序資料
@@ -149,7 +149,7 @@ over "ROOT"
     {
         # 掛載大型體積快取 (Payload 延遲加載)
         def Xform "explosion_hero" (
-            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usda"`@</ROOT>
         ) {}
     }
 }

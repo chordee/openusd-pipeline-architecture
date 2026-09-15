@@ -43,7 +43,7 @@ SkelRoot ──┼── 2. Skel ──────► 由【Rig 環節】提供
 
 > [!IMPORTANT]
 > **前兩者已於角色 Asset 階段組裝完畢，動畫層只交付第三者**
-> `Geometry` 與 `Skel` 皆封裝在**綁定角色**（`char_latest.usd`）之內，其 `/ROOT` 即為 `SkelRoot`。動畫層只需**單次引用**該綁定角色，再疊上自己輸出的 `SkelAnimation` 即可——無須、也不應分頭引用幾何與骨架。
+> `Geometry` 與 `Skel` 皆封裝在**綁定角色**（`char_latest.usda`）之內，其 `/ROOT` 即為 `SkelRoot`。動畫層只需**單次引用**該綁定角色，再疊上自己輸出的 `SkelAnimation` 即可——無須、也不應分頭引用幾何與骨架。
 >
 > 完整的角色 Asset 結構詳見 [Asset Layer 篇 §7 角色 Asset 結構](usd-asset-layer.md#7-角色-asset-結構character-asset)。
 
@@ -67,7 +67,7 @@ over "ROOT"
             # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
             def "Hero" (
                 prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usd"`@</ROOT>
+                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usda"`@</ROOT>
             )
             {
                 # 動畫師本鏡頭唯一實際輸出的動態資料 (SkelAnimation)
@@ -157,7 +157,7 @@ over "ROOT"
         def Scope "Props" ( kind = "group" )
         {
             def Xform "HeroGun" (
-                references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/blaster/asset_latest.usd"`@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/blaster/asset_latest.usda"`@</ROOT>
             )
             {
                 double3 xformOp:translate.timeSamples = {
@@ -204,7 +204,7 @@ over "ROOT"
 > 📖 詳細全域規範請見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 
 動畫部門交付發布時，同樣適用全 Pipeline 封裝標準：
-1. **目錄即包裝單元（同構內部結構）**：以任務發布目錄（如 `publish/shots/sq01/sh010/anim/`）為獨立封裝單位，內部結構固定為 `anim_latest.usd`、各版次 `v###/anim.usd`、子圖層（`layers/hero_skel_anim.usd`、`layers/camera.usd`）與局部覆寫層，檔名維持統一同構。
+1. **目錄即包裝單元（同構內部結構）**：以任務發布目錄（如 `publish/shots/sq01/sh010/anim/`）為獨立封裝單位，內部結構固定為 `anim_latest.usda`、各版次 `v###/anim.usd`、子圖層（`layers/hero_skel_anim.usd`、`layers/camera.usd`）與局部覆寫層，檔名維持統一同構。
 2. **Solaris Implicit Layer 禁錮**：若由 Solaris 輸出，所有導出的隱式圖層必須限制在目標目錄或其子目錄內，嚴禁外溢。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：`anim.usd` 堆疊包內的骨架動畫層與鏡頭層一律使用相對路徑（`@./...@`）。

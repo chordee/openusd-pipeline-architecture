@@ -65,7 +65,7 @@
    - **FX Element**（如 `fx/elements/explosion_hero/`）
    - **Pure USD Unit**（如 `shots/sq01/sh010/layout/scatter_forest/`）
 2. **版本決策（Latest vs Version Pinning）**：
-   - **預設選項**：`asset_latest.usd` / `element_latest.usd`（日常製作推薦，享受自動更新）。
+   - **預設選項**：`asset_latest.usda` / `element_latest.usda`（日常製作推薦，享受自動更新）。
    - **特定歷史版次**：下拉選單列出所有已凍結的歷史目錄（`v001`、`v002`...），供特定需求精確鎖定。
 3. **Variant 探索**：
    - 預先解析該 USD 主檔案的 `variantSets`（如 `model` LOD、`look` 材質），讓藝術家在載入前或載入時一併設定初始變體。
@@ -93,7 +93,7 @@
 ```usda
 # 藝術家將 chair 載入並重命名為 HeroArmChair，語意高度貼合場景
 def Xform "HeroArmChair" (
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
 )
 {
     double3 xformOp:translate = (1.2, 0, 0.45)
@@ -111,7 +111,7 @@ def Xform "HeroArmChair" (
 # 透過 Loader 載入之多個實例
 def Xform "Chair_01" (
     instanceable = true
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
 )
 {
     double3 xformOp:translate = (0, 0, 0)
@@ -120,7 +120,7 @@ def Xform "Chair_01" (
 
 def Xform "Chair_02" (
     instanceable = true
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
 )
 {
     double3 xformOp:translate = (1.5, 0, 0)
@@ -157,7 +157,7 @@ def Xform "Chair_02" (
 def Xform "OfficeChair_01" (
     # 預設自動注入：/__CLASS__/chair
     inherits = </__CLASS__/chair>
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
 ) {}
 ```
 
@@ -172,7 +172,7 @@ def Xform "OfficeChair_01" (
         </__CLASS__/wooden_props>,
         </__CLASS__/interior_dressing>
     ]
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
 ) {}
 ```
 
@@ -270,7 +270,7 @@ class "__CLASS__"
    stage = hou.node(".").stage()
    prim_path = "/ROOT/Environment/Props/chair_01"
    # Expression Variable 必須以反引號包裹字串運算式，否則不會展開
-   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`'
+   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`'
    
    # 1. 建立 Prim 並指派 kind
    prim = stage.DefinePrim(prim_path, "Xform")

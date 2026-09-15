@@ -9,26 +9,26 @@
 > 1. **Shot FX 容器路徑**：Shot 的 `fx.usd` 內統一在 `/ROOT/FX/` 底下掛載各個特效元素。
 > 2. **專案註冊命名（Registered Element Name）**：`/ROOT/FX/` 下的 Primitive 名稱直接對應特效在 Pipeline（Tracking / Pipeline Database）中註冊的元素名稱（例如 `explosion_hero`、`fire_ground`）。
 > 3. **獨立元素自身的 `/ROOT` 基準**：每個特效元素在自身內部**一律以 `/ROOT` 作為根節點**，其底下再細分幾何、體積、粒子與專屬材質。
-> 4. **同構進版與 Sub 單元無 latest 原則**：FX Element 與 Asset 完全同構。全元素目錄下唯有頂層 entry 具備 `element_latest.usd`；其底下的 `layers/`、`materials/`、`caches/` 等 sub 單元**自身絕不設 latest**。每次 sub 單元進版，直接推進 FX Element entry 整體進版（生成 `v###/element.usd`），並由 Pipeline 自動更新維護頂層 `element_latest.usd`。
+> 4. **同構進版與 Sub 單元無 latest 原則**：FX Element 與 Asset 完全同構。全元素目錄下唯有頂層 entry 具備 `element_latest.usda`；其底下的 `layers/`、`materials/`、`caches/` 等 sub 單元**自身絕不設 latest**。每次 sub 單元進版，直接推進 FX Element entry 整體進版（生成 `v###/element.usd`），並由 Pipeline 自動更新維護頂層 `element_latest.usda`。
 > 5. **Reference / Payload 映射**：Shot FX 層透過引導來源檔的 `</ROOT>`，自動將元素內容無縫映射到 `/ROOT/FX/<ElementName>` 的命名空間下。
 > 6. **龐大快取實體獨立儲存與 USD 封裝發布**：
 >    - **快取體量隔離**：特效解算產生的重型快取（Geo Cache 或數百 GB 的 OpenVDB 序列）體積龐大，**實體檔案會輸出至專門規劃的高速/大容量快取儲存空間（如獨立快取磁區），不直接存放在正規專案目錄內**。
 >    - **USD 輕量包裹**：透過 OpenUSD 的 **`Value Clips`**（幾何/剛體/粒子序列）或 **`OpenVDBAsset / Volume`** Schema 將外部龐大序列包裹為單一輕量的 `.usd` 圖層。
->    - **最終 Entry 統一發布與註冊**：包裹後的最終 FX Element Entry（`element.usd`、`element_latest.usd`）依然經由 Pipeline 發布流程，正式發布進專案所屬的標準目錄（`publish/fx/elements/<element_name>/`）內，並於專案管理系統（Tracking DB）中註冊。
+>    - **最終 Entry 統一發布與註冊**：包裹後的最終 FX Element Entry（`element.usd`、`element_latest.usda`）依然經由 Pipeline 發布流程，正式發布進專案所屬的標準目錄（`publish/fx/elements/<element_name>/`）內，並於專案管理系統（Tracking DB）中註冊。
 
 ---
 
 ## 1. 結構全景圖（Namespace Mapping）
 
 ```text
-【獨立特效元素入口：element_latest.usd】         【Shot FX 圖層：fx.usd】
+【獨立特效元素入口：element_latest.usda】         【Shot FX 圖層：fx.usd】
 defaultPrim = "ROOT"                       over "ROOT" {
 /ROOT                                          def Scope "FX" {
 ├── Volumes/                                       def Xform "explosion_hero" (
-│   └── density                                        payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
+│   └── density                                        payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usda"`@</ROOT>
 ├── Particles/                             )
 │   └── debris                                     def Xform "fire_ground" (
-└── Materials/                                         references = @`"${PROJECT_ROOT}/publish/fx/elements/fire_ground/element_latest.usd"`@</ROOT>
+└── Materials/                                         references = @`"${PROJECT_ROOT}/publish/fx/elements/fire_ground/element_latest.usda"`@</ROOT>
     └── M_Explosion                                )
                                                }
                                            }
@@ -48,13 +48,13 @@ defaultPrim = "ROOT"                       over "ROOT" {
 
 ---
 
-## 2. 獨立特效元素同構目錄與總裝結構 (`v###/element.usd` 與 `element_latest.usd`)
+## 2. 獨立特效元素同構目錄與總裝結構 (`v###/element.usd` 與 `element_latest.usda`)
 
 每個 FX 元素在輸出獨立快取與 USD 時，完全遵守與 Asset 一致的同構目錄規範：
 
 ```text
 /projects/show_A/publish/fx/elements/explosion_hero/       <-- 【FX 元素目錄，只有此層名稱不同】
-├── element_latest.usd                                   <-- 全域唯一最新動態入口 (指向最新版 v002/element.usd)
+├── element_latest.usda                                  <-- 全域唯一最新動態入口 (指向最新版 v002/element.usd)
 │
 ├── v001/                                                <-- 元素總版次目錄
 │   └── element.usd                                      <-- 固定名稱！Reference 鎖定 sub 單元特定版次
@@ -108,11 +108,11 @@ def Xform "ROOT" (
 > [!NOTE]
 > FX Element 與 Asset 完全同構，同樣以 **Reference** 嫁接各 sub 單元包：每個 sub 單元（`volume_pyro.usd`、`material.usd`）皆為自成一體的封裝單元、擁有自己的 `/ROOT`，`kind` 則由總裝層獨佔宣告。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
 
-### 2. 頂層唯一最新動態指標 (`element_latest.usd`)
-Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元素進版時，Pipeline 自動將其重定向指向最新版次：
+### 2. 頂層唯一最新動態指標 (`element_latest.usda`)
+Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usda`。元素進版時，Pipeline 自動將其重定向指向最新版次：
 
 ```usda
-# /projects/show_A/publish/fx/elements/explosion_hero/element_latest.usd （Sublayer 包裝圖層）
+# /projects/show_A/publish/fx/elements/explosion_hero/element_latest.usda （Sublayer 包裝圖層）
 #usda 1.0
 (
     defaultPrim = "ROOT"
@@ -190,10 +190,10 @@ def Xform "ROOT"
             def Scope "Prototypes"
             {
                 def Xform "Chunk_A" (
-                    payload = @`"${PROJECT_ROOT}/publish/assets/fx/debris_concrete_a/asset_latest.usd"`@</ROOT>
+                    payload = @`"${PROJECT_ROOT}/publish/assets/fx/debris_concrete_a/asset_latest.usda"`@</ROOT>
                 ) {}
                 def Xform "Chunk_B" (
-                    payload = @`"${PROJECT_ROOT}/publish/assets/fx/debris_concrete_b/asset_latest.usd"`@</ROOT>
+                    payload = @`"${PROJECT_ROOT}/publish/assets/fx/debris_concrete_b/asset_latest.usda"`@</ROOT>
                 ) {}
             }
             rel prototypes = [
@@ -290,7 +290,7 @@ def Xform "ROOT"
 ┌────────────────────────────────────────────────────────┐
 │   【專案所屬規範資料夾與 Pipeline 發布註冊】             │
 │   ${PROJECT_ROOT}/publish/fx/elements/explosion_hero/  │
-│   ├── element_latest.usd (最新動態入口)                 │
+│   ├── element_latest.usda (最新動態入口)                 │
 │   ├── v002/element.usd   (版次入口，僅數 KB)            │
 │   └── layers/v002/                                     │
 │       ├── volume_pyro.usd   (包裹外部 VDB 快取之 USD)    │
@@ -400,11 +400,11 @@ def Xform "ROOT"
 
 ### 3. FX Element Entry 正式發布與專案註冊
 當龐大實體快取被包裹為輕量的 `layers/v002/volume_pyro.usd` 與 `layers/v002/debris_clip.usd` 後：
-- **Pipeline 發布流程介入**：Pipeline 發布工具生成最終的總裝圖層 `v002/element.usd`，並更新指向它的 `element_latest.usd`。
+- **Pipeline 發布流程介入**：Pipeline 發布工具生成最終的總裝圖層 `v002/element.usd`，並更新指向它的 `element_latest.usda`。
 - **寫入專案所屬資料夾**：這些總裝與輕量包裹圖層（總共僅數十 KB 到數 MB）**正式發布進專案標準資料夾**：
   `${PROJECT_ROOT}/publish/fx/elements/explosion_hero/`
 - **專案管理系統註冊**：在專案管理資料庫（Tracking / ShotGrid / Production DB）中正式簽入該版本（`v002`），完成驗收發布。
-- **下游乾淨消費**：下游環節（Lighting、Shot Assembly）只需透過常規的專案路徑引用 `${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd`，即可無感加載這份體量龐大但架構極致整潔的特效。
+- **下游乾淨消費**：下游環節（Lighting、Shot Assembly）只需透過常規的專案路徑引用 `${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usda`，即可無感加載這份體量龐大但架構極致整潔的特效。
 
 ---
 
@@ -426,7 +426,7 @@ over "ROOT"
     {
         # 特效元素 1：主爆炸 (巨大體積快取建議使用 payload 便於延遲載入)
         def Xform "explosion_hero" (
-            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usda"`@</ROOT>
         )
         {
             # 可在此進行鏡頭層級的微調 Transform (如非必要盡量在元素內部定錨)
@@ -434,14 +434,14 @@ over "ROOT"
 
         # 特效元素 2：地面火焰 (持續性效果)
         def Xform "fire_ground" (
-            references = @`"${PROJECT_ROOT}/publish/fx/elements/fire_ground/element_latest.usd"`@</ROOT>
+            references = @`"${PROJECT_ROOT}/publish/fx/elements/fire_ground/element_latest.usda"`@</ROOT>
         )
         {
         }
 
         # 特效元素 3：衝擊波粒子
         def Xform "shockwave_sparks" (
-            references = @`"${PROJECT_ROOT}/publish/fx/elements/shockwave_sparks/element_latest.usd"`@</ROOT>
+            references = @`"${PROJECT_ROOT}/publish/fx/elements/shockwave_sparks/element_latest.usda"`@</ROOT>
         )
         {
         }
@@ -459,7 +459,7 @@ over "ROOT"
 
 2. **獨立預覽與驗證（Isolated Turntable & QC）**：
    - 元素自身是標準的 `component`，擁有完整的 `/ROOT/Materials` 與幾何。
-   - QC 部門可以直接開啟 `element_latest.usd`（或指定版次 `v###/element.usd`）進行單元測試與渲染，不需要載入龐大的 Shot 環境。
+   - QC 部門可以直接開啟 `element_latest.usda`（或指定版次 `v###/element.usd`）進行單元測試與渲染，不需要載入龐大的 Shot 環境。
 
 3. **Payload 記憶體卸載控制**：
    - 特效往往是整個鏡頭中檔案體積最龐大的部分（幾十 GB 到幾百 GB 的 VDB / 粒子）。
@@ -483,7 +483,7 @@ over "ROOT"
 > 📖 詳細全域規範請見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 
 每個 FX 元素在輸出發布時，必須嚴格遵守全 Pipeline 通用的封裝鐵律：
-1. **目錄即包裝單元（同構內部結構）**：以元素發布目錄（如 `publish/fx/elements/explosion_hero/`）為完整邊界，內部結構與檔名一律固定為 `element_latest.usd`、各版次 `v###/element.usd`、`layers/`、`materials/` 與 `caches/`，嚴禁在內部檔名摻雜特定元素名稱。
+1. **目錄即包裝單元（同構內部結構）**：以元素發布目錄（如 `publish/fx/elements/explosion_hero/`）為完整邊界，內部結構與檔名一律固定為 `element_latest.usda`、各版次 `v###/element.usd`、`layers/`、`materials/` 與 `caches/`，嚴禁在內部檔名摻雜特定元素名稱。
 2. **Solaris Implicit Layer 禁錮**：Houdini Solaris 導出時，所有生成的 Implicit Layers 必須限制在該目錄及其子目錄（如 `./layers/`）內，嚴禁外溢到目標資料夾以外。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：`element.usd` 引用包內的 `./layers/volume_pyro.usd` 一律使用相對路徑（`@./...@`），確保整個資料夾移動或打包時鏈結不壞。

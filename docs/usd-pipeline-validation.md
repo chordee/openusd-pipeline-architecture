@@ -136,7 +136,8 @@
 | **幾何數值符合專案單位** | 外包／第三方 Asset 的實際尺度已換算驗證 | 攔阻 | 同上 |
 | **時序單元已宣告範圍** | 時序發布單元已宣告 `startTimeCode` / `endTimeCode` 且涵蓋手把影格 | 攔阻 | 同上 |
 | **Camera 焦距單位正確** | `focalLength` / aperture 以「scene unit 的十分之一」計 | 攔阻 | 同上 |
-| **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其包裹的版本層逐項相同 | 攔阻 | [`latest` 實現機制](usd-publish-packaging.md) |
+| **包裝圖層 Metadata 一致** | `*_latest.usda` 的全部 Layer Metadata 與其包裹的版本層逐項相同 | 攔阻 | [`latest` 實現機制](usd-publish-packaging.md) |
+| **包裝圖層為明文格式** | `*_latest.usda` 實際編碼為 ASCII 而非 Crate（副檔名與內容相符） | 攔阻 | 同上 |
 
 ### 5. 路徑與封裝邊界
 
@@ -155,11 +156,11 @@
 
 | 檢查項 | 判定條件 | 關卡 | 級別 | 規範來源 |
 | :--- | :--- | :---: | :---: | :--- |
-| **鎖定清單遞移完整** | 解析過程命中的每個 `*_latest.usd` 皆已入帳 | 送算前 | 攔阻 | [逆向鎖定機制](usd-publish-packaging.md) |
+| **鎖定清單遞移完整** | 解析過程命中的每個 `*_latest.usda` 皆已入帳 | 送算前 | 攔阻 | [逆向鎖定機制](usd-publish-packaging.md) |
 | **鎖定情境下清單存在** | `Render` / `Delivery` 情境下鎖定清單必須存在，不得回落 `latest` | 送算前 | 攔阻 | 同上 |
 | **指定的 RenderSettings 存在** | 提交參數或 `renderSettingsPrimPath` 所指 Prim 確實存在且可解析 | 送算前 | 攔阻 | [Render 層](usd-shot-layers.md) |
 | **製作資料未寫死** | Lighting 發布版本內未寫死解析度與影格範圍 | 發布前 | 攔阻 | 同上 |
-| **交付包已解析 `latest`** | 交付包內不得殘留未鎖定的 `*_latest.usd` 引用 | 交付前 | 攔阻 | [不可變性層級](usd-publish-packaging.md) |
+| **交付包已解析 `latest`** | 交付包內不得殘留未鎖定的 `*_latest.usda` 引用 | 交付前 | 攔阻 | [不可變性層級](usd-publish-packaging.md) |
 
 > [!CAUTION]
 > **未標註關卡者，預設為**「**發布前**」

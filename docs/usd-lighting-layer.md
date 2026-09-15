@@ -160,7 +160,7 @@ Light Rig 沒有幾何、沒有快取，內容純粹是光源與其參數——�
 
 ```text
 /projects/show_A/publish/shots/sq01/lightrig_interior/   <-- 【Pure USD 單元目錄】
-├── lightrig_interior_latest.usd
+├── lightrig_interior_latest.usda
 ├── v001/
 │   └── lightrig_interior.usd
 └── v002/
@@ -177,7 +177,7 @@ over "ROOT"
     {
         # 引用 Sequence 級共用 Light Rig
         def Scope "Rig" (
-            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/lightrig_interior/lightrig_interior_latest.usd"`@</ROOT/Lighting>
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/lightrig_interior/lightrig_interior_latest.usda"`@</ROOT/Lighting>
         ) {}
 
         # 本鏡頭專屬的補光
@@ -267,7 +267,7 @@ lighting.usd (Master)
 
 Lighting 交付發布時，同樣適用全 Pipeline 封裝標準：
 
-1. **目錄即包裝單元（同構內部結構）**：以任務發布目錄（如 `publish/shots/sq01/sh010/lighting/`）為獨立封裝單位，內部結構固定為 `lighting_latest.usd`、各版次 `v###/lighting.usd`、子圖層（`layers/lighting_base.usd`、`layers/lighting_overrides.usd`）與各修補檔，檔名維持統一同構。
+1. **目錄即包裝單元（同構內部結構）**：以任務發布目錄（如 `publish/shots/sq01/sh010/lighting/`）為獨立封裝單位，內部結構固定為 `lighting_latest.usda`、各版次 `v###/lighting.usd`、子圖層（`layers/lighting_base.usd`、`layers/lighting_overrides.usd`）與各修補檔，檔名維持統一同構。
 2. **`/ROOT` 鐵律**：`lighting.usd` 為部門輸出，對 `/ROOT` 僅得使用 `over "ROOT"` 作為純命名空間容器，不得寫入任何屬性或元數據。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：`lighting.usd` 堆疊包內的 base 與 overrides 一律使用相對路徑（`@./...@`）。

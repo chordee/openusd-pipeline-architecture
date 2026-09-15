@@ -57,7 +57,7 @@
 
 ### 5. 目錄級封裝邊界、同構結構與路徑雙重標準
 - **全元素通用**：Asset、Set Dressing、Animation、FX、Pure USD 一體適用。
-- **目錄即包裝單元與同構內部結構**：以目標資料夾底下的全體檔案作為不可分割的單一發布單元。無論任何具體物件，資料夾內部結構與命名固定同構（如 `asset_latest.usd`、`modelDefault/`、`lookDefault/`），絕不以 Asset 名稱命名內部檔案。
+- **目錄即包裝單元與同構內部結構**：以目標資料夾底下的全體檔案作為不可分割的單一發布單元。無論任何具體物件，資料夾內部結構與命名固定同構（如 `asset_latest.usda`、`modelDefault/`、`lookDefault/`），絕不以 Asset 名稱命名內部檔案。
 - **暫存輸出與原子移轉註冊（Staging & Atomic Promotion）**：所有發布一律先輸出至隔離的暫存資料夾，待流程完全跑完且驗證通過後，才原子移轉至專案正式流程目錄並完成註冊，杜絕半成品外溢污染。
 - **Solaris Implicit Layer 治理與子目錄收斂**：優先採用 Flatten 打平；無法打平時由 Houdini 自動轉換輸出之圖層，必須透過 `Save Paths Relative to Output` 強制限制在輸出子目錄（如 `./layers/`）內，嚴禁外溢。亦可透過 `Configure Layer` 主動將隱式圖層顯式化。詳情參閱 [USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)。
 - **路徑邊界與 Expression Variable 替換**：
@@ -65,10 +65,10 @@
   - **包外引用**：輸出時由 Solaris Output Processor 自動將專案前綴替換為 Stage Expression Variable（``@`"${PROJECT_ROOT}/..."`@``），並於 Layer Metadata 預設宣告；專案遷移或交接客戶時，只需在頂層重新指派變數即可一口氣全局生效。
 
 ### 6. `asset_latest` 動態指向與 Asset Resolver 逆向鎖定（Version Pinning）
-- **版本控管的架構取捨**：不採用 VariantSet 控版（避免回溯修改歷史註冊檔），改採目錄進版（`v001`, `v002`...）並自動維護 `asset_latest.usd`。歷史版本在**位元組層級**凍結；**合成結果**則因跨包引用 `latest` 而會漂移，此為「日常漂移、關鍵時刻鎖定」的刻意設計，確定性由 Resolver 承擔。
-- **Sub 物件無 latest 與推進連動**：Asset 底下的 `modelDefault/`、`lookDefault/` 等 sub 物件自身不設 `latest`；每次子組件進版，直接驅動單元物件 Asset 整體進版，並由 Pipeline 自動更新根目錄唯一的 `asset_latest.usd`。
-- **跨平臺適配**：全平臺統一採用 `subLayers = [@./v###/asset.usd@]` 包裝圖層，不使用 Symlink——共用儲存上只存在單一檔案，且唯有真實 Layer 才能被 Asset Resolver 攔截。包裝圖層必須完整複製版本層的 Layer Metadata，否則 `upAxis` 等設定將回落至預設值。
-- **歷史確定性**：日常製作預設引用 `asset_latest.usd` 享受無感更新；提交渲染與發布時，由自訂 **Asset Resolver** 於 `Resolve()` 攔截並重寫路徑，將 `asset_latest` 逆向鎖定為具體歷史版本。情境以 `ArResolverContext` 攜帶；鎖定清單須**遞移涵蓋整棵依賴樹**，且鎖定情境下找不到清單必須 fail loud。此機制保證的是 **USD 組合結果的確定性**，畫面完全重現尚須貼圖、快取與渲染器版本各自的封存策略。
+- **版本控管的架構取捨**：不採用 VariantSet 控版（避免回溯修改歷史註冊檔），改採目錄進版（`v001`, `v002`...）並自動維護 `asset_latest.usda`。歷史版本在**位元組層級**凍結；**合成結果**則因跨包引用 `latest` 而會漂移，此為「日常漂移、關鍵時刻鎖定」的刻意設計，確定性由 Resolver 承擔。
+- **Sub 物件無 latest 與推進連動**：Asset 底下的 `modelDefault/`、`lookDefault/` 等 sub 物件自身不設 `latest`；每次子組件進版，直接驅動單元物件 Asset 整體進版，並由 Pipeline 自動更新根目錄唯一的 `asset_latest.usda`。
+- **跨平臺適配**：全平臺統一採用 `subLayers = [@./v###/asset.usd@]` 包裝圖層，不使用 Symlink——共用儲存上只存在單一檔案，且唯有真實 Layer 才能被 Asset Resolver 攔截。包裝圖層必須完整複製版本層的 Layer Metadata，否則 `upAxis` 等設定將回落至預設值；且一律以 **`.usda` 明文格式**寫出——版本層是位元組凍結的內容，包裝圖層是每次進版都被重寫的指標，兩者性質不同，明文讓 Metadata 複製一眼可驗。
+- **歷史確定性**：日常製作預設引用 `asset_latest.usda` 享受無感更新；提交渲染與發布時，由自訂 **Asset Resolver** 於 `Resolve()` 攔截並重寫路徑，將 `asset_latest` 逆向鎖定為具體歷史版本。情境以 `ArResolverContext` 攜帶；鎖定清單須**遞移涵蓋整棵依賴樹**，且鎖定情境下找不到清單必須 fail loud。此機制保證的是 **USD 組合結果的確定性**，畫面完全重現尚須貼圖、快取與渲染器版本各自的封存策略。
 
 ### 7. Stage Metadata 全專案一致：USD 不做任何自動轉換
 - **三項必須統一並於每個發布單元入口層宣告**：`metersPerUnit`、`upAxis`、`timeCodesPerSecond`。
