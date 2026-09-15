@@ -10,7 +10,7 @@
 >    - 無論是什麼 Asset（如 `Chair`、`Table`、`Car`），**資料夾內部的檔案結構與命名完全統一**！
 >    - 入口檔案一律單純命名為 `asset.usd`（各版次目錄內）與動態入口 `asset_latest.usda`（Asset 根目錄內），嚴禁在內部檔名摻雜具體 Asset 名稱。
 >    - 內部固定拆分子資料夾：`modelDefault/`、`lookDefault/`、`textureDefault/` 等，其內部各自進版（`v001/modelDefault.usd`）。FX Element 亦然（如 `element.usd` / `element_latest.usda`）。
->    - **包裝單元之上的分類目錄亦受規範**：發布樹由**作用域層級**（專案／序列／鏡頭）與**分類容器**兩條正交的軸構成，同一分類可出現在不同作用域（如 `assets/fx/` 與 `shots/<seq>/<shot>/fx/`），`libraries/` 則在三個層級各自存在。任一目錄**不得兼任分類目錄與包裝單元**，且**單元名全專案唯一**——工具遂能以「目錄內是否直接存在 `*_latest.usda`」單一判準可靠定界。
+>    - **包裝單元之上的分類目錄亦受規範**：發布樹由**作用域層級**（專案／序列／鏡頭）與**分類容器**兩條正交的軸構成，同一分類可出現在不同作用域（如 `assets/fx/` 與 `shots/<seq>/<shot>/fx/`），`libraries/` 則在三個層級各自存在。任一目錄**不得兼任分類目錄與包裝單元**，且**單元名在其作用域層級內唯一**——工具遂能以「目錄內是否直接存在 `*_latest.usda`」單一判準可靠定界。
 > 2. **輸出子目錄收斂（Save Paths Relative to Output）**：Pipeline 優先利用 Flatten 打平 Implicit Layers；對於結構上無法 Flatten 而被 Houdini 自動轉換為實體的圖層，必須透過 ROP 設定強制將路徑收斂在輸出資料夾的子目錄（如 `./layers/`）內，避免散落外溢。
 > 3. **路徑引用雙重標準與 Expression Variable 專案替換**：
 >    - **包內互連 → 相對路徑（`@./...@`）**：確保單一發布包搬移或跨平臺時不壞鏈。
@@ -404,27 +404,35 @@ assets/env/terrain/CliffPath/asset_latest.usda
 
 分類**層數**則完全自由——`assets/props/Chair/`（一層）與 `assets/props/weapons/Blaster/`（兩層）並存合法，只要沒有任何目錄兼任兩種角色。
 
-### 3. 單元名全專案唯一
+### 3. 單元名在其作用域層級內唯一
 
-**單元名是全專案唯一的識別碼，不分分類、不分型別，無任何例外。**
+**單元名是識別碼，其唯一性以作用域層級為界**——在同一作用域內不分分類、不分型別，無任何例外：
 
-分類路徑因此**不承載身分**：把 `Chair` 從 `props/` 移到 `furniture/` 不改變它是誰。製作管理系統（Tracking DB）與工具鏈一律**以單元名為鍵**，分類僅供人瀏覽；分類重整遂成為純粹的搬移作業，不牽動任何身分對應。
+| 作用域層級 | 唯一性範圍 |
+| :--- | :--- |
+| 專案（`assets/`、`rig/`、`libraries/`） | 全專案 |
+| 序列（`shots/<seq>/`） | 該序列 |
+| 鏡頭（`shots/<seq>/<shot>/`） | 該鏡頭 |
+
+因此製作管理系統（Tracking DB）與工具鏈的鍵是 **（作用域路徑, 單元名）**，而非單元名本身。鏡頭級單元本就倚賴路徑定址，`sh010` 與 `sh020` 各有一個 `BoyWalking` 並不構成問題。
+
+**分類路徑不承載身分**：在同一作用域內把 `Chair` 從 `props/` 移到 `furniture/` 不改變它是誰。分類重整遂成為純粹的搬移作業，不牽動任何身分對應。
 
 角色由此必須以名稱區別其兩個單元：
 
 ```text
 assets/char/Teacher/        → asset.usd    幾何材質角色（Model／Lookdev 交付）
-rig/teacher_rig/            → char.usd     綁定角色（Rigging 交付）
+rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 ```
 
 > [!CAUTION]
 > **不得以「同名即同一實體」表達對應關係**
-> 允許跨型別同名（`assets/char/Teacher/` 與 `rig/Teacher/` 並存）看似方便，實則埋下無法檢出的錯誤：某人替一個無關的綁定取名 `Teacher`，規則即**靜默宣稱**它與那個 `Teacher` 資產是同一角色，而 QC **無從判斷這兩個 `Teacher` 是不是同一位**。
+> 在同一作用域內允許跨型別同名（`assets/char/Teacher/` 與 `rig/Teacher/` 並存）看似方便，實則埋下無法檢出的錯誤：某人替一個無關的綁定取名 `Teacher`，規則即**靜默宣稱**它與那個 `Teacher` 資產是同一角色，而 QC **無從判斷這兩個 `Teacher` 是不是同一位**。
 >
 > 對應關係一律由 `char.usd` 內的 Reference **明示**：
 >
 > ```usda
-> # rig/teacher_rig/v001/char.usd
+> # rig/Teacher_rig/v001/char.usd
 > def Xform "Geometry" (
 >     prepend references = @`"${PROJECT_ROOT}/publish/assets/char/Teacher/asset_latest.usda"`@</ROOT>
 > ) {}
@@ -465,7 +473,7 @@ rig/teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 
 ### 6. 命名約定（本專案範例採用，非規範要求）
 
-本章的**不變量只有 §3.3 一條**：單元名全專案唯一。名稱長什麼樣子，規範不置喙。
+本章的**不變量只有 §3.3 一條**：單元名在其作用域層級內唯一。名稱長什麼樣子，規範不置喙。
 
 以下是本專案全篇範例所採用的約定，列出理由供各專案自行判斷取捨——**不代表這是唯一正確的做法**：
 
