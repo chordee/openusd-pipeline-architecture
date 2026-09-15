@@ -25,20 +25,27 @@
 ```text
 【角色動畫三合一組裝架構】
 
-           ┌── 1. geo (Geometry) ──► 由【Asset 環節】提供 (Mesh + 蒙皮權重，靜態不變)
-           │
-SkelRoot ──┼── 2. skel (Skeleton) ──► 由【Rig 環節】提供 (骨架關節拓樸與 Rest Pose)
-           │
-           └── 3. animation ──────► 由【Animator 環節】輸出 (僅含 Joint 時序動態)
+           ┌── 1. Geometry ──► 由【Model / Lookdev】提供 (Mesh + 材質，靜態不變)
+           │                    ※ 已封裝於綁定角色內
+SkelRoot ──┼── 2. Skel ──────► 由【Rig 環節】提供 (骨架拓樸、BlendShape、蒙皮權重)
+           │                    ※ 已封裝於綁定角色內
+           └── 3. AnimData ──► 由【Animator 環節】輸出 (Joint 時序動態 + BlendShape 權重)
+                                ※ 本層唯一產出
 ```
 
 ### 三大組成單元職責
 
 | 組成單元 | 來源環節 | 內容特性 | 硬碟負擔 |
 | :--- | :--- | :--- | :---: |
-| **`geo` (Mesh)** | **Asset 階段** | 角色高精細幾何體、UV、以及靜態蒙皮權重（`jointIndices`, `jointWeights`）。一次發佈，全片共用。 | 0 (純 Reference) |
-| **`skel` (Skeleton)** | **Rig 階段** | 關節拓樸階層、`bindTransforms` 與 `restTransforms`。定義角色骨骼結構，無動畫時間樣本。 | 0 (純 Reference) |
-| **`animation` (SkelAnimation)** | **Animation 階段** | **Animator 唯一輸出的檔案**。僅包含各 Joint 隨時間變化的旋轉四元數、位移與縮放陣列。 | **極小** (數十 KB ~ 數 MB) |
+| **`Geometry`** | **Model / Lookdev 階段** | 角色幾何體、UV 與材質。以幾何材質 Asset 的形式發布，一次發佈、全片共用。 | 0 (純 Reference) |
+| **`Skel` (Skeleton)** | **Rig 階段** | 關節拓樸、`bindTransforms`、`restTransforms` 與 `BlendShape` 本體；並以 `over` 將蒙皮權重寫回 `Geometry` 的 Mesh。無動畫時間樣本。 | 0 (純 Reference) |
+| **`AnimData` (SkelAnimation)** | **Animation 階段** | **Animator 唯一輸出的檔案**。僅含各 Joint 隨時間變化的旋轉／位移／縮放陣列，以及 `blendShapeWeights`。 | **極小** (數十 KB ~ 數 MB) |
+
+> [!IMPORTANT]
+> **前兩者已於角色資產階段組裝完畢，動畫層只交付第三者**
+> `Geometry` 與 `Skel` 皆封裝在**綁定角色**（`char_latest.usd`）之內，其 `/ROOT` 即為 `SkelRoot`。動畫層只需**單次引用**該綁定角色，再疊上自己輸出的 `SkelAnimation` 即可——無須、也不應分頭引用幾何與骨架。
+>
+> 完整的角色資產結構詳見 [Asset Layer 篇 §7 角色資產結構](usd-asset-layer.md)。
 
 ### 骨架角色組裝 USDA 範例
 
@@ -54,24 +61,16 @@ over "ROOT"
     {
         def Scope "Characters" ( kind = "group" )
         {
-            # 必須宣告為 SkelRoot，Hydra / 渲染器才會啟動 GPU/CPU Skinning
-            # 並且必須套用 SkelBindingAPI —— skel:* 全系列屬性與 relationship
+            # 單次引用綁定角色，一併帶入 Geometry（幾何＋材質）與 Skel（骨架）。
+            # 其 /ROOT 即為 SkelRoot，型別隨 Reference 帶入，此處無須重複宣告。
+            # SkelBindingAPI 必須套用 —— skel:* 全系列屬性與 relationship
             # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
-            def SkelRoot "Hero" (
+            def "Hero" (
                 prepend apiSchemas = ["SkelBindingAPI"]
+                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usd"`@</ROOT>
             )
             {
-                # 1. 引用 Asset 端的幾何 (geo，指向最新發布之模型)
-                def "Geo" (
-                    references = @`"${PROJECT_ROOT}/publish/assets/characters/hero/asset_latest.usd"`@</ROOT/ModelDefault>
-                ) {}
-
-                # 2. 引用 Rig 端的靜態骨架 (skel，指向最新發布之骨架)
-                def Skeleton "Skel" (
-                    references = @`"${PROJECT_ROOT}/publish/assets/characters/hero/rig/rig_latest.usd"`@</ROOT/Skeleton>
-                ) {}
-
-                # 3. 動畫師本鏡頭實際輸出的動態資料 (SkelAnimation)
+                # 動畫師本鏡頭唯一實際輸出的動態資料 (SkelAnimation)
                 def SkelAnimation "AnimData"
                 {
                     uniform token[] joints = ["Hips", "Hips/Spine", "Hips/Spine/Chest", ...]
@@ -85,13 +84,18 @@ over "ROOT"
                         1: [(0, 100, 0), (0, 15, 0), ...],
                         2: [(0, 101, 0.5), (0, 15, 0), ...]
                     }
+
+                    # BlendShape 權重亦由動畫層輸出（形狀本體在綁定角色的 Skel 內）
+                    uniform token[] blendShapes = ["smile"]
+                    float[] blendShapeWeights.timeSamples = {
+                        1: [0.0],
+                        2: [0.35]
+                    }
                 }
 
-                # 建立動態綁定關聯 (Binding)
-                # 掛在 SkelRoot 上可沿命名空間繼承給底下所有被 skin 的 Mesh，
-                # 無需在每顆 Mesh 上重複宣告。
+                # 掛上動畫來源即完成。
+                # skel:skeleton 已由綁定角色的 skel 包寫在各 Mesh 上，此處無須重複宣告。
                 rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
-                rel skel:skeleton = </ROOT/Anim/Characters/Hero/Skel>
             }
         }
     }

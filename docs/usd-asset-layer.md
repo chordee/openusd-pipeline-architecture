@@ -574,7 +574,162 @@ def Xform "ROOT" (
 
 ---
 
-## 7. 在鏡頭（Shot）中的使用範例
+## 7. 角色資產結構（Character Asset）
+
+角色與一般道具的關鍵差異在於：**幾何材質與綁定分屬不同部門、不同審批週期，且幾何材質本身對下游具備獨立的消費價值**（可作為靜態道具擺放、製作破碎版本、或不綁定直接使用）。
+
+依 [§6.4 的判準](#4-以-reference-嫁接-modeldefault-與-lookdefault-的架構效益)——**該單元是否對下游有獨立、正當的消費價值**——角色因此拆分為**兩個獨立發布單元**：
+
+| 發布單元 | 內容 | 入口檔名 | 交付部門 |
+| :--- | :--- | :--- | :--- |
+| **幾何材質角色** | 標準 Asset 結構（`modelDefault/`、`lookDefault/`、`textureDefault/`） | `asset.usd` / `asset_latest.usd` | Model / Lookdev |
+| **綁定角色** | `SkelRoot` 總成，引用上者並疊加骨架 | **`char.usd` / `char_latest.usd`** | Rigging |
+
+> [!NOTE]
+> 入口檔名刻意以 `char` 與 `asset` 區分：兩者在專案中對外是不同單元，鏡頭端引用的是**綁定角色**（`char_latest.usd`）。發布單元邊界因此對齊審批邊界——Model／Lookdev 驗收一次、Rigging 驗收一次，與製作管理系統中的 task 劃分同形。
+
+### 1. 綁定角色的目錄結構
+
+```text
+<綁定角色目錄>/
+├── char_latest.usd                  <-- 全域唯一最新動態入口
+├── v001/
+│   └── char.usd                     <-- 固定名稱！/ROOT 為 SkelRoot
+├── v002/
+│   └── char.usd
+└── skel/                            <-- 固定的骨架 sub 物件目錄 (無 latest！)
+    ├── v001/skel.usd
+    └── v002/skel.usd
+```
+
+`skel/` **不設 latest**：單獨取用骨架而不要幾何的情境（如 Mocap retarget）通常仍需對應的 bind pose 幾何，引用完整的 `char_latest.usd` 更安全。因此角色完全沿用既有的 sub 物件規則，不需任何例外。
+
+### 2. 總裝結構：`SkelRoot` 底下的三顆分支
+
+```usda
+# v001/char.usd
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def SkelRoot "ROOT" (
+    kind = "component"
+)
+{
+    # 1. 幾何材質：引用幾何材質角色的 /ROOT，一次帶入 Model 與 Look
+    def Xform "Geometry" (
+        prepend references = @`"${PROJECT_ROOT}/publish/assets/char/hero/asset_latest.usd"`@</ROOT>
+    ) {}
+
+    # 2. 骨架：引用本包內的 skel sub 物件
+    def Skeleton "Skel" (
+        prepend references = @../skel/v001/skel.usd@</ROOT/Skel>
+    ) {}
+}
+```
+
+合成後的 Stage 結構：
+
+```text
+/ROOT (SkelRoot, kind = component)
+├── Geometry/                <-- 幾何材質 Asset 的 /ROOT 映射至此
+│   ├── material:binding     <-- 綁定落在此層，不觸及角色的 /ROOT
+│   ├── ModelDefault/Body
+│   └── LookDefault/Materials
+├── Skel (Skeleton)          <-- joints / bindTransforms / restTransforms
+│   └── BlendShapes/         <-- BlendShape 本體（靜態形狀資料）
+└── AnimData (SkelAnimation) <-- 鏡頭層注入，發布包內不存在
+```
+
+> [!IMPORTANT]
+> **`/ROOT` 型別破例為 `SkelRoot`**
+> 這是全 Pipeline 唯一不使用 `def Xform "ROOT"` 的發布單元。原因是 **`SkelRoot` 是 Hydra 解算 Skinning 的邊界**——不在 `SkelRoot` 底下的 Mesh，即使完整套用了 `SkelBindingAPI` 也不會產生變形。將邊界置於 `/ROOT` 可確保角色無論被引用至鏡頭何處，其變形恆常有效。
+>
+> 合成上無虞：總裝層的 Local 型別意見強於各包經 Reference 帶入的 `Xform`，composed 型別即為 `SkelRoot`。但此型別競爭須為工具鏈所知，不可誤判為衝突。
+
+> [!TIP]
+> **綁定落在 `Geometry` 而非角色的 `/ROOT`**
+> 幾何材質 Asset 的 `material:binding` 寫在它自己的 `/ROOT` 上，經 Reference 映射後落於 `Geometry`。因此**沒有任何 sub 包需要碰角色的 `/ROOT`**，[`/ROOT` 鐵律](usd-publish-packaging.md)的白名單例外在角色這邊完全用不到。
+>
+> 這同時解決了一個常見錯誤：若改為引用 `</ROOT/ModelDefault>` 以求「只取幾何」，`/ROOT` 上的綁定不會隨之帶入，角色將完全失去材質。**一律引用完整的 `</ROOT>`。**
+
+### 3. `skel/` 包的內容與蒙皮權重的 `over`
+
+骨架包交付三樣東西：`Skeleton` 拓樸、`BlendShape` 本體，以及**以 `over` 寫回幾何的蒙皮資料**：
+
+```usda
+# skel/v001/skel.usd （Rigging 部門交付的骨架 sub 物件包）
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+)
+
+def Xform "ROOT"
+{
+    def Skeleton "Skel"
+    {
+        uniform token[] joints = ["Hips", "Hips/Spine", "Hips/Spine/Chest"]
+        uniform matrix4d[] bindTransforms = [ /* 世界空間 */ ]
+        uniform matrix4d[] restTransforms = [ /* joint-local 空間 */ ]
+
+        def Scope "BlendShapes"
+        {
+            def BlendShape "smile" { uniform vector3f[] offsets = [ /* ... */ ] }
+        }
+    }
+
+    # 以 over 寫回幾何包的 Mesh，注入蒙皮資料
+    over "Geometry"
+    {
+        over "ModelDefault"
+        {
+            over "Body" ( prepend apiSchemas = ["SkelBindingAPI"] )
+            {
+                rel skel:skeleton = </ROOT/Skel>
+                rel skel:blendShapeTargets = [ </ROOT/Skel/BlendShapes/smile> ]
+                uniform token[] skel:blendShapes = ["smile"]
+
+                # elementSize 必須明確設定（每點影響的 joint 數，常見 4 或 8）
+                int[] primvars:skel:jointIndices = [ /* ... */ ] ( elementSize = 4 )
+                float[] primvars:skel:jointWeights = [ /* ... */ ] ( elementSize = 4 )
+                matrix4d primvars:skel:geomBindTransform = ( /* ... */ )
+            }
+        }
+    }
+}
+```
+
+> [!IMPORTANT]
+> **蒙皮權重歸骨架包，不歸幾何包**
+> `primvars:skel:jointIndices` / `jointWeights` / `geomBindTransform` 雖然寫在 Mesh 上，卻是**綁定部門的產出**。若置於幾何包內，綁定師每次調權重都得推進幾何版本——即使拓樸一個點也沒動。
+>
+> 交由骨架包以 `over` 注入之後，權重與骨架同版進退，幾何包維持純幾何。此模式與 [`lookDefault` 以 `over` 寫回綁定](#5-材質綁定契約material-binding-contract)**完全同構**。
+>
+> 同理，`rel skel:skeleton` 也寫在這個 `over` 裡而非掛在 `SkelRoot` 上靠繼承——既然本來就要 over 每顆 Mesh，順帶多一條 rel 是零成本，換來 `/ROOT` 完全不被觸碰。
+
+> [!CAUTION]
+> **`elementSize` 未設定是最常見的致命錯誤**
+> `jointIndices` / `jointWeights` 必須透過 `UsdGeomPrimvar.SetElementSize(n)` 明確宣告每點影響的 joint 數量，否則 imaging 端**無法切分每點影響數**，Skinning 結果錯亂。此項列為發布前 QC 必檢。詳見 [USD Skel 骨架動畫設定指南](usd-skel-guide.md)。
+
+### 4. 跨包引用 `latest` 的取捨
+
+`Geometry` 引用的是幾何材質角色的 **`asset_latest.usd`**（動態指標），而非鎖定的具體版次。這是刻意的選擇：
+
+- **接受漂移**：建模一進版，既有的 `char/v001` 所看到的幾何即隨之更新。由於製作人員與流程本就存在時間差，拓樸變動導致的權重失效**必然會在畫面上顯現**，屬可被發現、可被修復的問題。
+- **凍結交由 Resolver**：歷史可重現性由 [Asset Resolver 逆向鎖定](usd-publish-packaging.md)在送算與審批時達成，與全 Pipeline「日常漂移、關鍵時刻鎖定」的一貫精神一致。
+
+> [!WARNING]
+> **此取捨對 Resolver 快照提出硬性要求**
+> 快照必須**遞移涵蓋整棵依賴樹**：鏡頭引用 `char_latest` → 鎖定至 `char/v002` 尚不足夠，必須一路鎖定其內部引用的 `assets/char/hero/v003`。若僅鎖定直接引用的一層，跨包的可重現性即為虛假。
+>
+> 另建議：發布幾何材質角色時，若偵測到 point count 或 topology hash 變動，應**主動告警依賴它的綁定角色單元**。拓樸變更會使全部權重失效，下游必然重工，不應等動畫師發現角色炸裂才得知。
+
+---
+
+## 8. 在鏡頭（Shot）中的使用範例
 
 當環境部門在 `environment.usd` 中引用此 Asset 時，透過 `${PROJECT_ROOT}` 參照，並可同時自由組合兩組 Variant：
 
@@ -614,7 +769,7 @@ over "ROOT"
 
 ---
 
-## 8. Asset 架構規範對照表
+## 9. Asset 架構規範對照表
 
 | 規範項目 | 規則說明 | 範例 / 命名 |
 | :--- | :--- | :--- |
@@ -629,7 +784,7 @@ over "ROOT"
 
 ---
 
-## 9. Asset 發布封裝與路徑邊界規範
+## 10. Asset 發布封裝與路徑邊界規範
 
 > 📖 詳細全域規範請見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 

@@ -271,10 +271,12 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | :--- | :--- | :--- |
    | **幾何零材質** | 幾何發布單元（`modelDefault/`、FX `layers/`）內不得存在任何 `Material` / `Shader` Prim | [材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract) |
    | **幾何零綁定** | 幾何發布單元內不得出現任何 `material:binding`，含 `GeomSubset` 上的分面綁定 | 同上 |
-   | **綁定 `over` 命中** | look / material 圖層內每個 `over` 路徑，合成後皆對應到 `IsDefined()` 為真的 Prim | 同上 |
+   | **覆寫 `over` 命中** | look / material / skel 圖層內每個 `over` 路徑，合成後皆對應到 `IsDefined()` 為真的 Prim | 同上 |
    | **`/ROOT` 已被定義** | 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True` | [`/ROOT` 鐵律](#2-同構目錄包裝單元isomorphic-packaging-unit) |
    | **`/ROOT` 未被部門污染** | 部門輸出的 sub 圖層，在 `/ROOT` 上不得殘留任何屬性或元數據意見（含 `kind`） | 同上 |
    | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
+   | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色資產結構](usd-asset-layer.md#7-角色資產結構character-asset) |
+   | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 必須明確宣告 `elementSize`，否則 imaging 端無法切分每點影響數 | 同上 |
    | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
 
    > [!CAUTION]

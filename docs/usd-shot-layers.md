@@ -112,24 +112,19 @@ over "ROOT"
     {
         def Scope "Characters" ( kind = "group" )
         {
-            # SkelRoot 必須套用 SkelBindingAPI，skel:* 綁定才成立
-            def SkelRoot "Hero" ( prepend apiSchemas = ["SkelBindingAPI"] )
+            # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
+            def "Hero" (
+                prepend apiSchemas = ["SkelBindingAPI"]
+                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usd"`@</ROOT>
+            )
             {
-                # 於 SkelRoot 綁定骨架，沿命名空間繼承給底下所有被 skin 的 Mesh
-                rel skel:skeleton = </ROOT/Anim/Characters/Hero/skel>
-
-                # 引用角色骨架與幾何 Asset
-                def "geo" ( references = @`"${PROJECT_ROOT}/publish/assets/char/hero/asset_latest.usd"`@</ROOT> ) {}
-                # 注入純動態時序資料 (Animation prim)
-                def Skeleton "skel" ( prepend apiSchemas = ["SkelBindingAPI"] )
-                {
-                    rel skel:animationSource = </ROOT/Anim/Characters/Hero/anim_data>
-                }
-                def SkelAnimation "anim_data"
+                # 動畫層唯一產出：純動態時序資料
+                def SkelAnimation "AnimData"
                 {
                     uniform token[] joints = ["Hips", "Spine", "Head"]
                     quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
                 }
+                rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
             }
         }
     }
