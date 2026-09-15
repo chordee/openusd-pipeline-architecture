@@ -878,7 +878,7 @@ def Xform "ROOT" (
 | **暫存輸出與移轉** | 先輸出至隔離暫存區，QC 驗證通過後原子移轉專案目錄並註冊 | 杜絕未完成或損壞之半成品外溢污染正式專案結構 |
 | **Implicit Layers** | 優先 Flatten；無法 Flatten 者透過 Save Paths Relative 100% 收斂於子目錄內 | 搭配 [USD Solaris Implicit Layer 治理與輸出指南](usd-solaris-implicit-layer.md) 實踐 |
 | **包內 Sublayer / Ref** | 必須使用 `@./...@` 相對路徑 | 掃描 `.usd` SdfLayerDependencies，禁止絕對路徑指向包內 |
-| **包外 Composition Arcs** | 必須使用絕對路徑或 Pipeline URI | 掃描 SdfLayerDependencies，禁止使用 `../../` 跳出包外 |
+| **包外 Composition Arcs** | 必須改寫為 Stage Expression Variable（``@`"${PROJECT_ROOT}/..."`@``） | 掃描 SdfLayerDependencies，**路徑解析後不得逸出 Package Root**（包內向上跳層如 `@../modelDefault/...@` 為合規） |
 | **Pure USD 單元** | 內容不限，專供自訂與特殊操作 | 僅驗證路徑與封裝邊界，放寬 Schema 限制 |
 | **進版格式** | `v###` 三位數零填充目錄 | `v001`, `v002`, `v003`... 保持歷史唯讀 |
 | **`latest` 實現** | 全平臺統一為 USD Sublayer 包裝圖層 | 不使用 Symlink／Hardlink——二者無法被 Asset Resolver 攔截 |

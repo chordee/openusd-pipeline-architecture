@@ -34,7 +34,7 @@
     subLayers = [
         @./layers/lighting.usd@,     # [0] 最強：燈光、渲染設定與全場外觀覆寫
         @./layers/fx.usd@,           # [1] 次強：特效模擬、破碎與角色接管
-        @./layers/animation.usd@,    # [2] 中等：角色骨架動態、攝影機與道具動畫
+        @./layers/anim.usd@,    # [2] 中等：角色骨架動態、攝影機與道具動畫
         @./layers/environment.usd@   # [3] 最弱：世界舞台、建築與 Set Dressing
     ]
 )
@@ -85,7 +85,7 @@ over "ROOT"
     {
         # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usd 之 </ROOT>）
         def Xform "Terrain" (
-            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/asset_latest.usd"`@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usd"`@</ROOT>
         ) {}
         
         def Scope "Props" ( kind = "group" )
@@ -148,8 +148,8 @@ over "ROOT"
     def Scope "FX" ( kind = "group" )
     {
         # 掛載大型體積快取 (Payload 延遲加載)
-        def Xform "hero_explosion" (
-            payload = @`"${PROJECT_ROOT}/publish/fx/elements/hero_explosion/element_latest.usd"`@</ROOT>
+        def Xform "explosion_hero" (
+            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
         ) {}
     }
 }
@@ -308,7 +308,7 @@ over "ROOT"
 ```
 
 ### 情境 C：FX 覆寫 Animation（接管被炸毀的角色）
-* **檔案**：`fx_overrides/hero_explosion_switch.usd`
+* **檔案**：`fx_overrides/explosion_hero_switch.usd`
 * **實務目的**：第 45 格主角被炸碎，FX 圖層需在第 45 格將動畫角色設為隱形，改由 FX 自身生成的破碎快取呈現：
 ```usda
 #usda 1.0
