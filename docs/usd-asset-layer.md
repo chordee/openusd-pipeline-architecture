@@ -549,7 +549,7 @@ def Xform "ROOT" (
 外部消費端（Environment、Layout、Animation）**一律且唯一引用頂層的 `asset_latest.usd`**。在 Asset 進版時，Pipeline 自動將其重定向指向最新的版次：
 
 ```usda
-# /projects/show_A/publish/assets/props/chair/asset_latest.usd (Windows 包裝層或 Linux Symlink)
+# /projects/show_A/publish/assets/props/chair/asset_latest.usd （Sublayer 包裝圖層）
 #usda 1.0
 (
     defaultPrim = "ROOT"

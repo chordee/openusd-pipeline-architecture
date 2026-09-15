@@ -111,7 +111,7 @@ def Xform "ROOT" (
 Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元素進版時，Pipeline 自動將其重定向指向最新版次：
 
 ```usda
-# /projects/show_A/publish/fx/elements/explosion_hero/element_latest.usd (Windows 包裝層或 Linux Symlink)
+# /projects/show_A/publish/fx/elements/explosion_hero/element_latest.usd （Sublayer 包裝圖層）
 #usda 1.0
 (
     defaultPrim = "ROOT"

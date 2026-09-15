@@ -15,7 +15,7 @@
 >    - **包內互連 → 相對路徑（`@./...@`）**：確保單一發布包搬移或跨平臺時不壞鏈。
 >    - **包外引用 → 專案 Expression Variable（``@`"${PROJECT_ROOT}/..."`@``）**：所有引用專案目錄的絕對路徑，在輸出時由 **Houdini Solaris Output Processor** 自動改寫為 Stage Expression Variable（如 `${PROJECT_ROOT}`），並於 Layer Metadata 中預設宣告。未來專案目錄搬遷或交付客戶時，**只需在頂層重新指定變數或以 Wrapper Layer 包裹，即可一口氣全局替換所有層的路徑**，零檔案修改。
 > 4. **Pure USD 單元**：發布目標純粹為 USD，內容與結構放寬限制，專供靈活應付額外自訂操作與特殊工具鏈。
-> 5. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口（Linux 符號連結；Windows 採 `subLayers` 包裝圖層）。
+> 5. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口。全平臺**統一採用 `subLayers` 包裝圖層**（不使用 Symlink），且包裝圖層必須完整複製版本層的全部 Layer Metadata。
 > 6. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本的「不可變性（Immutability）」。
 > 7. **Asset Resolver 逆向鎖定（Version Pinning）**：日常製作引用 `latest` 享受自動更新；農場算圖或定剪交付時，由自訂 Asset Resolver 讀取審批快照，動態將 `latest` 鎖定為具體歷史版本，保障 100% 可重現性。
 > 8. **暫存輸出與發布後移轉註冊（Staging & Atomic Promotion）**：所有 USD 元件在發布時，一律先輸出至獨立的**暫存資料夾（Staging / Scratch Directory）**；直到所有檔案寫入、QC 驗證與依賴校驗完全跑完，Pipeline 才以原子操作搬移至專案正式流程結構內並完成資料庫註冊，徹底杜絕半成品外溢污染專案。
@@ -277,6 +277,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
    | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色資產結構](usd-asset-layer.md#7-角色資產結構character-asset) |
    | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 必須明確宣告 `elementSize`，否則 imaging 端無法切分每點影響數 | 同上 |
+   | **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其所包裹的版本層逐項相同 | [`latest` 實現機制](#5-latest-動態入口的實現機制) |
    | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
 
    > [!CAUTION]
@@ -430,40 +431,64 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 ---
 
-## 5. 跨平臺的 `latest` 實現機制
+## 5. `latest` 動態入口的實現機制
 
 在 USD 生產 Pipeline 中，所有基本元素都會經歷頻繁的版本迭代（`v001`, `v002`, `v003`...）。每次進版時，均自動維護一個 `latest` 入口：
 
 ```text
 /projects/show_A/publish/assets/props/chair/
-├── latest.usd             <-- 【動態入口】：Linux 下為 Symlink，Windows 下為 Sublayer Wrapper
+├── asset_latest.usd       <-- 【動態入口】：USD Sublayer 包裝圖層
 ├── v001/
-│   └── chair.usd
+│   └── asset.usd
 ├── v002/
-│   └── chair.usd
+│   └── asset.usd
 └── v003/                  <-- 目前最新版
-    └── chair.usd
+    └── asset.usd
 ```
 
-### 1. Linux 環境：Symbolic Link
-在 Linux 生產環境中，`latest.usd` 直接作為指向具體版本檔案的軟連結（Symlink）：
-```bash
-ln -sfn v003/chair.usd latest.usd
-```
-* **優點**：零檔案開銷，檔案系統層級即時解析，向下相容性極高。
+### 1. 一律採用 Sublayer 包裝圖層，不使用 Symlink
 
-### 2. Windows 環境：Sublayer Wrapper Layer
-在 Windows 作業系統中，由於建立符號連結通常需要管理員權限（UAC）或開發者模式，且跨 SMB/CIFS 網路磁碟機時常有權限問題。因此 Windows 改採 **USD Sublayer 包裝圖層**：
+> [!CAUTION]
+> **這不是作業系統選項，而是專案層級的單一選擇**
+> 常見的誤解是「Linux 用 Symlink、Windows 用包裝圖層」。但發布目標是**共用的專案儲存**，`asset_latest.usd` **就只有一個實體檔案**——它要嘛是 Symlink、要嘛是包裝圖層，不可能讓 Linux 農場看到 Symlink、而 Windows 工作站看到包裝圖層。
+>
+> 因此必須全專案擇一。本架構統一採用 **Sublayer 包裝圖層**。
 
-每次發布新版本（如 `v003`）時，發布腳本自動在元素根目錄產生/改寫一個輕量的 `latest.usda`：
+選用包裝圖層而非 Symlink 的三項理由：
+
+1. **跨平臺無條件可用**：純 USD 官方原生機制，不需要任何作業系統底層權限（Windows 建立 Symlink 通常需要 UAC 或開發者模式）。Symlink 跨 SMB/CIFS 的行為則取決於伺服器設定與 Windows 用戶端策略，無法保證。
+2. **Asset Resolver 得以攔截**：包裝圖層是一個**真實存在的 Layer**，Resolver 看得見、攔得住。Symlink 在 AR 解析時很可能直接被 realpath 為 `v003/asset.usd`，Resolver **根本沒有機會介入**——[逆向鎖定機制](#8-asset-resolver-的逆向鎖定機制version-pinning)將因此失效。
+3. **行為單一**：兩種實作在 Resolver 眼中是完全不同的攔截點，並存會使同一套鎖定邏輯無法涵蓋。
+
+> [!NOTE]
+> **Hardlink 亦不適用於 `latest`**
+> Hardlink 雖然同樣免權限、零 metadata 損失，但與 Symlink 一樣**無法被 Resolver 攔截**（解析後即為實體檔案），且存在「寫穿」污染歷史版本的風險。它適用於貼圖等大體積資料的增量去重，不適用於版本入口指標。
+
+### 2. 包裝圖層必須完整複製版本層的 Layer Metadata
+
+> [!CAUTION]
+> **Layer Metadata 不會透過 `subLayers` 向上傳遞**
+> Stage 層級的設定**只取 root layer 的 metadata**。包裝圖層若只宣告 `subLayers`，則版本層內的 `metersPerUnit`、`upAxis`、`timeCodesPerSecond`、`startTimeCode` / `endTimeCode` **全數取不到**，USD 會回落至預設值。
+>
+> 最直接的症狀是 **`upAxis` 預設為 `"Z"`**——版本層明明宣告了 `"Y"`，透過包裝圖層開啟卻是 `"Z"`，**整顆 Asset 躺倒 90 度**。
+>
+> 更隱蔽的是 **`timeCodesPerSecond` 不一致**：若版本層宣告 `25` 而包裝層未宣告（預設 `24`），USD 會依兩者比值對 sublayer 施加**自動時間縮放**。動畫不會壞掉，只是整體速率偏移 `24/25`——這種錯誤極難歸因。
+
+因此發布工具產生包裝圖層時，**必須逐項複製版本層的全部 Layer Metadata**：
 
 ```usda
+# /projects/show_A/publish/assets/props/chair/asset_latest.usd
 #usda 1.0
 (
+    # 以下 metadata 必須與 v003/asset.usd 完全一致，缺一不可
     defaultPrim = "ROOT"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+    timeCodesPerSecond = 24
+    # 具時序內容的單元另需複製 startTimeCode / endTimeCode
+
     subLayers = [
-        # 【Windows 方案】：直接包裹最新版本的實體檔案
-        @./v003/chair.usd@
+        @./v003/asset.usd@      # 包裹最新版本的實體檔案
     ]
 )
 
@@ -471,7 +496,11 @@ over "ROOT"
 {
 }
 ```
-* **優點**：純 USD 官方原生機制，完全不需要任何作業系統底層權限，跨網路磁碟機 100% 穩定相容。
+
+> [!TIP]
+> **實作建議：以程式讀取後原樣寫出，不要維護白名單**
+> 發布工具應直接讀取版本層的 `SdfLayer` metadata 逐項轉寫，而非硬編碼一份欄位清單——否則日後新增任何 Layer Metadata（如自訂的發布審計欄位）都會被靜默遺漏。
+
 
 ---
 
@@ -598,8 +627,8 @@ def Xform "ROOT" (
 | **包外 Composition Arcs** | 必須使用絕對路徑或 Pipeline URI | 掃描 SdfLayerDependencies，禁止使用 `../../` 跳出包外 |
 | **Pure USD 單元** | 內容不限，專供自訂與特殊操作 | 僅驗證路徑與封裝邊界，放寬 Schema 限制 |
 | **進版格式** | `v###` 三位數零填充目錄 | `v001`, `v002`, `v003`... 保持歷史唯讀 |
-| **Linux Latest** | 符號連結（Symlink） | 指向最新版本目錄或實體檔案 |
-| **Windows Latest** | USD Sublayer Wrapper | `latest.usda` 包含 `subLayers = [@./v###/...@]` |
+| **`latest` 實現** | 全平臺統一為 USD Sublayer 包裝圖層 | 不使用 Symlink／Hardlink——二者無法被 Asset Resolver 攔截 |
+| **包裝圖層 Metadata** | 必須完整複製版本層的全部 Layer Metadata | Layer Metadata 不透過 `subLayers` 傳遞；遺漏將導致 `upAxis` 回落預設值、`timeCodesPerSecond` 不一致引發隱式時間縮放 |
 | **版本控管機制** | 獨立目錄進版搭配 `latest` 指向 | 權衡取捨：不以 VariantSet 控版，確保發布不可變性 |
 | **生產期引用** | 預設引用 `latest.usd` | 享受無感即時更新 |
 | **渲染/發布鎖定** | 透過 Asset Resolver 執行 Version Pinning | 保障生產可重現性與渲染穩定性 |
