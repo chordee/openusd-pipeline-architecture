@@ -204,7 +204,7 @@ over "ROOT"
 > 📖 詳細全域規範請見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 
 動畫部門交付發布時，同樣適用全 Pipeline 封裝標準：
-1. **目錄即包裝單元（同構內部結構）**：`anim/` 為**分類目錄**，其下每個動畫單元（如 `anim/BoyWalking/`）各自為獨立封裝單位、各自進版。單元內部結構固定為 `anim_latest.usda`、各版次 `v###/anim.usd`，以及沿用 sub 物件規則的 `skel/v###/skel.usd`（SkelAnimation，不設 `latest`），檔名維持統一同構，嚴禁摻雜具體角色名稱。
+1. **目錄即包裝單元（同構內部結構）**：`charAnim/` 為**分類目錄**，其下每個角色動畫單元（如 `charAnim/BoyWalking/`）各自為獨立封裝單位、各自進版。單元內部結構固定為 `charAnim_latest.usda`、各版次 `v###/charAnim.usd`，以及兩個沿用 sub 物件規則、均不設 `latest` 的子單元——`skel/v###/skel.usd` 承載**靜態**資料（`Skeleton` 拓樸、`BlendShape` 本體、控制器階層），`anim/v###/anim.usd` 承載**時序**取樣（joint、`xformOp`、`blendShapeWeights` 動畫）。檔名維持統一同構，嚴禁摻雜具體角色名稱。
 2. **Solaris Implicit Layer 禁錮**：若由 Solaris 輸出，所有導出的隱式圖層必須限制在目標目錄或其子目錄內，嚴禁外溢。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：`anim.usd` 堆疊包內的骨架動畫層與鏡頭層一律使用相對路徑（`@./...@`）。

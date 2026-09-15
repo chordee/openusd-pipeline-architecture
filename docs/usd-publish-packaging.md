@@ -206,22 +206,39 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 > - **Sub 單元進版推進 Element Entry 進版**：特效師每次重新解算體積（生成新版體積圖層）或更新專用著色器（`materials/v002/`），Pipeline 直接推進 `element.usd` 整體進版（生成 `v002/element.usd`），內部以相對路徑精準鎖定各 sub 單元版本，並自動維護頂層 `element_latest.usda` 指向 `v002/element.usd`。
 > - **龐大快取空間隔離與 USD 輕量包裹**：特效解算的重型二進位快取（Geo Cache 或數百 GB 的 OpenVDB 序列）體量龐大，**實體檔案輸出至獨立規劃的高速快取空間（如專用快取伺服器或 scratch 磁區），不直接存放在專案目錄內**。發布時透過 **`Value Clips`**（幾何）或 **`OpenVDBAsset / Volume`** Schema 包裹為單一輕量 `.usd` 圖層，最終的 FX Element Entry 依然正規發布進專案目錄（`publish/assets/fx/...`）並於系統註冊。詳見：[USD FX Layer 鏡頭特效層架構設計](usd-fx-layer.md)。
 
-### 範例 C：Animation 發布包目錄結構
+### 範例 C：角色動畫發布包目錄結構
 ```text
-/projects/show_A/publish/shots/sq01/sh010/anim/          <-- 【分類目錄，非包裝單元】
-├── BoyWalking/                                         <-- 【包裝單元】
-│   ├── anim_latest.usda                                <-- 動畫最新動態入口
-│   ├── v001/
-│   │   └── anim.usd                                    <-- 固定主入口檔案 (/ROOT/Anim)
-│   ├── v002/
-│   │   └── anim.usd
-│   └── skel/                                           <-- SkelAnimation sub 單元（無 latest）
-│       ├── v001/skel.usd
-│       └── v002/skel.usd
-└── ShotCamera/                                         <-- 【包裝單元】同層獨立進版
-    ├── anim_latest.usda
-    └── v001/anim.usd
+/projects/show_A/publish/shots/sq01/sh010/charAnim/      <-- 【分類目錄，非包裝單元】
+└── BoyWalking/                                         <-- 【包裝單元】
+    ├── charAnim_latest.usda                            <-- 最新動態入口
+    ├── v001/
+    │   └── charAnim.usd                                <-- 固定主入口檔案 (/ROOT/Anim)
+    ├── v002/
+    │   └── charAnim.usd
+    ├── skel/                                           <-- 【靜態】單幀資料，無 latest
+    │   ├── v001/skel.usd
+    │   └── v002/skel.usd
+    └── anim/                                           <-- 【時序】序列取樣，無 latest
+        ├── v001/anim.usd
+        └── v002/anim.usd
 ```
+
+兩個 sub 單元的分界是**靜態與時序**，而非 Schema 類別：
+
+| 內容 | 落點 |
+| :--- | :---: |
+| `Skeleton` 的 `joints` 拓樸、`bindTransforms`、`restTransforms` | `skel/` |
+| `BlendShape` 本體（`offsets`、`normalOffsets`、`pointIndices`） | `skel/` |
+| 控制器階層與其靜態 transform | `skel/` |
+| `SkelAnimation` 的 `translations` / `rotations` / `scales` 時序 | `anim/` |
+| `blendShapeWeights` 時序 | `anim/` |
+| 控制器 `xformOp` 的時序取樣 | `anim/` |
+
+這條分界與 OpenUSD 自身的 Schema 切分一致——`BlendShape` 存放形狀 `offsets`、`SkelAnimation` 存放 `blendShapeWeights`；`Skeleton` 存放 `restTransforms`、`SkelAnimation` 存放每幀的 joint transforms。實務效益則是：靜態資料體積大而變動少，時序資料才是動畫師反覆迭代的對象，分開後重發動畫無須重寫靜態層。
+
+> [!NOTE]
+> **兩個 sub 單元均不設 `latest`**
+> 沿用 sub 物件的既有規則：任一 sub 單元進版，直接推進 `charAnim` 單元整體進版。若 `anim/` 自設 `latest`，`v001/charAnim.usd` 的合成結果將在未進版的情況下漂移，[位元組層級的不可變性](#8-重大架構抉擇為什麼不使用-variantset-控制版本)即告失守。
 
 * **發布原子性（Atomicity）**：整個資料夾視為一個完整的不可分割單位。發布工具在驗證、上傳、封存或備份時，均以此資料夾整體為操作對象。
 
@@ -315,7 +332,8 @@ publish/                                <-- 專案作用域
     │   │
     │   └── <shot>/                     <-- 鏡頭作用域
     │       ├── layout/<unit>/
-    │       ├── anim/<unit>/                → anim.usd
+    │       ├── charAnim/<unit>/            → charAnim.usd
+    │       ├── camera/<unit>/              → camera.usd
     │       ├── fx/<unit>/                  → element.usd
     │       ├── lighting/<unit>/
     │       └── libraries/<unit>/           Pure USD（如點雲散佈）
@@ -462,7 +480,7 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 | 綁定角色 | `char.usd` | `rig/<unit>/` |
 | FX Element | `element.usd` | `assets/fx/<unit>/` |
 | Set | `set.usd` | `assets/sets/<unit>/` |
-| Animation | `anim.usd` | `shots/<seq>/<shot>/anim/<unit>/` |
+| 角色動畫 | `charAnim.usd` | `shots/<seq>/<shot>/charAnim/<unit>/` |
 | Pure USD | 單元名 | 任一作用域的 `libraries/<unit>/` |
 
 分類目錄**不重複編碼型別**。`assets/fx/` 底下同時放碎塊 Component Asset（`asset.usd`）與可重用 FX Element（`element.usd`）並不構成歧義——工具讀入口檔名即知該套哪套契約，無須維護「目錄名 → 單元型別」對照表。
