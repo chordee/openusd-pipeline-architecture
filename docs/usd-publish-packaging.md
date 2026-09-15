@@ -302,11 +302,19 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 以下三項 Layer Metadata 必須**全專案統一，且在每一個發布單元的入口層明確宣告**。它們看似瑣碎，卻是跨部門協作中最常見、也最難歸因的災難來源。
 
-| Metadata | 作用 | USD 預設值 |
+| Metadata | 作用 | 未宣告時的 fallback |
 | :--- | :--- | :--- |
-| `metersPerUnit` | 一個 Stage 單位代表幾公尺 | `0.01`（公分） |
-| `upAxis` | 世界座標的上方向 | **`"Z"`** |
-| `timeCodesPerSecond` | 一秒鐘包含幾個 timeCode | `24` |
+| `metersPerUnit` | 一個 Stage 單位代表幾公尺 | `0.01`（公分）＊ |
+| `upAxis` | 世界座標的上方向 | **`"Z"`** ＊ |
+| `timeCodesPerSecond` | 一秒鐘包含幾個 timeCode | `24`（另有 `framesPerSecond` 回落，見 §3.2） |
+
+> [!WARNING]
+> **＊ 這兩項的 fallback 是「站台層級可配置」，不是寫死的常數**
+> `UsdGeomGetStageUpAxis()` 與 `UsdGeomGetStageMetersPerUnit()` 在未宣告時，回傳的是 `UsdGeomGetFallbackUpAxis()` / `UsdGeomGetFallbackMetersPerUnit()`——而這兩個 fallback **可透過 `UsdGeomMetrics` 的 plugInfo 於站台層級覆寫**。上表數值為**標準 OpenUSD 發行版**的值。
+>
+> 這意味著：**同一份未宣告 `upAxis` 的檔案，在不同的 USD 安裝下可能得到不同的結果**——工作站、農場節點、外包方、客戶端各自的配置未必一致。
+>
+> 因此結論不是「記住預設值是什麼」，而是——**永遠明確宣告，不倚賴任何 fallback**。各 DCC 隨附的 USD（如 Houdini、Maya）是否調整過此配置，應於實際部署環境中自行驗證。
 
 > [!CAUTION]
 > **核心認知：USD 對這三項「完全不做自動轉換」**
@@ -331,8 +339,10 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ```
 
 > [!WARNING]
-> **`upAxis` 的預設值是 `"Z"`，不是 `"Y"`**
-> 任何未明確宣告 `upAxis` 的入口層，USD 均視為 Z-up。若專案採 Y-up 而某個發布單元漏了宣告，該單元被單獨開啟時即整個躺倒 90 度。此為 [`latest` 包裝圖層](#6-latest-動態入口的實現機制)遺漏 metadata 時最常見的症狀。
+> **標準 OpenUSD 的 `upAxis` fallback 是 `"Z"`，不是 `"Y"`**
+> 未明確宣告 `upAxis` 的入口層，在標準發行版下均被視為 Z-up。若專案採 Y-up 而某個發布單元漏了宣告，該單元被單獨開啟時即整個躺倒 90 度——此為 [`latest` 包裝圖層](#6-latest-動態入口的實現機制)遺漏 metadata 時最常見的症狀。
+>
+> 又因 fallback 可於站台層級配置，**漏宣告的後果會隨環境而異**：可能在工作站上看起來正常、送到農場或交付客戶後才躺倒。這使「明確宣告」從建議升格為必要。
 
 > [!TIP]
 > **Camera 的 `focalLength` 與 aperture 受 `metersPerUnit` 牽動**

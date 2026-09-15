@@ -68,7 +68,7 @@
 ### 7. Stage Metadata 全專案一致：USD 不做任何自動轉換
 - **三項必須統一並於每個發布單元入口層宣告**：`metersPerUnit`、`upAxis`、`timeCodesPerSecond`。
 - **最反直覺之處**：Asset 被 Reference / Payload 引入時，**被引用層的宣告會被完全忽略**，Stage 只採用 root layer 的值。USD **不會**依差異縮放幾何、**也不會**旋轉座標系——這兩項是「宣告」而非「轉換指令」。以公尺建模的角色引入公分制專案，會靜默地變成 1.8 公分高。
-- **`upAxis` 預設為 `"Z"`**：Y-up 專案若有單元漏宣告，單獨開啟即整個躺倒 90 度。
+- **標準 OpenUSD 的 `upAxis` fallback 為 `"Z"`**：Y-up 專案若有單元漏宣告，單獨開啟即整個躺倒 90 度。且此 fallback **可於站台層級配置**，漏宣告的後果會隨環境而異——可能在工作站正常、送農場或交付客戶後才躺倒。
 - **`timeCodesPerSecond` 不一致會引發隱式時間縮放**：sublayer 與 root layer 數值不同時，USD 依比值自動縮放時間樣本，動畫不報錯、不壞掉，僅整體速率偏移——極難歸因。
 - **發布時須確保幾何數值本身即符合專案單位**，不得倚賴 metadata 宣告來救。詳見：[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)。
 
