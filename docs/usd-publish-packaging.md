@@ -16,7 +16,7 @@
 >    - **包外引用 → 專案 Expression Variable（``@`"${PROJECT_ROOT}/..."`@``）**：所有引用專案目錄的絕對路徑，在輸出時由 **Houdini Solaris Output Processor** 自動改寫為 Stage Expression Variable（如 `${PROJECT_ROOT}`），並於 Layer Metadata 中預設宣告。未來專案目錄搬遷或交付客戶時，**只需在頂層重新指定變數或以 Wrapper Layer 包裹，即可一口氣全局替換所有層的路徑**，零檔案修改。
 > 4. **Pure USD 單元**：發布目標純粹為 USD，內容與結構放寬限制，專供靈活應付額外自訂操作與特殊工具鏈。
 > 5. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口。全平臺**統一採用 `subLayers` 包裝圖層**（不使用 Symlink），且包裝圖層必須完整複製版本層的全部 Layer Metadata。
-> 6. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本的「不可變性（Immutability）」。
+> 6. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本在**位元組層級**的不可變性（Immutability）。惟**合成結果**因跨包引用 `latest` 仍會漂移，歷史確定性須倚賴 Asset Resolver 鎖定。
 > 7. **Asset Resolver 逆向鎖定（Version Pinning）**：日常製作引用 `latest` 享受自動更新；農場算圖或定剪交付時，由自訂 Asset Resolver 讀取審批快照，動態將 `latest` 鎖定為具體歷史版本，保障 100% 可重現性。
 > 8. **暫存輸出與發布後移轉註冊（Staging & Atomic Promotion）**：所有 USD 元件在發布時，一律先輸出至獨立的**暫存資料夾（Staging / Scratch Directory）**；直到所有檔案寫入、QC 驗證與依賴校驗完全跑完，Pipeline 才以原子操作搬移至專案正式流程結構內並完成資料庫註冊，徹底杜絕半成品外溢污染專案。
 
@@ -132,7 +132,7 @@ def PointInstancer "ForestTrees"
 >      ```
 > 3. **頂層自動維護唯一的 `asset_latest.usd`**：
 >    - 只有在整個 Asset 進版時，Pipeline 才會自動維護並將頂層的 `asset_latest.usd` 更新指向新生成的版次（如 `v002/asset.usd`）。
->    - 這保證了歷史每個版本 `asset.usd` 的內部結構完全不可變（Immutable），且外部消費端永遠只需對接唯一的 `asset_latest.usd`。
+>    - 這保證了歷史每個版本 `asset.usd` 的**檔案內容**完全不可變（Immutable），且外部消費端永遠只需對接唯一的 `asset_latest.usd`。
 
 > [!CAUTION]
 > **Pipeline `/ROOT` 鐵律：`/ROOT` 的結構性意見為 Pipeline 工程專有，部門一律不得宣告**
@@ -511,10 +511,47 @@ over "ROOT"
 
 | 評估維度 | USD VariantSet 控制版本（權衡後不採用） | `latest` 指標 / Sublayer 模式（選用方案） |
 | :--- | :--- | :--- |
-| **歷史發布不可變性<br>(Immutability)** | **需回溯修改**。<br>發布 `v003` 時，必須重新開啟並編輯上層主檔案，將 `v003` 註冊進 variant 清單，歷史目錄無法設為完全唯讀。 | **完全凍結**。<br>`v001` 與 `v002` 所在的資料夾一旦發布便轉為 Read-Only，永不改動。 |
+| **歷史發布不可變性<br>(Immutability)** | **需回溯修改**。<br>發布 `v003` 時，必須重新開啟並編輯上層主檔案，將 `v003` 註冊進 variant 清單，歷史目錄無法設為完全唯讀。 | **位元組層級凍結**。<br>`v001` 與 `v002` 所在的資料夾一旦發布便轉為 Read-Only，其檔案內容永不改動。<br>*（合成結果因跨包 `latest` 仍會漂移，詳見下節）* |
 | **檔案鎖與並發發布** | **可能衝突**。<br>多人同時發布不同分支時，會同時爭搶寫入同一個包含 VariantSet 的主檔。 | **零衝突**。<br>新版本寫入獨立的新目錄，僅在最後一步以原子操作更新 `latest` 指向。 |
 | **Stage 記憶體開銷** | **累積膨脹**。<br>VariantSet 會將數十個歷史版本的定義都載入記憶體結構中，版本越多 Stage 解析負擔越大。 | **極致輕量**。<br>Stage 僅解析 `latest` 指向的那一個單一版本。 |
 | **維護成本** | **連鎖更新**。<br>上游 Asset 每次加版，下游必須全部重新簽入以適應新的 Variant 選項。 | **局部自理**。<br>每個 Asset 只需維護自身當前的 `latest` 指標。 |
+
+### 不可變性的兩個層級：位元組凍結 vs 合成結果
+
+上表的「位元組層級凍結」僅在**位元組層級**成立，必須與**合成結果層級**分開理解——兩者混為一談會造成嚴重誤判。
+
+| 層級 | 是否凍結 | 說明 |
+| :--- | :---: | :--- |
+| **位元組層級**（檔案內容） | **是** | `v001/asset.usd` 一旦發布即轉為唯讀，其位元組永不改動。這是目錄進版相對於 VariantSet 控版的真正優勢。 |
+| **合成結果層級**（composed Stage） | **否** | 只要該版本內部存在指向 `*_latest.usd` 的引用，其合成結果就會隨上游進版而**漂移**。 |
+
+### 哪些引用會漂移
+
+```text
+v002/asset.usd
+ ├─► @../modelDefault/v002/…@          ← 包內相對路徑鎖定具體版次：凍結 ✓
+ └─► @../lookDefault/v001/…@           ← 同上：凍結 ✓
+
+chars/hero/v002/char.usd
+ └─► @…/assets/char/hero/asset_latest.usd@   ← 跨包引用 latest：漂移 ✗
+
+sets/livingroom/v003/set.usd
+ └─► @…/assets/props/chair/asset_latest.usd@ ← 跨包引用 latest：漂移 ✗
+```
+
+**規律**：包內以相對路徑鎖定的 sub 物件恆為凍結；**跨包引用一律走 `latest`，因而恆會漂移**。
+
+### 這是刻意的設計，不是缺陷
+
+跨包若一律鎖定具體版次，將引發**版本雪崩**：建模修一次破面 → 引用該 Asset 的所有 Set Dressing、綁定角色、鏡頭總成全部必須重新發布一輪，且層層相乘。此成本在實務上不可承受。
+
+因此全 Pipeline 一致採取「**日常漂移、關鍵時刻鎖定**」：跨包引用維持 `latest` 以享受無感更新，歷史確定性則由 [Asset Resolver 逆向鎖定](#8-asset-resolver-的逆向鎖定機制version-pinning)在送算與審批時達成。
+
+> [!CAUTION]
+> **由此推導出的三項後果，必須讓團隊確實知悉**
+> 1. **「發布即凍結」的直覺會誤導**：開啟 `sets/livingroom/v003/` 看到的畫面，**不等於**該版本當初發布時的畫面。要回到當初，必須連同當時的鎖定清單一起解析。
+> 2. **Resolver 鎖定的四項注意事項是必要條件，而非建議**：既然檔案層不保證合成結果，可重現性就**完全**倚賴鎖定機制。其中「遞移涵蓋整棵依賴樹」與「鎖定情境下 fail loud」任一項失守，整套承諾即告瓦解。
+> 3. **交付與封存不可直接複製目錄**：直接打包發布目錄交付客戶或長期封存時，其中的 `latest` 會指向**打包當下的最新版**，而非交付所核准的版本。正確作法是先以鎖定清單解析後再行打包（或 Flatten），或將鎖定清單一併交付並要求對方以相同 Resolver 開啟。
 
 > [!TIP]
 > **架構取捨的核心定位**
@@ -693,7 +730,7 @@ def Xform "ROOT" (
 | **進版格式** | `v###` 三位數零填充目錄 | `v001`, `v002`, `v003`... 保持歷史唯讀 |
 | **`latest` 實現** | 全平臺統一為 USD Sublayer 包裝圖層 | 不使用 Symlink／Hardlink——二者無法被 Asset Resolver 攔截 |
 | **包裝圖層 Metadata** | 必須完整複製版本層的全部 Layer Metadata | Layer Metadata 不透過 `subLayers` 傳遞；遺漏將導致 `upAxis` 回落預設值、`timeCodesPerSecond` 不一致引發隱式時間縮放 |
-| **版本控管機制** | 獨立目錄進版搭配 `latest` 指向 | 權衡取捨：不以 VariantSet 控版，確保發布不可變性 |
+| **版本控管機制** | 獨立目錄進版搭配 `latest` 指向 | 位元組層級不可變；合成結果因跨包 `latest` 漂移，須由 Resolver 鎖定 |
 | **生產期引用** | 預設引用 `latest.usd` | 享受無感即時更新 |
 | **渲染/發布鎖定** | 透過 Asset Resolver 於 `Resolve()` 重寫 `*_latest.usd` 路徑；情境以 `ArResolverContext` 攜帶 | 鎖定清單須遞移涵蓋依賴樹；鎖定情境下找不到清單須 fail loud |
 | **Asset Loader 載入規範** | Query（檢索）與 Load（掛載）兩段式架構 | 遵循原生 Composition Arcs（Ref/Payload/Sublayer），支援自由指定 Target Prim Path |
