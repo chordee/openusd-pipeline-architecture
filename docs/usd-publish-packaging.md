@@ -208,15 +208,19 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 ### 範例 C：Animation 發布包目錄結構
 ```text
-/projects/show_A/publish/shots/sq01/sh010/anim/          <-- 【動畫任務目錄】
-├── anim_latest.usda                                    <-- 動畫最新動態入口
-├── v001/
-│   └── anim.usd                                        <-- 固定主入口檔案 (/ROOT/Anim)
-├── v002/
-│   └── anim.usd
-└── layers/                                             <-- 骨架 SkelAnimation 與 Camera 時序層
-    ├── hero_skel_anim.usd
-    └── shot_camera.usd
+/projects/show_A/publish/shots/sq01/sh010/anim/          <-- 【分類目錄，非包裝單元】
+├── BoyWalking/                                         <-- 【包裝單元】
+│   ├── anim_latest.usda                                <-- 動畫最新動態入口
+│   ├── v001/
+│   │   └── anim.usd                                    <-- 固定主入口檔案 (/ROOT/Anim)
+│   ├── v002/
+│   │   └── anim.usd
+│   └── skel/                                           <-- SkelAnimation sub 單元（無 latest）
+│       ├── v001/skel.usd
+│       └── v002/skel.usd
+└── ShotCamera/                                         <-- 【包裝單元】同層獨立進版
+    ├── anim_latest.usda
+    └── v001/anim.usd
 ```
 
 * **發布原子性（Atomicity）**：整個資料夾視為一個完整的不可分割單位。發布工具在驗證、上傳、封存或備份時，均以此資料夾整體為操作對象。
