@@ -272,7 +272,7 @@ over "ROOT"
                 rel material:binding = </ROOT/Lighting/Materials/M_Table_Darker>
             }
             
-            # 隱藏背景遮擋視線的樹木
+            # 隱藏背景遮擋視線的樹木（此樹為獨立 Prim，故可直接 over）
             over "Tree_Occluder"
             {
                 token visibility = "invisible"
@@ -281,6 +281,30 @@ over "ROOT"
     }
 }
 ```
+
+> [!CAUTION]
+> **若目標是 `PointInstancer` 的其中一個實例，上述寫法完全無效**
+> `PointInstancer` 的實例**不是 Prim**——它們只是 `positions` / `protoIndices` 等陣列中的一筆索引，在命名空間中根本不存在，因此**沒有任何路徑可供 `over`**。
+>
+> 海量散佈（森林、碎石、草皮）一律以 `PointInstancer` 承載，所以「隱藏那棵擋鏡頭的樹」在散佈場景中必須改用實例級的機制：
+>
+> ```usda
+> over "ROOT" { over "Environment" { over "SetDressing"
+> {
+>     over "OuterForest"
+>     {
+>         over "ForestTrees"
+>         {
+>             # 以 id 隱藏個別實例；未宣告 ids 時，id 即為實例在陣列中的索引
+>             int64[] invisibleIds = [1723, 4408]
+>         }
+>     }
+> } } }
+> ```
+>
+> **同一限制亦適用於材質**：無法為單一實例指定專屬 `material:binding`。若需外觀差異，只能在原型層級處理——增加一個原型並以 `protoIndices` 指派，或改用 `Instanceable Xform` 逐顆擺放。
+>
+> 因此 Lighting 在動手前必須先確認目標的承載形式：**獨立 Prim 用 `over`，`PointInstancer` 實例用 `invisibleIds`**。兩者無法互換，用錯不會報錯、只是毫無反應。
 
 ### 情境 B：Lighting 覆寫 Animation（角色 Lookdev 修補）
 * **檔案**：`lighting_overrides/char_eye_highlight_fix.usd`

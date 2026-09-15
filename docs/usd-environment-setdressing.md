@@ -138,6 +138,18 @@ def Xform "ROOT" (
 
 * **存檔特性**：即使包含十萬棵樹木散佈，此檔案僅需儲存幾十萬個浮點數（二進位 `.usd` 下約數 MB 到幾十 MB），而不會像傳統格式那樣把幾何網格複製十萬次產生上百 GB 的肥大快取。
 
+> [!IMPORTANT]
+> **下游覆寫方式與獨立 Prim 完全不同**
+> `PointInstancer` 換取極致輕量的代價，是**實例不具備 Prim 身分**——它們僅是陣列中的索引，命名空間裡沒有對應路徑。因此下游部門慣用的 `over` + `visibility` 在此**毫無作用**（不報錯，單純沒反應）。
+>
+> | 需求 | 獨立 Prim | `PointInstancer` 實例 |
+> | :--- | :--- | :--- |
+> | 隱藏個別物件 | `over` + `token visibility = "invisible"` | `int64[] invisibleIds = [...]` |
+> | 個別指定材質 | `over` + `rel material:binding` | **不可行**；須新增原型並以 `protoIndices` 指派 |
+> | 個別微調 Transform | `over` + `xformOp:*` | **不可行**；須改寫 `positions` / `orientations` 陣列 |
+>
+> **選型判準**：需要下游逐顆覆寫的物件（英雄道具、會被動畫接管的家具）應以 `Instanceable Xform` 逐顆擺放；僅需整體存在、不會被個別指名的自然散佈才使用 `PointInstancer`。詳見 [Shot Layers 篇跨部門覆寫](usd-shot-layers.md)。
+
 > [!TIP]
 > **Pipeline 解耦最佳實踐：Points Primitive 獨立發布為 Pure USD 單元**
 > 若將海量點位陣列直接寫死在 `layout.usd` 主圖層中，每次微調散佈疏密都必須迫使整顆鏡頭的 Layout 總成進版，引發下游連鎖更新。
