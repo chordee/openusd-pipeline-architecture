@@ -12,7 +12,7 @@
 
 ## 📚 專題筆記清單與核心權威索引
 
-全套架構由 8 篇互補且深度的專題筆記構成，涵蓋 Pipeline 所有核心面向：
+全套架構由 10 篇互補且深度的專題筆記構成，涵蓋 Pipeline 所有核心面向：
 
 | 筆記名稱 | 核心探討範疇 | 關鍵架構概念 |
 | :--- | :--- | :--- |
@@ -24,6 +24,8 @@
 | **[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)** | 通用封裝、路徑邊界與版本控制 | 目錄即包裝單元、內相對外絕對、`latest` 指向與 Asset Resolver 逆向鎖定 |
 | **[USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)** | 全元素載入與場景陳設工具架構 | Query/Load 兩段式分離、原生 Composition Arcs、自由指定 Prim Path、Instanceable、Class Inherits 標籤廣播 |
 | **[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)** | Solaris 導出虛擬層收斂與治理機制 | Flatten 打平優先、無法打平時強制落地子目錄（`./layers/`）、`Configure Layer` 主動顯式化（Explicit Layer） |
+| **[USD Skel 骨架動畫設定指南](docs/usd-skel-guide.md)** | Skel Schema 底層語法與陣列規範 | `SkelRoot` 邊界、`bindTransforms` 與 `restTransforms` 的座標空間差異、`elementSize` 踩雷點 |
+| **[USD Pipeline 驗證與 QC 架構](docs/usd-pipeline-validation.md)** | 規範的強制執行機制 | 索引而非規則本體、三級嚴重度（攔阻／報告／建議）、三道關卡、具名具時限之豁免機制 |
 
 ---
 
@@ -71,7 +73,7 @@
 - **最反直覺之處**：Asset 被 Reference / Payload 引入時，**被引用層的宣告會被完全忽略**，Stage 只採用 root layer 的值。USD **不會**依差異縮放幾何、**也不會**旋轉座標系——這兩項是「宣告」而非「轉換指令」。以公尺建模的角色引入公分制專案，會靜默地變成 1.8 公分高。
 - **本架構採公尺 + Y-up**（`metersPerUnit = 1`、`upAxis = "Y"`），與 Houdini 原生行為一致；公分制專案等同持續與 Houdini 的求解器尺度假設與 Camera 換算對抗。
 - **fallback 隨環境而異，漏宣告的後果不可預測**：標準 OpenUSD 的 `upAxis` fallback 為 `"Z"`，而 Houdini 覆寫為 `"Y"`（實測 22.0）；`metersPerUnit` 的 fallback 兩者皆為 `0.01`，與本架構的公尺制相反。未宣告的圖層在 Houdini 中看似正常，送進標準環境即躺倒或縮小百分之一。
-- **Camera 焦距在公尺制下為十分之一 scene unit**：35mm 應寫作 `0.35`。誤填 `35` 時 FOV 仍正確（比值不變），但**景深徹底錯亂**，會拖到 Lighting 階段才爆。
+- **Camera 焦距的單位恆為 scene unit 的十分之一**，與採用何種單位制無關；變的是 scene unit 本身——公分制下十分之一即 1mm（`focalLength = 35` 就是 35mm），公尺制下則為 10cm（35mm 須寫作 `0.35`）。誤填 `35` 時 FOV 仍正確（比值不變），但**景深徹底錯亂**，會拖到 Lighting 階段才爆。
 - **`timeCodesPerSecond` 不一致會引發隱式時間縮放**：sublayer 與 root layer 數值不同時，USD 依比值自動縮放時間樣本，動畫不報錯、不壞掉，僅整體速率偏移——極難歸因。
 - **發布時須確保幾何數值本身即符合專案單位**，不得倚賴 metadata 宣告來救。詳見：[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)。
 
@@ -95,7 +97,7 @@
 
 | 專業崗位 | 核心推薦閱讀篇目 | 實踐重點 |
 | :--- | :--- | :--- |
-| **Pipeline / TD / 架構師** | 全部 8 篇（著重於 [USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)、[USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)、[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)） | 掌握包裝邊界驗證、Solaris ROP 配置、Implicit Layer 輸出治理、Asset Resolver 鎖定邏輯與發布 Hook。 |
+| **Pipeline / TD / 架構師** | 全部 10 篇（著重於 [USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)、[USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)、[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)） | 掌握包裝邊界驗證、Solaris ROP 配置、Implicit Layer 輸出治理、Asset Resolver 鎖定邏輯、發布 Hook 與 QC 規則模組實作。 |
 | **Model / Lookdev TD** | [USD Asset Layer 架構設計](docs/usd-asset-layer.md)、[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md) | 理解幾何與材質雙層解耦、Model/Look VariantSet 封裝、以及 `/ROOT` 命名規範。 |
 | **Layout / Set Dresser** | [USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)、[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)、[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)、[USD Asset Layer 架構設計](docs/usd-asset-layer.md) | 掌握 Loader Query/Load 擺放實務、Assembly 虛擬組裝、跨鏡頭 Set Asset 複用、`PointInstancer` 海量散佈優化、與避免 multi-input 產生外溢隱式圖層。 |
 | **Animator / Rigging TD** | [USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)、[USD Skel 骨架動畫設定指南](docs/usd-skel-guide.md) | 掌握角色雙單元切分（`asset` / `char`）與 `SkelRoot` 三分支，蒙皮權重歸骨架包以 `over` 注入，避免輸出全幾何快取。 |

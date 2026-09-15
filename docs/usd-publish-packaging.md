@@ -265,34 +265,14 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 2. **階段二：完整性與安全性檢驗（Validation）**：
    - 包含檔案完整性、USD SdfLayer 依賴性檢查、相對路徑合規性、以及是否有未經處理的外溢隱式圖層。
    - 若任何檢查失敗，直接清理暫存目錄並報錯終止，**正式專案結構 100% 保持純淨**。
-
-   **Pre-flight QC 強制檢查項清單**：
-
-   | 檢查項 | 判定標準 | 對應鐵律 |
-   | :--- | :--- | :--- |
-   | **幾何零材質** | 幾何發布單元（`modelDefault/`、FX `layers/`）內不得存在任何 `Material` / `Shader` Prim | [材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract) |
-   | **幾何零綁定** | 幾何發布單元內不得出現任何 `material:binding`，含 `GeomSubset` 上的分面綁定 | 同上 |
-   | **覆寫 `over` 命中** | look / material / skel 圖層內每個 `over` 路徑，合成後皆對應到 `IsDefined()` 為真的 Prim | 同上 |
-   | **`/ROOT` 已被定義** | 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True` | [`/ROOT` 鐵律](#2-同構目錄包裝單元isomorphic-packaging-unit) |
-   | **`/ROOT` 未被部門污染** | 部門輸出的 sub 圖層，在 `/ROOT` 上不得殘留任何屬性或元數據意見（含 `kind`） | 同上 |
-   | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
-   | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色 Asset 結構](usd-asset-layer.md#7-角色-asset-結構character-asset) |
-   | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 必須明確宣告 `elementSize`，否則 imaging 端無法切分每點影響數 | 同上 |
-   | **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其所包裹的版本層逐項相同 | [`latest` 實現機制](#6-latest-動態入口的實現機制) |
-   | **Stage Metadata 全專案一致** | 每個發布單元入口層的 `metersPerUnit`、`upAxis`、`timeCodesPerSecond` 皆已宣告且與專案設定相同 | [Stage Metadata 規範](#3-stage-metadata-全域規範單位座標系與時間軸) |
-   | **幾何數值符合專案單位** | 匯入之外包／第三方 Asset 的實際尺度已換算驗證，不倚賴 metadata 宣告 | 同上 |
-   | **時序單元已宣告範圍** | 動畫、FX Element 等時序發布單元皆已宣告 `startTimeCode` / `endTimeCode`，且涵蓋手把影格 | 同上 |
-   | **Camera 焦距單位正確** | `focalLength` / aperture 以「scene unit 的十分之一」計；公尺制下 35mm 應為 `0.35`。誤填會使 FOV 正常但 DOF 錯亂，須於手寫與轉檔產出的鏡頭逐一驗證 | 同上 |
-   | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#9-asset-resolver-的逆向鎖定機制version-pinning) |
-   | **指定的 RenderSettings 存在**<br>*（送農場前）* | 提交參數或 `renderSettingsPrimPath` 所指的 `RenderSettings` Prim 確實存在且合成後可解析 | [Render 層](usd-shot-layers.md) |
-   | **製作資料未寫死** | Lighting 發布版本內不得寫死解析度與影格範圍，該類製作資料由 Pipeline 注入 | 同上 |
-   | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
+   - **完整的檢查項清單、嚴重度分級與豁免機制，詳見專題筆記：[USD Pipeline 驗證與 QC 架構](usd-pipeline-validation.md)**。
 
    > [!CAUTION]
    > **幾何零材質、零綁定必須由工具強制剝除，不可仰賴人工紀律**
    > Houdini、Maya 等 DCC 的 USD 匯出器**預設就會在 Mesh 上寫入 direct binding**。因此幾何發布 Hook 必須在輸出時主動移除所有 `material:binding` 與 `Material` / `Shader` Prim，QC 僅作為最後一道把關。
    >
    > 一旦有 Asset 夾帶了 direct binding 流入專案，該 Asset 的**所有下游覆寫都會靜默失效**——不報錯、不警告，只是畫面沒變，且極難歸因。務必守在發布關口。
+
 3. **階段三：原子移轉（Atomic Promotion / Move）**：
    - 唯有在發布流程所有邏輯**完全跑完並驗證通過後**，發布引擎才將暫存目錄以檔案系統原子操作（`move` / `rename`）移轉至專案所屬的正式資料夾結構中。
    - 同步更新頂層的 `_latest.usd` 入口指標，並將該版本目錄設為唯讀（Read-Only）。
