@@ -713,6 +713,7 @@ def SkelRoot "ROOT" (
 │   └── Look/Materials
 ├── Skel (Skeleton)          <-- joints / bindTransforms / restTransforms
 │   └── BlendShapes/         <-- BlendShape 本體（靜態形狀資料）
+├── Controls/                <-- 選用：烘出的控制器，purpose = "guide"（見 §7.3）
 └── AnimData (SkelAnimation) <-- 鏡頭層注入，發布包內不存在
 ```
 
@@ -728,11 +729,11 @@ def SkelRoot "ROOT" (
 >
 > 這同時解決了一個常見錯誤：若改為引用 `</ROOT/Model>` 以求「只取幾何」，`/ROOT` 上的綁定不會隨之帶入，角色將完全失去材質。**一律引用完整的 `</ROOT>`。**
 
-### 3. Rig 與 Skel 不等價：USD 只承載變形層
+### 3. Rig 與 Skel：USD 承載變形，不承載綁定邏輯
 
-「Rig」是部門與工序的名稱，「Skel」是 USD 實際承載的東西。兩者常被混用，但**不等價**——`UsdSkel` 只是 Rig 的輸出子集，具體說是**變形層**。
+「Rig」是部門與工序的名稱。**USD 本身沒有 rig 格式**——沒有任何 Schema 或檔案型別提供綁定功能。Rig 實際存在於 Houdini／Maya 的場景檔中，動畫製作也一律是打開 DCC 場景進行，而非開啟 USD。
 
-`UsdSkel` 的完整表面即以下四者，別無其他：
+`UsdSkel` 承載的是 Rig 的**輸出**，具體說是變形層，完整表面即以下四者：
 
 | Schema | 承載內容 |
 | :--- | :--- |
@@ -741,20 +742,72 @@ def SkelRoot "ROOT" (
 | `SkelAnimation` | `joints`、`translations`、`rotations`、`scales`、`blendShapes`、`blendShapeWeights` |
 | `BlendShape` | `offsets`、`normalOffsets`、`pointIndices` |
 
-控制器、IK／FK、約束、Deformer Stack、Space Switch、Driven Key——**一個都沒有，也沒有地方安放**。`UsdSkel` 是為了**傳輸**骨骼變形而設計（需能撐到群眾規模），刻意不承載綁定邏輯。
+**無法表達的是求值邏輯**：IK／FK 解算、約束圖、運算式、Driven Key、Space Switch、Deformer Stack。這些留在 DCC 場景裡，不跨越發布邊界。
 
 > [!IMPORTANT]
-> **綁定角色是消費用產物，不是製作用產物**
-> 發布出去的綁定角色**無法以原本的控制器重新動畫**。下游能做的只有透過 `SkelAnimation` 驅動 joints，或改寫 `blendShapeWeights`。動畫必須在 DCC 內對著真正的 Rig 製作，發布時烘焙為 `SkelAnimation`。
->
-> 這正是 `AnimData` **不存在於發布包內、僅由鏡頭層注入**的原因——發布包沒有能產生它的東西。同理，[`skel/` 不設 `latest`](#1-綁定角色的目錄結構)的取捨也受同一限制約束：單獨取用骨架而不要幾何的情境（如 Mocap retarget），拿到的同樣只有變形層。
+> **無法表達綁定邏輯，不等於控制器放不進 USD**
+> 控制器的 transform 只是矩陣，完全可以烘成一般的 `Xform` Prim 帶時序取樣，隨 `skel` 或 `anim` 一併發布。實務上這是常見且值得做的——理由見下。
 
-因此在命名上，兩個詞各自在不同的域裡成立，不互相取代：
+#### 蒙皮變形沒有可供 constraint 的對象
+
+> [!CAUTION]
+> **`Skeleton` 的關節不是 Prim**
+> `joints` 是 `Skeleton` 上的 `token[]` 屬性，命名空間裡**不存在對應的 Prim**：
+>
+> ```text
+> /ROOT/Skel                  ← Skeleton Prim，存在
+> /ROOT/Skel/Root/Hip/Hand_L  ← 不存在，GetPrimAtPath() 回傳 invalid null prim
+> ```
+>
+> 這與 [PointInstancer 實例不具 Prim 身分](usd-environment-setdressing.md)是**同一類問題**：陣列元素無法被 `over`、無法被指名，也**無法成為 constraint 的目標**。
+
+因此當下游需要讓道具跟著角色的手走時，蒙皮後的 Mesh 給不出任何可指名的對象——它只是一批每幀變形的點，「手」在命名空間裡並不存在。**烘出來的控制器 `Xform` 在此成為唯一可定址的把手**，即使它們絕大多數不參與最終算圖。
+
+非算圖用途的控制器應宣告 `purpose = "guide"`，使其在算圖時自動排除、在 Viewport 中仍可選取：
+
+```usda
+def Xform "Controls" (
+    kind = "group"
+)
+{
+    token purpose = "guide"
+
+    def Xform "CTRL_Hand_L"
+    {
+        matrix4d xformOp:transform.timeSamples = { ... }
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+}
+```
+
+> [!TIP]
+> **USD 原生的精簡替代方案：`constraintTargets`**
+> `UsdGeomModelAPI` 提供 `constraintTargets:<name>`（型別 `matrix4d`），專為「對外公開若干可供約束的座標」而設，無須搬運整套控制器階層：
+>
+> ```usda
+> def Xform "ROOT" (
+>     prepend apiSchemas = ["GeomModelAPI"]
+>     kind = "component"
+> )
+> {
+>     matrix4d constraintTargets:HandL.timeSamples = { ... }
+> }
+> ```
+>
+> 兩者取向不同、可並存：控制器帶著完整的製作語意與階層，適合需要貼近原始 Rig 的情境；`constraintTargets` 則是刻意精簡的對外介面，只承諾若干具名座標。惟須注意 `GetConstraintTargets()` **僅在該 Prim 具 model `kind` 時才列舉得到**。
+
+#### 兩個詞各自的適用域
 
 - **Rig** — 部門、工序、審批關卡與[分類目錄](usd-publish-packaging.md)（`publish/rig/<unit>/`）
 - **Skel** — Prim 名與 Schema（`/ROOT/Skel`、`UsdSkelSkeleton`）
 
-把 Prim 命名為 `Rig` 會讓人打開檔案去找控制器，然後找不到。
+把 Prim 命名為 `Rig` 會讓人打開檔案去找解算邏輯，然後找不到——USD 裡沒有那種東西。
+
+> [!IMPORTANT]
+> **綁定角色是消費用產物**
+> 發布出去的綁定角色**無法以原本的控制器重新動畫**——控制器縱使一併烘出，也只剩每幀的矩陣，背後的 IK 與約束網路並未隨行。下游能做的是透過 `SkelAnimation` 驅動 joints、改寫 `blendShapeWeights`，或**以控制器為錨點做約束**。
+>
+> 這正是 `AnimData` **不存在於發布包內、僅由鏡頭層注入**的原因——發布包沒有能產生它的東西。同理，[`skel/` 不設 `latest`](#1-綁定角色的目錄結構)的取捨亦受同一限制約束。
 
 ### 4. `skel/` 包的內容與蒙皮權重的 `over`
 
