@@ -99,7 +99,7 @@ USD ROP (Output Processor)
 
 ## 4. Pipeline 的縱深防禦：Output Processor 守衛與三層防禦體系
 
-### 4.1 核心困境：為什麼 Pre-publish Hook 在節點階段難以完全防禦？
+### 1. 核心困境：為什麼 Pre-publish Hook 在節點階段難以完全防禦？
 
 許多 Pipeline TD 的第一反應是：「我在發布前寫一個 Pre-publish Hook 腳本，在節點圖上檢查只要有 Implicit Layer 就報錯阻擋，不就解決了？」
 
@@ -115,7 +115,7 @@ USD ROP (Output Processor)
 
 ---
 
-### 4.2 終端攔截手段：Solaris Output Processor 雙重職責 (守衛與路徑改寫)
+### 2. 終端攔截手段：Solaris Output Processor 雙重職責 (守衛與路徑改寫)
 
 既然節點圖難以預測，另一種在 Pipeline TD 之間常見且強大的手段是：**利用 Houdini Solaris 的自訂 Output Processor**。
 
@@ -134,7 +134,7 @@ USD ROP (Output Processor)
 
 ---
 
-### 4.3 最佳實踐：三層縱深防禦體系 (Three-Tier Defense Architecture)
+### 3. 最佳實踐：三層縱深防禦體系 (Three-Tier Defense Architecture)
 
 因此，工業級 Pipeline 的最佳解法絕非單靠終端的 Output Processor 攔截，而是建立「**源頭教育 → 流程前置檢視 → 終端守衛**」的三層縱深防禦體系：
 
@@ -189,7 +189,7 @@ USD ROP (Output Processor)
 
 Layout 與場景陳設組在製作環境（Environment）時，是 Pipeline 中最容易出問題的部門。
 
-#### 常見四大災難操作：
+#### 常見四大災難操作
 1. **過度依賴 `SOP Create` 與 `SOP Modify`**：
    - 藝術家習慣在 Solaris 內部直接拉 `SOP Create` 捏幾何、排地表碎石，或用 `SOP Modify` 隨手刷權重。
    - 這些節點會在背後生成大量依附於特定影格與時間點的匿名 Implicit Layers，且藝術家往往不主動管理。

@@ -486,6 +486,7 @@ over "ROOT"
 ```
 
 > [!WARNING]
+> **`GeomSubset` 名稱一經發布即為對外介面**
 > 這是本契約中**唯一**由 look 層下探至幾何內部路徑的情境，代價是 look 層與幾何的 subset 命名產生耦合。因此 `GeomSubset` 的名稱一經發布即視為**對外介面**，建模端不得隨意改名——改名會使 look 層的 `over` 靜默落空。QC 必須驗證 look 層每個 `over` 路徑都命中實際存在的 Prim。
 
 ### 5. 發佈期強制執行（Publish-time Enforcement）
@@ -657,6 +658,7 @@ def Xform "ROOT" (
 | **綁定角色** | `SkelRoot` 總成，引用上者並疊加骨架 | **`char.usd` / `char_latest.usda`** | Rigging |
 
 > [!NOTE]
+> **入口檔名的區分對齊審批邊界**
 > 入口檔名刻意以 `char` 與 `asset` 區分：兩者在專案中對外是不同單元，鏡頭端引用的是**綁定角色**（`char_latest.usda`）。發布單元邊界因此對齊審批邊界——Model／Lookdev 驗收一次、Rigging 驗收一次，與製作管理系統中的 task 劃分同形。
 
 ### 1. 綁定角色的目錄結構

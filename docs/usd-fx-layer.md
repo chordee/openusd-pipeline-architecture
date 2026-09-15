@@ -106,7 +106,8 @@ def Xform "ROOT" (
 ```
 
 > [!NOTE]
-> FX Element 與 Asset 完全同構，同樣以 **Reference** 嫁接各 sub 單元包：每個 sub 單元（`volume_pyro.usd`、`material.usd`）皆為自成一體的封裝單元、擁有自己的 `/ROOT`，`kind` 則由總裝層獨佔宣告。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
+> **FX Element 與 Asset 完全同構**
+> 同樣以 **Reference** 嫁接各 sub 單元包：每個 sub 單元（`volume_pyro.usd`、`material.usd`）皆為自成一體的封裝單元、擁有自己的 `/ROOT`，`kind` 則由總裝層獨佔宣告。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
 
 ### 2. 頂層唯一最新動態指標 (`element_latest.usda`)
 Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usda`。元素進版時，Pipeline 自動將其重定向指向最新版次：
