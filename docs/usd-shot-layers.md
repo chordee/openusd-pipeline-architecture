@@ -110,24 +110,22 @@ over "ROOT"
 
 over "ROOT"
 {
+    # 部門分支由 Master 的 base 建立；各單元於其下貢獻一顆以自身單元名命名的 Prim
     def Scope "Anim" ( kind = "group" )
     {
-        def Scope "Characters" ( kind = "group" )
+        # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
+        def "BoyWalking" (
+            prepend apiSchemas = ["SkelBindingAPI"]
+            prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
+        )
         {
-            # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
-            def "Hero" (
-                prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
-            )
+            # 動畫層唯一產出：純動態時序資料
+            def SkelAnimation "AnimData"
             {
-                # 動畫層唯一產出：純動態時序資料
-                def SkelAnimation "AnimData"
-                {
-                    uniform token[] joints = ["Hips", "Spine", "Head"]
-                    quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
-                }
-                rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
+                uniform token[] joints = ["Hips", "Spine", "Head"]
+                quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
             }
+            rel skel:animationSource = </ROOT/Anim/BoyWalking/AnimData>
         }
     }
 }
@@ -285,6 +283,48 @@ over "Render"
 over "ROOT" {}
 ```
 
+### `<dept>_base.usd`：彙整本鏡頭該部門的發布單元
+
+`base` 並非單一扁平檔案，而是**彙整該鏡頭中本部門所有已發布單元**的容器。以 Animation 為例，本鏡頭發布了 `BoyWalking` 與 `GirlRunning` 兩個角色動畫單元：
+
+```usda
+# anim_base.usd
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+    subLayers = [
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/BoyWalking/charAnim_latest.usda"`@,
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/GirlRunning/charAnim_latest.usda"`@
+    ]
+)
+
+over "ROOT" {}
+```
+
+合成後，每個單元各自佔據部門分支底下以**自身單元名**命名的一顆 Prim：
+
+```text
+/ROOT/Anim/BoyWalking
+/ROOT/Anim/GirlRunning
+```
+
+> [!IMPORTANT]
+> **單元名即 Prim 名**
+> 這是[單元名採 PascalCase](usd-publish-packaging.md) 的直接效益——單元名無須任何轉換即可充當 Prim 名，工具鏈不必維護「單元名 → Prim 名」對照表。同時它使「哪顆 Prim 由哪個單元產出」在命名空間中一望即知，跨部門排查時無須回溯整個圖層堆疊。
+
+四大部門一律同構：
+
+| 部門 | Master | `base` 彙整的單元 | 合成後的 Prim |
+| :--- | :--- | :--- | :--- |
+| Environment | `environment.usd` | Set Dressing、Layout 單元 | `/ROOT/Environment/<UnitName>` |
+| Animation | `anim.usd` | charAnim、camera 單元 | `/ROOT/Anim/<UnitName>` |
+| FX | `fx.usd` | FX Element 單元 | `/ROOT/FX/<UnitName>` |
+| Lighting | `lighting.usd` | Light Rig、燈光單元 | `/ROOT/Lighting/<UnitName>` |
+
+> [!NOTE]
+> **Master 進版，`base` 與 `overrides` 不進版**
+> Master 是部門對鏡頭的交付面，具備完整版本歷史與 `latest`。`base` 與 `overrides` 是其內部組裝層，隨 Master 一併凍結——任一單元進版，由 Pipeline 重新產生 `base` 並推進 Master 版次。這與 [sub 物件不設 `latest`](usd-publish-packaging.md) 是同一條規則。
+
 ### `lighting_overrides.usd` 容器的多層 Sublayer 結構
 
 `overrides.usd` 本身作為聚合容器（Container Layer），進一步 Sublayer 各任務或藝術家獨立發佈的微型覆寫檔案：
@@ -307,12 +347,14 @@ over "ROOT" {}
 ```text
 [Shot 視角]
 shot.usd
- └── subLayer: lighting.usd (Master)
+ └── subLayer: lighting.usd (Master，進版並維護 latest)
       ├── subLayer: lighting_overrides.usd (容器)
       │    ├── subLayer: shot_lookdev_patch_v03.usd   <-- 細分任務覆寫
       │    ├── subLayer: char_eye_highlight_fix.usd   <-- 細分任務覆寫
       │    └── subLayer: bg_prop_prune.usd            <-- 細分任務覆寫
-      └── subLayer: lighting_base.usd                 <-- 放置 /ROOT/Lighting 光源本體
+      └── subLayer: lighting_base.usd                 <-- 彙整本鏡頭已發布的燈光單元
+           ├── subLayer: KeyRig/lighting_latest.usda       --> /ROOT/Lighting/KeyRig
+           └── subLayer: RimRig/lighting_latest.usda       --> /ROOT/Lighting/RimRig
 ```
 
 ---

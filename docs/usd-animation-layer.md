@@ -57,46 +57,45 @@ SkelRoot ──┼── 2. Skel ──────► 由【Rig 環節】提供
 
 over "ROOT"
 {
-    def Scope "Anim" ( kind = "group" )
+    # /ROOT/Anim 由部門 Master 的 base 建立，單元本身僅以 over 進入
+    over "Anim"
     {
-        def Scope "Characters" ( kind = "group" )
+        # Prim 名即本單元的單元名（BoyWalking），無須任何轉換。
+        # 單次引用綁定角色，一併帶入 Geometry（幾何＋材質）與 Skel（骨架）。
+        # 其 /ROOT 即為 SkelRoot，型別隨 Reference 帶入，此處無須重複宣告。
+        # SkelBindingAPI 必須套用 —— skel:* 全系列屬性與 relationship
+        # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
+        def "BoyWalking" (
+            prepend apiSchemas = ["SkelBindingAPI"]
+            prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
+        )
         {
-            # 單次引用綁定角色，一併帶入 Geometry（幾何＋材質）與 Skel（骨架）。
-            # 其 /ROOT 即為 SkelRoot，型別隨 Reference 帶入，此處無須重複宣告。
-            # SkelBindingAPI 必須套用 —— skel:* 全系列屬性與 relationship
-            # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
-            def "Hero" (
-                prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
-            )
+            # 動畫師本鏡頭唯一實際輸出的動態資料 (SkelAnimation)
+            def SkelAnimation "AnimData"
             {
-                # 動畫師本鏡頭唯一實際輸出的動態資料 (SkelAnimation)
-                def SkelAnimation "AnimData"
-                {
-                    uniform token[] joints = ["Hips", "Hips/Spine", "Hips/Spine/Chest", ...]
-                    
-                    # 僅輸出隨時間變化的四元數陣列 (極度輕量)
-                    quatf[] rotations.timeSamples = {
-                        1: [(1, 0, 0, 0), (0.7, 0, 0.7, 0), ...],
-                        2: [(0.99, 0.01, 0, 0), (0.69, 0.02, 0.7, 0), ...]
-                    }
-                    float3[] translations.timeSamples = {
-                        1: [(0, 1.0, 0), (0, 0.15, 0), ...],
-                        2: [(0, 1.01, 0.005), (0, 0.15, 0), ...]
-                    }
+                uniform token[] joints = ["Hips", "Hips/Spine", "Hips/Spine/Chest", ...]
 
-                    # BlendShape 權重亦由動畫層輸出（形狀本體在綁定角色的 Skel 內）
-                    uniform token[] blendShapes = ["smile"]
-                    float[] blendShapeWeights.timeSamples = {
-                        1: [0.0],
-                        2: [0.35]
-                    }
+                # 僅輸出隨時間變化的四元數陣列 (極度輕量)
+                quatf[] rotations.timeSamples = {
+                    1: [(1, 0, 0, 0), (0.7, 0, 0.7, 0), ...],
+                    2: [(0.99, 0.01, 0, 0), (0.69, 0.02, 0.7, 0), ...]
+                }
+                float3[] translations.timeSamples = {
+                    1: [(0, 1.0, 0), (0, 0.15, 0), ...],
+                    2: [(0, 1.01, 0.005), (0, 0.15, 0), ...]
                 }
 
-                # 掛上動畫來源即完成。
-                # skel:skeleton 已由綁定角色的 skel 包寫在各 Mesh 上，此處無須重複宣告。
-                rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
+                # BlendShape 權重亦由動畫層輸出（形狀本體在綁定角色的 Skel 內）
+                uniform token[] blendShapes = ["smile"]
+                float[] blendShapeWeights.timeSamples = {
+                    1: [0.0],
+                    2: [0.35]
+                }
             }
+
+            # 掛上動畫來源即完成。
+            # skel:skeleton 已由綁定角色的 skel 包寫在各 Mesh 上，此處無須重複宣告。
+            rel skel:animationSource = </ROOT/Anim/BoyWalking/AnimData>
         }
     }
 }

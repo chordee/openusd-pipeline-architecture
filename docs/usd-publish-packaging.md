@@ -331,11 +331,20 @@ publish/                                <-- 專案作用域
     │   ├── libraries/<unit>/               Pure USD（如跨鏡頭共用的 Light Rig）
     │   │
     │   └── <shot>/                     <-- 鏡頭作用域
-    │       ├── layout/<unit>/
-    │       ├── charAnim/<unit>/            → charAnim.usd
-    │       ├── camera/<unit>/              → camera.usd
-    │       ├── fx/<unit>/                  → element.usd
-    │       ├── lighting/<unit>/
+    │       ├── Shot/                       → shot.usd    只 sublayer 四個部門 Master
+    │       ├── environment/
+    │       │   ├── Environment_master/     → environment.usd
+    │       │   └── <unit>/
+    │       ├── anim/
+    │       │   ├── Anim_master/            → anim.usd
+    │       │   ├── charAnim/<unit>/        → charAnim.usd
+    │       │   └── camera/<unit>/          → camera.usd
+    │       ├── fx/
+    │       │   ├── Fx_master/              → fx.usd
+    │       │   └── <unit>/                 → element.usd
+    │       ├── lighting/
+    │       │   ├── Lighting_master/        → lighting.usd
+    │       │   └── <unit>/
     │       └── libraries/<unit>/           Pure USD（如點雲散佈）
 ```
 
@@ -344,6 +353,8 @@ publish/                                <-- 專案作用域
 | 專案 | `publish/` 之下 | 全專案任一鏡頭 |
 | 序列 | `shots/<seq>/` 之下 | 該序列各鏡頭 |
 | 鏡頭 | `shots/<seq>/<shot>/` 之下 | 該鏡頭 |
+
+每個部門在鏡頭級各有一個 **Master 單元**（`<Dept>_master`），它是該部門對鏡頭的**交付面**：`Shot` 只 sublayer 四個 Master，各 Master 再經其 `base` 彙整本部門已發布的單元。單元名於合成後即為部門分支下的 Prim 名（`/ROOT/Anim/BoyWalking`）——詳見 [Shot Layers 篇](usd-shot-layers.md)。
 
 **分類容器不專屬於任一作用域層級。** 最明顯的是 FX：`assets/fx/` 放的是跨鏡頭重複取用的元素，`shots/<seq>/<shot>/fx/` 放的是該鏡頭專屬的模擬產出——兩者都是 FX，差別只在可見範圍。單元該落在哪一層，取決於**它預期被誰取用**，而非由哪個部門產出。
 
@@ -480,7 +491,8 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 | 綁定角色 | `char.usd` | `rig/<unit>/` |
 | FX Element | `element.usd` | `assets/fx/<unit>/` |
 | Set | `set.usd` | `assets/sets/<unit>/` |
-| 角色動畫 | `charAnim.usd` | `shots/<seq>/<shot>/charAnim/<unit>/` |
+| 角色動畫 | `charAnim.usd` | `shots/<seq>/<shot>/anim/charAnim/<unit>/` |
+| 部門 Master | `<dept>.usd` | `shots/<seq>/<shot>/<dept>/<Dept>_master/` |
 | Pure USD | 單元名 | 任一作用域的 `libraries/<unit>/` |
 
 分類目錄**不重複編碼型別**。`assets/fx/` 底下同時放碎塊 Component Asset（`asset.usd`）與可重用 FX Element（`element.usd`）並不構成歧義——工具讀入口檔名即知該套哪套契約，無須維護「目錄名 → 單元型別」對照表。

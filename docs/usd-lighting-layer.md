@@ -75,7 +75,7 @@ def RectLight "KeyLight" (
 
     # 為全場投射陰影，但主角除外（避免自身陰影破壞臉部打光）
     uniform bool collection:shadowLink:includeRoot = 1
-    prepend rel collection:shadowLink:excludes = </ROOT/Anim/Characters/Hero>
+    prepend rel collection:shadowLink:excludes = </ROOT/Anim/BoyWalking>
 }
 ```
 
