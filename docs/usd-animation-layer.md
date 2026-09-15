@@ -129,8 +129,8 @@ over "ROOT"
         {
             def Camera "ShotCam"
             {
-                # 公尺制下，焦距與光圈以「scene unit 的十分之一」計：
-                #   35mm = 0.035m = 0.35    50mm = 0.05m = 0.5
+                # 焦距與光圈的單位恆為「scene unit 的十分之一」；本專案為公尺制，
+                # 故十分之一即 10cm：35mm = 0.035m = 0.35    50mm = 0.05m = 0.5
                 float2 clippingRange = (0.01, 10000)
                 float horizontalAperture = 0.20955        # Academy 光圈 20.955mm
                 float focalLength.timeSamples = {
