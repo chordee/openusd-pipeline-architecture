@@ -71,11 +71,11 @@ def RectLight "KeyLight" (
     # 照亮全場，但排除特效體積（避免煙霧被主光打爆）
     uniform bool collection:lightLink:includeRoot = 1
     uniform token collection:lightLink:expansionRule = "expandPrims"
-    prepend rel collection:lightLink:excludes = </ROOT/FX/explosion_hero>
+    prepend rel collection:lightLink:excludes = </ROOT/FX/ExplosionHero>
 
     # 為全場投射陰影，但主角除外（避免自身陰影破壞臉部打光）
     uniform bool collection:shadowLink:includeRoot = 1
-    prepend rel collection:shadowLink:excludes = </ROOT/Anim/Characters/Hero>
+    prepend rel collection:shadowLink:excludes = </ROOT/Anim/BoyWalking>
 }
 ```
 
@@ -102,12 +102,12 @@ def RectLight "KeyLight" (
 
 ### 3. 以單元自述的 collection 作為連結目標
 
-上方範例的 `excludes` 直接寫死 `</ROOT/FX/explosion_hero>`——燈光層因此必須知道該元素被掛在哪、內部長什麼樣。更穩健的作法是**由單元自己宣告 collection**，燈光端指向語意單位而非手打路徑。
+上方範例的 `excludes` 直接寫死 `</ROOT/FX/ExplosionHero>`——燈光層因此必須知道該元素被掛在哪、內部長什麼樣。更穩健的作法是**由單元自己宣告 collection**，燈光端指向語意單位而非手打路徑。
 
 發布單元得在自身總裝層的 `/ROOT` 宣告 collection（此為 [`/ROOT` 白名單](usd-publish-packaging.md)的唯一項目）：
 
 ```usda
-# fx/elements/explosion_hero/v002/element.usd
+# fx/elements/ExplosionHero/v002/element.usd
 def Xform "ROOT" (
     kind = "component"
     prepend apiSchemas = ["CollectionAPI:fxVolumes"]
@@ -118,18 +118,18 @@ def Xform "ROOT" (
 }
 ```
 
-經 Reference 嫁接後，**collection 的 target 會自動重映射至掛載位置**——`/ROOT` 變成 `/ROOT/FX/explosion_hero`，成員查詢隨之正確。單元內部改結構時由單元自己維護 collection，燈光端不受影響。
+經 Reference 嫁接後，**collection 的 target 會自動重映射至掛載位置**——`/ROOT` 變成 `/ROOT/FX/ExplosionHero`，成員查詢隨之正確。單元內部改結構時由單元自己維護 collection，燈光端不受影響。
 
 > [!CAUTION]
 > **但 `excludes` 不支援指向另一個 collection**
-> `collection:lightLink:excludes` 只能指向 **Prim 路徑**；指向另一個 collection（如 `…/explosion_hero.collection:fxVolumes`）**不會產生任何作用**——USD 不報錯，該元素照樣被照亮。
+> `collection:lightLink:excludes` 只能指向 **Prim 路徑**；指向另一個 collection（如 `…/ExplosionHero.collection:fxVolumes`）**不會產生任何作用**——USD 不報錯，該元素照樣被照亮。
 >
 > 因此單元自述的 collection **無法直接串接為連結目標**，必須由工具接手：
 >
 > ```text
 > FX 元素包     →  於自身 /ROOT 宣告 collection:fxVolumes（單元自述）
 >       ↓ Reference
-> 鏡頭合成      →  collection 自動重映射至 /ROOT/FX/explosion_hero
+> 鏡頭合成      →  collection 自動重映射至 /ROOT/FX/ExplosionHero
 >       ↓
 > Lighting 工具 →  讀取該 collection、展開為 Prim 路徑清單
 >       ↓
@@ -159,12 +159,12 @@ def Xform "ROOT" (
 Light Rig 沒有幾何、沒有快取，內容純粹是光源與其參數——正符合 [Pure USD 單元](usd-publish-packaging.md)的定位：
 
 ```text
-/projects/show_A/publish/shots/sq01/lightrig_interior/   <-- 【Pure USD 單元目錄】
-├── lightrig_interior_latest.usda
+/projects/show_A/publish/shots/sq01/libraries/LightRigInterior/   <-- 【Pure USD 單元目錄】
+├── LightRigInterior_latest.usda
 ├── v001/
-│   └── lightrig_interior.usd
+│   └── LightRigInterior.usd
 └── v002/
-    └── lightrig_interior.usd
+    └── LightRigInterior.usd
 ```
 
 ### 2. 由各鏡頭的 `lighting_base` 引用
@@ -177,7 +177,7 @@ over "ROOT"
     {
         # 引用 Sequence 級共用 Light Rig
         def Scope "Rig" (
-            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/lightrig_interior/lightrig_interior_latest.usda"`@</ROOT/Lighting>
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/libraries/LightRigInterior/LightRigInterior_latest.usda"`@</ROOT/Lighting>
         ) {}
 
         # 本鏡頭專屬的補光
@@ -214,7 +214,7 @@ over "ROOT"
 
 > [!CAUTION]
 > **貼圖路徑不適用 Stage Expression Variable**
-> `inputs:texture:file` 是 **asset 型屬性值**，而非組合弧的 asset path。Expression Variable 的展開發生於合成階段，**不涵蓋一般屬性值**（詳見 [發布封裝篇 §5](usd-publish-packaging.md)）。
+> `inputs:texture:file` 是 **asset 型屬性值**，而非組合弧的 asset path。Expression Variable 的展開發生於合成階段，**不涵蓋一般屬性值**（詳見 [發布封裝篇 §6](usd-publish-packaging.md)）。
 >
 > 因此 HDRI 路徑**不得**寫成運算式形式，而應由 **Output Processor 於輸出時寫入已解析的絕對路徑**：
 

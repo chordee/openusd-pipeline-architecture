@@ -33,7 +33,7 @@
 │                 階段一：Query（獨立瀏覽檢索器）               │
 │  - 跨 DCC 通用獨立 UI（或嵌於 DCC 面板）                    │
 │  - 全專案發布目錄檢索（Asset, SetDressing, FX, Pure USD）    │
-│  - 動態版本篩選（預設 latest.usd，支援歷史 v### 鎖定）        │
+│  - 動態版本篩選（預設 *_latest.usda，支援歷史 v### 鎖定）     │
 │  - 屬性預覽（Thumbnail, Variants 清單, Metadata）           │
 └──────────────────────────────┬──────────────────────────────┘
                                │
@@ -48,7 +48,7 @@
 │  2. 指定擺放目標路徑（Target Prim Path，如 /ROOT/Props/Chair）│
 │  3. 實例化開關：[✔] Instanceable (原生記憶體共享)             │
 │  4. 繼承標籤（Class Inherits）：                             │
-│     ├── 預設繼承：/__CLASS__/chair                           │
+│     ├── 預設繼承：/__CLASS__/Chair                           │
 │     └── 追加標籤：/__CLASS__/indoor_props                   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -60,10 +60,10 @@
 ### 職責邊界
 檢索器專注於「找到對的元素與對的版本」，與具體 DCC 解耦：
 1. **全元素開放檢索**：
-   - **Component Asset**（如 `assets/props/chair/`）
-   - **Set Dressing Assembly**（如 `sets/livingroom/`）
-   - **FX Element**（如 `fx/elements/explosion_hero/`）
-   - **Pure USD Unit**（如 `shots/sq01/sh010/layout/scatter_forest/`）
+   - **Component Asset**（如 `assets/props/Chair/`）
+   - **Set Dressing Assembly**（如 `sets/LivingRoom/`）
+   - **FX Element**（如 `fx/elements/ExplosionHero/`）
+   - **Pure USD Unit**（如 `shots/sq01/sh010/layout/ScatterForest/`）
 2. **版本決策（Latest vs Version Pinning）**：
    - **預設選項**：`asset_latest.usda` / `element_latest.usda`（日常製作推薦，享受自動更新）。
    - **特定歷史版次**：下拉選單列出所有已凍結的歷史目錄（`v001`、`v002`...），供特定需求精確鎖定。
@@ -84,7 +84,7 @@
 | **`Sublayer`** | 鏡頭分層堆疊、跨部門整層整合 | **不可自訂**<br>*(圖層級全場覆蓋)* | 參與 Stage 根層級 LIVRPS 意見仲裁，直接疊加整個圖層。 |
 
 ### 2. 自由指定目標擺放路徑（Target Prim Path）
-在傳統軟體中，匯入檔案常強行依檔名產生節點（例如匯入 `chair.usd` 強制在 `/chair`）。但在本架構中：
+在傳統軟體中，匯入檔案常強行依檔名產生節點（例如匯入 `Chair.usd` 強制在 `/Chair`）。但在本架構中：
 - 所有被發布的元素，其內部根節點**一律同構解耦為 `/ROOT`**。
 - **Loader 允許藝術家自由指定擺放路徑**：
   - 預設建議路徑：`/ROOT/Environment/Props/{asset_name}_01`
@@ -93,7 +93,7 @@
 ```usda
 # 藝術家將 chair 載入並重命名為 HeroArmChair，語意高度貼合場景
 def Xform "HeroArmChair" (
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
 )
 {
     double3 xformOp:translate = (1.2, 0, 0.45)
@@ -111,7 +111,7 @@ def Xform "HeroArmChair" (
 # 透過 Loader 載入之多個實例
 def Xform "Chair_01" (
     instanceable = true
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
 )
 {
     double3 xformOp:translate = (0, 0, 0)
@@ -120,7 +120,7 @@ def Xform "Chair_01" (
 
 def Xform "Chair_02" (
     instanceable = true
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
 )
 {
     double3 xformOp:translate = (1.5, 0, 0)
@@ -150,14 +150,14 @@ def Xform "Chair_02" (
 在複雜鏡頭中，下游部門（特別是 Lighting 與 Lookdev）常需對全場特定類別的 Asset 或元素進行「**批量屬性覆寫**」或「**全域分組控制**」。Loader 導入了標準的 **`inherit`** 標籤規範：
 
 ### 1. 預設規範：`/__CLASS__/{專案註冊名稱}`
-當透過 Loader 載入名為 `chair` 的 Asset 時，Loader 預設自動在 Prim 上注入該 Asset 的 Class 繼承：
+當透過 Loader 載入名為 `Chair` 的 Asset 時，Loader 預設自動在 Prim 上注入該 Asset 的 Class 繼承：
 
 ```usda
 # Loader 產出的實體 Prim
 def Xform "OfficeChair_01" (
-    # 預設自動注入：/__CLASS__/chair
-    inherits = </__CLASS__/chair>
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+    # 預設自動注入：/__CLASS__/Chair
+    inherits = </__CLASS__/Chair>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
 ) {}
 ```
 
@@ -168,11 +168,11 @@ Loader 介面提供「Inherit Classes / Tags」輸入欄，藝術家可追加更
 def Xform "OfficeChair_01" (
     # 藝術家追加多重標籤繼承
     inherits = [
-        </__CLASS__/chair>,
+        </__CLASS__/Chair>,
         </__CLASS__/wooden_props>,
         </__CLASS__/interior_dressing>
     ]
-    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
 ) {}
 ```
 
@@ -270,7 +270,7 @@ class "__CLASS__"
    stage = hou.node(".").stage()
    prim_path = "/ROOT/Environment/Props/chair_01"
    # Expression Variable 必須以反引號包裹字串運算式，否則不會展開
-   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`'
+   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`'
    
    # 1. 建立 Prim 並指派 kind
    prim = stage.DefinePrim(prim_path, "Xform")
@@ -284,7 +284,7 @@ class "__CLASS__"
    
    # 4. 注入 Class Inherits
    inherits = prim.GetInherits()
-   inherits.AddInherit(Sdf.Path("/__CLASS__/chair"))
+   inherits.AddInherit(Sdf.Path("/__CLASS__/Chair"))
    inherits.AddInherit(Sdf.Path("/__CLASS__/wooden_props"))
    ```
 

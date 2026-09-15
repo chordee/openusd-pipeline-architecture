@@ -31,11 +31,16 @@
     framesPerSecond = 24
     startTimeCode = 1        # 含前後手把的完整範圍
     endTimeCode = 100
+    # 四個部門 Master 各為獨立包裝單元，故一律以專案變數作跨包絕對引用
     subLayers = [
-        @./layers/lighting.usd@,     # [0] 最強：燈光、渲染設定與全場外觀覆寫
-        @./layers/fx.usd@,           # [1] 次強：特效模擬、破碎與角色接管
-        @./layers/anim.usd@,    # [2] 中等：角色骨架動態、攝影機與道具動畫
-        @./layers/environment.usd@   # [3] 最弱：世界舞台、建築與 Set Dressing
+        # [0] 最強：燈光、渲染設定與全場外觀覆寫
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/lighting/Lighting_master/lighting_latest.usda"`@,
+        # [1] 次強：特效模擬、破碎與角色接管
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/fx/Fx_master/fx_latest.usda"`@,
+        # [2] 中等：角色骨架動態、攝影機與道具動畫
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/Anim_master/anim_latest.usda"`@,
+        # [3] 最弱：世界舞台、建築與 Set Dressing
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/environment/Environment_master/environment_latest.usda"`@
     ]
 )
 
@@ -45,6 +50,10 @@ def Xform "ROOT" (
 {
 }
 ```
+
+> [!IMPORTANT]
+> **部門 Master 是包外引用，不得寫成相對路徑**
+> 四個部門 Master 與 `Shot` 分屬**不同的包裝單元**，彼此引用即為包外引用，依[路徑雙重標準](usd-publish-packaging.md)必須使用絕對路徑並由 Output Processor 變數化。若寫成 `@./layers/lighting.usd@`，等於宣稱 Master 是 `Shot` 包內的檔案——一旦該部門單獨重新發布，鏈結即告失效。
 
 ---
 
@@ -85,13 +94,13 @@ over "ROOT"
     {
         # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usda 之 </ROOT>）
         def Xform "Terrain" (
-            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usda"`@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/CliffPath/asset_latest.usda"`@</ROOT>
         ) {}
         
         def Scope "Props" ( kind = "group" )
         {
             def Xform "Table_01" (
-                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usda"`@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/WoodenTable/asset_latest.usda"`@</ROOT>
             ) {}
         }
     }
@@ -110,24 +119,22 @@ over "ROOT"
 
 over "ROOT"
 {
+    # 部門分支由 Master 的 base 建立；各單元於其下貢獻一顆以自身單元名命名的 Prim
     def Scope "Anim" ( kind = "group" )
     {
-        def Scope "Characters" ( kind = "group" )
+        # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
+        def "BoyWalking" (
+            prepend apiSchemas = ["SkelBindingAPI"]
+            prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
+        )
         {
-            # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
-            def "Hero" (
-                prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usda"`@</ROOT>
-            )
+            # 動畫層唯一產出：純動態時序資料
+            def SkelAnimation "AnimData"
             {
-                # 動畫層唯一產出：純動態時序資料
-                def SkelAnimation "AnimData"
-                {
-                    uniform token[] joints = ["Hips", "Spine", "Head"]
-                    quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
-                }
-                rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
+                uniform token[] joints = ["Hips", "Spine", "Head"]
+                quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
             }
+            rel skel:animationSource = </ROOT/Anim/BoyWalking/AnimData>
         }
     }
 }
@@ -148,8 +155,8 @@ over "ROOT"
     def Scope "FX" ( kind = "group" )
     {
         # 掛載大型體積快取 (Payload 延遲加載)
-        def Xform "explosion_hero" (
-            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usda"`@</ROOT>
+        def Xform "ExplosionHero" (
+            payload = @`"${PROJECT_ROOT}/publish/assets/fx/ExplosionHero/element_latest.usda"`@</ROOT>
         ) {}
     }
 }
@@ -172,7 +179,7 @@ over "ROOT"
         def DomeLight "SkyDome"
         {
             # 注意：asset 型「屬性值」不適用 Composition 階段的 Expression Variable，
-            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §4.2。
+            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §6.2。
             asset inputs:texture:file = @/projects/show_A/assets/hdri/sunset.exr@
             float inputs:intensity = 1.2
         }
@@ -285,6 +292,48 @@ over "Render"
 over "ROOT" {}
 ```
 
+### `<dept>_base.usd`：彙整本鏡頭該部門的發布單元
+
+`base` 並非單一扁平檔案，而是**彙整該鏡頭中本部門所有已發布單元**的容器。以 Animation 為例，本鏡頭發布了 `BoyWalking` 與 `GirlRunning` 兩個角色動畫單元：
+
+```usda
+# anim_base.usd
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+    subLayers = [
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/BoyWalking/charAnim_latest.usda"`@,
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/GirlRunning/charAnim_latest.usda"`@
+    ]
+)
+
+over "ROOT" {}
+```
+
+合成後，每個單元各自佔據部門分支底下以**自身單元名**命名的一顆 Prim：
+
+```text
+/ROOT/Anim/BoyWalking
+/ROOT/Anim/GirlRunning
+```
+
+> [!IMPORTANT]
+> **單元名即 Prim 名**
+> 這是[單元名採 PascalCase](usd-publish-packaging.md) 的直接效益——單元名無須任何轉換即可充當 Prim 名，工具鏈不必維護「單元名 → Prim 名」對照表。同時它使「哪顆 Prim 由哪個單元產出」在命名空間中一望即知，跨部門排查時無須回溯整個圖層堆疊。
+
+四大部門一律同構：
+
+| 部門 | Master | `base` 彙整的單元 | 合成後的 Prim |
+| :--- | :--- | :--- | :--- |
+| Environment | `environment.usd` | Set Dressing、Layout 單元 | `/ROOT/Environment/<UnitName>` |
+| Animation | `anim.usd` | charAnim、camera 單元 | `/ROOT/Anim/<UnitName>` |
+| FX | `fx.usd` | FX Element 單元 | `/ROOT/FX/<UnitName>` |
+| Lighting | `lighting.usd` | Light Rig、燈光單元 | `/ROOT/Lighting/<UnitName>` |
+
+> [!NOTE]
+> **Master 進版，`base` 與 `overrides` 不進版**
+> Master 是部門對鏡頭的交付面，具備完整版本歷史與 `latest`。`base` 與 `overrides` 是其內部組裝層，隨 Master 一併凍結——任一單元進版，由 Pipeline 重新產生 `base` 並推進 Master 版次。這與 [sub 物件不設 `latest`](usd-publish-packaging.md) 是同一條規則。
+
 ### `lighting_overrides.usd` 容器的多層 Sublayer 結構
 
 `overrides.usd` 本身作為聚合容器（Container Layer），進一步 Sublayer 各任務或藝術家獨立發佈的微型覆寫檔案：
@@ -307,12 +356,14 @@ over "ROOT" {}
 ```text
 [Shot 視角]
 shot.usd
- └── subLayer: lighting.usd (Master)
+ └── subLayer: lighting.usd (Master，進版並維護 latest)
       ├── subLayer: lighting_overrides.usd (容器)
       │    ├── subLayer: shot_lookdev_patch_v03.usd   <-- 細分任務覆寫
       │    ├── subLayer: char_eye_highlight_fix.usd   <-- 細分任務覆寫
       │    └── subLayer: bg_prop_prune.usd            <-- 細分任務覆寫
-      └── subLayer: lighting_base.usd                 <-- 放置 /ROOT/Lighting 光源本體
+      └── subLayer: lighting_base.usd                 <-- 彙整本鏡頭已發布的燈光單元
+           ├── subLayer: KeyRig/lighting_latest.usda       --> /ROOT/Lighting/KeyRig
+           └── subLayer: RimRig/lighting_latest.usda       --> /ROOT/Lighting/RimRig
 ```
 
 ---
@@ -544,4 +595,4 @@ over "ROOT"
 所有交付至鏡頭中的圖層元素皆遵循統一標準：
 - **目錄即包裝單元**：以目標輸出資料夾作為完整封裝邊界，隱式圖層禁止外溢。
 - **內相對、外絕對**：資料夾內部層層互連使用 `@./...@` 相對路徑；引用外部共用 Asset 庫一律使用絕對路徑。
-- **動態 `latest` 引用與逆向鎖定**：日常製作預設引用 `latest.usd`；農場算圖或定剪審查時，由自訂 **Asset Resolver** 將 `latest` 在記憶體中逆向鎖定為具體歷史版本，保證 100% 畫面可重現。
+- **動態 `latest` 引用與逆向鎖定**：日常製作預設引用 `*_latest.usda`；農場算圖或定剪審查時，由自訂 **Asset Resolver** 將 `latest` 在記憶體中逆向鎖定為具體歷史版本，保證 100% 畫面可重現。
