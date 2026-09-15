@@ -67,7 +67,7 @@ def Xform "ROOT" (
             variants = { string look = "LookRed" }
         )
         {
-            double3 xformOp:translate = (120, 0, 0)
+            double3 xformOp:translate = (1.2, 0, 0)
             uniform token[] xformOpOrder = ["xformOp:translate"]
         }
 
@@ -76,7 +76,7 @@ def Xform "ROOT" (
             variants = { string look = "LookBlue" }
         )
         {
-            double3 xformOp:translate = (-120, 0, 0)
+            double3 xformOp:translate = (-1.2, 0, 0)
             uniform token[] xformOpOrder = ["xformOp:translate"]
         }
     }
@@ -128,7 +128,7 @@ def Xform "ROOT" (
 
             # 2. 真正的硬碟空間消耗點：數萬點的空間矩陣數據
             int[] protoIndices = [0, 1, 0, 0, 1, /* ...數十萬筆索引 */]
-            point3f[] positions = [(10.2, 0, 45.1), (-32.5, 0, 12.8), /* ...數十萬筆座標 */]
+            point3f[] positions = [(10.2, 0, 45.1), (-32.5, 0, 12.8), /* ...數十萬筆座標（公尺） */]
             quath[] orientations = [(1, 0, 0, 0), /* ...旋轉四元數 */]
             float3[] scales = [(1, 1, 1), /* ...隨機縮放 */]
         }
@@ -137,6 +137,20 @@ def Xform "ROOT" (
 ```
 
 * **存檔特性**：即使包含十萬棵樹木散佈，此檔案僅需儲存幾十萬個浮點數（二進位 `.usd` 下約數 MB 到幾十 MB），而不會像傳統格式那樣把幾何網格複製十萬次產生上百 GB 的肥大快取。
+
+> [!IMPORTANT]
+> **下游覆寫方式與獨立 Prim 完全不同**
+> `PointInstancer` 換取極致輕量的代價，是**實例不具備 Prim 身分**——它們僅是陣列中的索引，命名空間裡沒有對應路徑。Instancer 本身仍是可正常 `over` 的 Prim，但覆寫對象從「**那顆物件**」變成「**Instancer 上的陣列屬性**」，下游慣用的 `over` + `visibility` 在此**毫無作用**（不報錯，單純沒反應）。
+>
+> | 需求 | 獨立 Prim | `PointInstancer` 實例 |
+> | :--- | :--- | :--- |
+> | 隱藏個別物件 | `over` + `token visibility = "invisible"` | `int64[] invisibleIds = [...]` |
+> | 個別指定材質 | `over` + `rel material:binding` | **不可行**；須新增原型並以 `protoIndices` 指派 |
+> | 個別微調 Transform | `over` + `xformOp:*` | **不可行**；須改寫 `positions` / `orientations` 陣列 |
+>
+> **選型判準**：需要下游逐顆覆寫的物件（英雄道具、會被動畫接管的家具）應以 `Instanceable Xform` 逐顆擺放；僅需整體存在、不會被個別指名的自然散佈才使用 `PointInstancer`。
+>
+> **另須留意陣列屬性的覆寫互斥性**：`invisibleIds` 等陣列屬性由最強意見全取、不逐元素合併，多個部門各自覆寫同一顆 Instancer 會互相蓋掉。若預期多方需各自控制，應依用途拆分為多顆 Instancer。詳見 [Shot Layers 篇跨部門覆寫](usd-shot-layers.md)。
 
 > [!TIP]
 > **Pipeline 解耦最佳實踐：Points Primitive 獨立發布為 Pure USD 單元**

@@ -1,6 +1,6 @@
 # USD：Animation Layer 動態架構設計
 
-在鏡頭（Shot）的 USD 堆疊中，**Animation Layer（`animation.usd`）** 位於 `/ROOT/Anim`，權重高於 Environment、低於 FX 與 Lighting。
+在鏡頭（Shot）的 USD 堆疊中，**Animation Layer（`anim.usd`）** 位於 `/ROOT/Anim`，權重高於 Environment、低於 FX 與 Lighting。
 
 雖然 Animation Layer 呈現了整個鏡頭最複雜生動的表演（角色走動、表情、道具互動、鏡頭運動），但在工業級 USD Pipeline 中，**Animation Layer 實際輸出的硬碟佔用量極小（通常僅數 MB）**。這得益於 USD 將動態資料與實體幾何徹底解耦的設計。
 
@@ -81,8 +81,8 @@ over "ROOT"
                         2: [(0.99, 0.01, 0, 0), (0.69, 0.02, 0.7, 0), ...]
                     }
                     float3[] translations.timeSamples = {
-                        1: [(0, 100, 0), (0, 15, 0), ...],
-                        2: [(0, 101, 0.5), (0, 15, 0), ...]
+                        1: [(0, 1.0, 0), (0, 0.15, 0), ...],
+                        2: [(0, 1.01, 0.005), (0, 0.15, 0), ...]
                     }
 
                     # BlendShape 權重亦由動畫層輸出（形狀本體在綁定角色的 Skel 內）
@@ -129,14 +129,21 @@ over "ROOT"
         {
             def Camera "ShotCam"
             {
-                float2 clippingRange = (0.1, 10000)
+                # 公尺制下，焦距與光圈以「scene unit 的十分之一」計：
+                #   35mm = 0.035m = 0.35    50mm = 0.05m = 0.5
+                float2 clippingRange = (0.01, 10000)
+                float horizontalAperture = 0.20955        # Academy 光圈 20.955mm
                 float focalLength.timeSamples = {
-                    1: 35.0,
-                    50: 50.0
+                    1: 0.35,
+                    50: 0.5
+                }
+                float focusDistance.timeSamples = {
+                    1: 5.0,                               # 對焦距離為 world unit（公尺）
+                    50: 3.2
                 }
                 double3 xformOp:translate.timeSamples = {
-                    1: (0, 150, 300),
-                    50: (20, 155, 250)
+                    1: (0, 1.5, 3),
+                    50: (0.2, 1.55, 2.5)
                 }
                 float3 xformOp:rotateXYZ.timeSamples = {
                     1: (-10, 5, 0),
@@ -154,8 +161,8 @@ over "ROOT"
             )
             {
                 double3 xformOp:translate.timeSamples = {
-                    1: (15.2, 110.5, 45.0),
-                    2: (15.8, 112.0, 46.2)
+                    1: (0.152, 1.105, 0.45),
+                    2: (0.158, 1.12, 0.462)
                 }
                 float3 xformOp:rotateXYZ.timeSamples = {
                     1: (0, 45, 10),
