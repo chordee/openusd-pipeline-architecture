@@ -53,7 +53,7 @@ SOP Create ──► Merge (Separate Layers) ──► Reference ──► USD R
 
 ```text
 USD ROP (Output Processor)
-├── Output File: /projects/.../publish/sets/livingroom/v001/livingroom.usd
+├── Output File: /projects/.../publish/assets/sets/LivingRoom/v001/set.usd
 ├── Save Path Mode: Relative to Output File
 └── Sublayer/Anonymous Directory: ./layers/
 ```

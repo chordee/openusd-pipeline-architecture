@@ -67,7 +67,7 @@ over "ROOT"
             # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
             def "Hero" (
                 prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usda"`@</ROOT>
+                prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
             )
             {
                 # 動畫師本鏡頭唯一實際輸出的動態資料 (SkelAnimation)
@@ -157,7 +157,7 @@ over "ROOT"
         def Scope "Props" ( kind = "group" )
         {
             def Xform "HeroGun" (
-                references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/blaster/asset_latest.usda"`@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/Blaster/asset_latest.usda"`@</ROOT>
             )
             {
                 double3 xformOp:translate.timeSamples = {

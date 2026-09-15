@@ -58,6 +58,7 @@
 ### 5. 目錄級封裝邊界、同構結構與路徑雙重標準
 - **全元素通用**：Asset、Set Dressing、Animation、FX、Pure USD 一體適用。
 - **目錄即包裝單元與同構內部結構**：以目標資料夾底下的全體檔案作為不可分割的單一發布單元。無論任何具體物件，資料夾內部結構與命名固定同構（如 `asset_latest.usda`、`modelDefault/`、`lookDefault/`），絕不以 Asset 名稱命名內部檔案。
+- **發布根目錄分類**：包裝單元之上的分類目錄按**作用域**切分頂層——`assets/`（跨鏡頭可重用）、`rig/`（綁定角色）、`shots/`（鏡頭專屬）、`libraries/`（Pure USD，不套結構檢查）。三條不變量：任一目錄不得兼任分類目錄與包裝單元、單元名全專案唯一、**目錄樹不鏡射場景樹**（跨分類連接一律以 Reference 明示，不以目錄巢狀或命名巧合暗示）。分類層數與命名形式則由專案自訂。
 - **暫存輸出與原子移轉註冊（Staging & Atomic Promotion）**：所有發布一律先輸出至隔離的暫存資料夾，待流程完全跑完且驗證通過後，才原子移轉至專案正式流程目錄並完成註冊，杜絕半成品外溢污染。
 - **Solaris Implicit Layer 治理與子目錄收斂**：優先採用 Flatten 打平；無法打平時由 Houdini 自動轉換輸出之圖層，必須透過 `Save Paths Relative to Output` 強制限制在輸出子目錄（如 `./layers/`）內，嚴禁外溢。亦可透過 `Configure Layer` 主動將隱式圖層顯式化。詳情參閱 [USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)。
 - **路徑邊界與 Expression Variable 替換**：

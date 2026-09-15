@@ -26,12 +26,12 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 
 ## 1. 同構目錄與 Asset 圖層結構樹（Isomorphic Asset Structure）
 
-無論任何 Asset（如 `chair`、`table`、`car`），資料夾內部結構與核心檔案名稱完全同構固定。
+無論任何 Asset（如 `Chair`、`Table`、`car`），資料夾內部結構與核心檔案名稱完全同構固定。
 
 最核心的架構原則是：**`modelDefault/`、`lookDefault/`、`textureDefault/` 是屬於單元物件 Asset 底下的 sub 物件，自身絕不設獨立的 `latest` 指標；其底下每次進版，均直接推進單元物件 Asset 進版，並由 Pipeline 在 Asset 根目錄自動維護唯一的 `asset_latest.usda`**。
 
 ```text
-/projects/show_A/publish/assets/props/chair/               <-- 【Asset 目錄，只有此層名稱不同】
+/projects/show_A/publish/assets/props/Chair/               <-- 【Asset 目錄，只有此層名稱不同】
 ├── asset_latest.usda                                    <-- 全域唯一最新動態入口 (指向最新版 v002/asset.usd)
 ├── v001/                                                <-- Asset 總版次目錄
 │   └── asset.usd                                        <-- 固定名稱！Reference 鎖定子物件特定版次
@@ -97,11 +97,11 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 ```usda
 # 消費端場景完全自由命名，無縫接軌來源的 /ROOT
 def Xform "OfficeChair_A" (
-    references = @assets/props/chair/chair.usd@</ROOT>
+    references = @assets/props/Chair/asset_latest.usda@</ROOT>
 ) {}
 
 def Xform "HeroSeat" (
-    references = @assets/props/chair/chair.usd@</ROOT>
+    references = @assets/props/Chair/asset_latest.usda@</ROOT>
 ) {}
 ```
 USD 的 Reference / Payload 機制會自動將來源檔的 `/ROOT` 映射為消費端指定的 Prim 名稱（如 `OfficeChair_A`），Asset 內部無需知道外部叫什麼，外部也無需妥協 Asset 內部的名稱。
@@ -207,7 +207,7 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 | :--- | :--- | :--- |
 | **`component`** | 單一 Asset 根節點（如 `/ROOT`） | **ModelAPI 的最小葉節點**。宣告為 `component` 後，Viewport 的 Model Selection 才能一鍵選取整件 Asset，且 `drawMode` 能正確作用於該單元。 |
 | **`group`** | 部門分支或邏輯分組（如 `/ROOT/Props`） | 聚合多個 Model 的容器，本身不包含幾何資料。 |
-| **`assembly`** | 大型場景集合（如 Set Dressing `livingroom.usd`） | 跨鏡頭的重要複合單元，支援整體階層的 DrawMode 降級顯示。 |
+| **`assembly`** | 大型場景集合（如 Set Dressing `LivingRoom.usd`） | 跨鏡頭的重要複合單元，支援整體階層的 DrawMode 降級顯示。 |
 | **`subcomponent`** | Asset 內部的細部組件（如椅子的一隻腳） | 供結構內部標記，通常不對外暴露。 |
 
 > [!CAUTION]
@@ -281,7 +281,7 @@ over "ROOT"
         def Scope "Props" ( kind = "group" )        # 中間容器，命名與層數自由
         {
             def Xform "Table_01" (                  # component 由 Asset 帶入
-                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usda"`@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/WoodenTable/asset_latest.usda"`@</ROOT>
             ) {}
         }
     }
@@ -544,7 +544,7 @@ over "Table_01" (
 當任何子物件（如 `modelDefault/v002/`）進版時，Pipeline 自動推進生成全新的 `v###/asset.usd`，內部以不可變的相對路徑明確鎖定各子組件的具體版本：
 
 ```usda
-# /projects/show_A/publish/assets/props/chair/v002/asset.usd
+# /projects/show_A/publish/assets/props/Chair/v002/asset.usd
 #usda 1.0
 (
     defaultPrim = "ROOT"
@@ -578,7 +578,7 @@ def Xform "ROOT" (
 當 Pipeline 檢測到變體 sub 物件並存（如 `modelLow/`、`lookRed/`），即自動改以 VariantSet 形式封裝。**variant 區塊直接承載 Reference**，各變體對應各自的 sub 物件包：
 
 ```usda
-# /projects/show_A/publish/assets/props/chair/v003/asset.usd
+# /projects/show_A/publish/assets/props/Chair/v003/asset.usd
 #usda 1.0
 (
     defaultPrim = "ROOT"
@@ -614,13 +614,13 @@ def Xform "ROOT" (
 
 > [!NOTE]
 > **這與「不以 VariantSet 控版」的架構取捨並不衝突**
-> [發布封裝篇 §6](usd-publish-packaging.md) 反對的是**以 VariantSet 承載版本序列**——那會迫使每次加版都回溯修改上層主檔。此處的 VariantSet 只承載**形態與外觀變體**，且各版次 `asset.usd` 皆由 Pipeline 在進版時整份重新生成，歷史版本依然 100% 凍結不可變。
+> [發布封裝篇 §8](usd-publish-packaging.md) 反對的是**以 VariantSet 承載版本序列**——那會迫使每次加版都回溯修改上層主檔。此處的 VariantSet 只承載**形態與外觀變體**，且各版次 `asset.usd` 皆由 Pipeline 在進版時整份重新生成，歷史版本依然 100% 凍結不可變。
 
 ### 3. 頂層唯一最新動態指標 (`asset_latest.usda`)
 外部消費端（Environment、Layout、Animation）**一律且唯一引用頂層的 `asset_latest.usda`**。在 Asset 進版時，Pipeline 自動將其重定向指向最新的版次：
 
 ```usda
-# /projects/show_A/publish/assets/props/chair/asset_latest.usda （Sublayer 包裝圖層）
+# /projects/show_A/publish/assets/props/Chair/asset_latest.usda （Sublayer 包裝圖層）
 #usda 1.0
 (
     defaultPrim = "ROOT"
@@ -693,7 +693,7 @@ def SkelRoot "ROOT" (
 {
     # 1. 幾何材質：引用幾何材質角色的 /ROOT，一次帶入 Model 與 Look
     def Xform "Geometry" (
-        prepend references = @`"${PROJECT_ROOT}/publish/assets/char/hero/asset_latest.usda"`@</ROOT>
+        prepend references = @`"${PROJECT_ROOT}/publish/assets/char/Hero/asset_latest.usda"`@</ROOT>
     ) {}
 
     # 2. 骨架：引用本包內的 skel sub 物件
@@ -728,7 +728,35 @@ def SkelRoot "ROOT" (
 >
 > 這同時解決了一個常見錯誤：若改為引用 `</ROOT/Model>` 以求「只取幾何」，`/ROOT` 上的綁定不會隨之帶入，角色將完全失去材質。**一律引用完整的 `</ROOT>`。**
 
-### 3. `skel/` 包的內容與蒙皮權重的 `over`
+### 3. Rig 與 Skel 不等價：USD 只承載變形層
+
+「Rig」是部門與工序的名稱，「Skel」是 USD 實際承載的東西。兩者常被混用，但**不等價**——`UsdSkel` 只是 Rig 的輸出子集，具體說是**變形層**。
+
+`UsdSkel` 的完整表面即以下四者，別無其他：
+
+| Schema | 承載內容 |
+| :--- | :--- |
+| `Skeleton` | `joints`（拓樸）、`jointNames`、`bindTransforms`、`restTransforms` |
+| `SkelBindingAPI` | `primvars:skel:jointIndices` / `jointWeights`、`geomBindTransform`、`skinningMethod` |
+| `SkelAnimation` | `joints`、`translations`、`rotations`、`scales`、`blendShapes`、`blendShapeWeights` |
+| `BlendShape` | `offsets`、`normalOffsets`、`pointIndices` |
+
+控制器、IK／FK、約束、Deformer Stack、Space Switch、Driven Key——**一個都沒有，也沒有地方安放**。`UsdSkel` 是為了**傳輸**骨骼變形而設計（需能撐到群眾規模），刻意不承載綁定邏輯。
+
+> [!IMPORTANT]
+> **綁定角色是消費用產物，不是製作用產物**
+> 發布出去的綁定角色**無法以原本的控制器重新動畫**。下游能做的只有透過 `SkelAnimation` 驅動 joints，或改寫 `blendShapeWeights`。動畫必須在 DCC 內對著真正的 Rig 製作，發布時烘焙為 `SkelAnimation`。
+>
+> 這正是 `AnimData` **不存在於發布包內、僅由鏡頭層注入**的原因——發布包沒有能產生它的東西。同理，[`skel/` 不設 `latest`](#1-綁定角色的目錄結構)的取捨也受同一限制約束：單獨取用骨架而不要幾何的情境（如 Mocap retarget），拿到的同樣只有變形層。
+
+因此在命名上，兩個詞各自在不同的域裡成立，不互相取代：
+
+- **Rig** — 部門、工序、審批關卡與[分類目錄](usd-publish-packaging.md)（`publish/rig/<unit>/`）
+- **Skel** — Prim 名與 Schema（`/ROOT/Skel`、`UsdSkelSkeleton`）
+
+把 Prim 命名為 `Rig` 會讓人打開檔案去找控制器，然後找不到。
+
+### 4. `skel/` 包的內容與蒙皮權重的 `over`
 
 骨架包交付三樣東西：`Skeleton` 拓樸、`BlendShape` 本體，以及**以 `over` 寫回幾何的蒙皮資料**：
 
@@ -786,7 +814,7 @@ def Xform "ROOT"
 > **`elementSize` 未設定是最常見的致命錯誤**
 > `jointIndices` / `jointWeights` 必須透過 `UsdGeomPrimvar.SetElementSize(n)` 明確宣告每點影響的 joint 數量，否則 imaging 端**無法切分每點影響數**，Skinning 結果錯亂。此項列為發布前 QC 必檢。詳見 [USD Skel 骨架動畫設定指南](usd-skel-guide.md)。
 
-### 4. 跨包引用 `latest` 的取捨
+### 5. 跨包引用 `latest` 的取捨
 
 `Geometry` 引用的是幾何材質角色的 **`asset_latest.usda`**（動態指標），而非鎖定的具體版次。這是刻意的選擇：
 
@@ -795,7 +823,7 @@ def Xform "ROOT"
 
 > [!WARNING]
 > **此取捨對 Resolver 快照提出硬性要求**
-> 快照必須**遞移涵蓋整棵依賴樹**：鏡頭引用 `char_latest` → 鎖定至 `char/v002` 尚不足夠，必須一路鎖定其內部引用的 `assets/char/hero/v003`。若僅鎖定直接引用的一層，跨包的可重現性即為虛假。
+> 快照必須**遞移涵蓋整棵依賴樹**：鏡頭引用 `char_latest` → 鎖定至 `char/v002` 尚不足夠，必須一路鎖定其內部引用的 `assets/char/Hero/v003`。若僅鎖定直接引用的一層，跨包的可重現性即為虛假。
 >
 > 另建議：發布幾何材質角色時，若偵測到 point count 或 topology hash 變動，應**主動告警依賴它的綁定角色單元**。拓樸變更會使全部權重失效，下游必然重工，不應等動畫師發現角色炸裂才得知。
 
@@ -819,7 +847,7 @@ over "ROOT"
         {
             # 前景道具：高模 + 紅色材質
             def Xform "HeroChair" (
-                references = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
                 variants = {
                     string model = "High"
                     string look = "LookRed"
@@ -828,7 +856,7 @@ over "ROOT"
 
             # 遠景道具：低模 + 藍色材質
             def Xform "BGChair_01" (
-                references = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usda"`@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`@</ROOT>
                 variants = {
                     string model = "Low"
                     string look = "LookBlue"
@@ -861,7 +889,7 @@ over "ROOT"
 > 📖 詳細全域規範請見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 
 Asset 發布同樣必須遵守全 Pipeline 通用的封裝鐵律：
-1. **目錄即包裝單元（同構內部結構）**：以 Asset 目錄（如 `publish/assets/props/chair/`）為獨立封裝單位，內部結構與檔名一律固定為 `asset_latest.usda`、`modelDefault/`、`lookDefault/`、`textureDefault/` 等，嚴禁在內部檔名摻雜個別 Asset 名稱。
+1. **目錄即包裝單元（同構內部結構）**：以 Asset 目錄（如 `publish/assets/props/Chair/`）為獨立封裝單位，內部結構與檔名一律固定為 `asset_latest.usda`、`modelDefault/`、`lookDefault/`、`textureDefault/` 等，嚴禁在內部檔名摻雜個別 Asset 名稱。
 2. **Solaris Implicit Layer 禁錮**：若 Asset 於 Solaris 產出，所有導出的隱式圖層必須限制在該目錄及其子目錄（如 `./layers/`）內，嚴禁外溢。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：各版次 `v###/asset.usd` 堆疊 `@../lookDefault/...@` 與 `@../modelDefault/...@` 一律採用相對路徑（向上跳一層仍在 Asset Package 邊界內），貼圖引用包內 `@../textureDefault/...@` 亦為相對路徑，保障整顆 Asset 資料夾可完整隨意搬遷。

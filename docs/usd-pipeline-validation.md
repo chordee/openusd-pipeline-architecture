@@ -151,6 +151,9 @@
 | **無壞鏈 Sublayer** | 所有 Sublayer 引用皆可解析 | 攔阻 | 同上 |
 | **進版格式合規** | 版本目錄為 `v###` 三位數零填充 | 攔阻 | [同構包裝單元](usd-publish-packaging.md) |
 | **內部檔名未摻雜物件名** | 包內檔名為 `asset.usd` / `element.usd` 等固定名稱 | 攔阻 | 同上 |
+| **分類目錄未兼任包裝單元** | 含 `*_latest.usda` 的目錄，其子目錄不得再含 `*_latest.usda` | 攔阻 | [發布根目錄分類](usd-publish-packaging.md) |
+| **單元名全專案唯一** | 掃描全 `publish/` 樹，無同名包裝單元（不分分類、不分型別） | 攔阻 | 同上 |
+| **入口檔名與所在根相符** | `rig/` 下為 `char.usd`、`assets/sets/` 下為 `set.usd`，餘類推 | 報告 | 同上 |
 
 ### 6. 版本鎖定與渲染
 

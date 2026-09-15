@@ -85,13 +85,13 @@ over "ROOT"
     {
         # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usda 之 </ROOT>）
         def Xform "Terrain" (
-            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usda"`@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/CliffPath/asset_latest.usda"`@</ROOT>
         ) {}
         
         def Scope "Props" ( kind = "group" )
         {
             def Xform "Table_01" (
-                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usda"`@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/WoodenTable/asset_latest.usda"`@</ROOT>
             ) {}
         }
     }
@@ -117,7 +117,7 @@ over "ROOT"
             # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
             def "Hero" (
                 prepend apiSchemas = ["SkelBindingAPI"]
-                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usda"`@</ROOT>
+                prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
             )
             {
                 # 動畫層唯一產出：純動態時序資料
@@ -148,8 +148,8 @@ over "ROOT"
     def Scope "FX" ( kind = "group" )
     {
         # 掛載大型體積快取 (Payload 延遲加載)
-        def Xform "explosion_hero" (
-            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usda"`@</ROOT>
+        def Xform "ExplosionHero" (
+            payload = @`"${PROJECT_ROOT}/publish/assets/fx/ExplosionHero/element_latest.usda"`@</ROOT>
         ) {}
     }
 }
@@ -172,7 +172,7 @@ over "ROOT"
         def DomeLight "SkyDome"
         {
             # 注意：asset 型「屬性值」不適用 Composition 階段的 Expression Variable，
-            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §4.2。
+            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §6.2。
             asset inputs:texture:file = @/projects/show_A/assets/hdri/sunset.exr@
             float inputs:intensity = 1.2
         }
@@ -544,4 +544,4 @@ over "ROOT"
 所有交付至鏡頭中的圖層元素皆遵循統一標準：
 - **目錄即包裝單元**：以目標輸出資料夾作為完整封裝邊界，隱式圖層禁止外溢。
 - **內相對、外絕對**：資料夾內部層層互連使用 `@./...@` 相對路徑；引用外部共用 Asset 庫一律使用絕對路徑。
-- **動態 `latest` 引用與逆向鎖定**：日常製作預設引用 `latest.usd`；農場算圖或定剪審查時，由自訂 **Asset Resolver** 將 `latest` 在記憶體中逆向鎖定為具體歷史版本，保證 100% 畫面可重現。
+- **動態 `latest` 引用與逆向鎖定**：日常製作預設引用 `*_latest.usda`；農場算圖或定剪審查時，由自訂 **Asset Resolver** 將 `latest` 在記憶體中逆向鎖定為具體歷史版本，保證 100% 畫面可重現。
