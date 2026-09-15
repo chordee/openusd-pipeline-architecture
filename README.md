@@ -16,7 +16,7 @@
 
 | 筆記名稱 | 核心探討範疇 | 關鍵架構概念 |
 | :--- | :--- | :--- |
-| **[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)** | 鏡頭總成、強弱權重與覆寫機制 | 四大部門圖層順序（`L > FX > A > E`）、`Master = Overrides + Base`、跨部門稀疏覆寫 |
+| **[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)** | 鏡頭總成、強弱權重、覆寫機制與渲染設定 | 四大部門圖層順序（`L > FX > A > E`）、`Master = Overrides + Base`、跨部門稀疏覆寫、`/Render` 命名空間 |
 | **[USD Asset Layer 架構設計](docs/usd-asset-layer.md)** | 單一發布 Asset 內部結構 | 模型/材質雙包 Reference 嫁接、`ModelDefault`/`LookDefault`、雙維度 VariantSet、`/ROOT` 解耦哲學 |
 | **[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)** | 世界舞台與場景陳設組裝 | Layout 與 Set Dressing 組合、虛擬組裝（零幾何實體）、`PointInstancer` 點雲數據消耗 |
 | **[USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)** | 角色骨架與道具時序動態 | 角色拆為幾何材質與綁定兩個發布單元、`SkelRoot` 底下三分支（`Geometry` + `Skel` + `AnimData`）、數 MB 極致輕量儲存 |
@@ -33,6 +33,7 @@
 
 ### 1. 統一根節點 `/ROOT`、語意命名解耦，且結構性意見為 Pipeline 工程專有
 - **所有發布單元（Asset、Set Dressing、FX Element、Shot）頂層一律以 `/ROOT` 為唯一根節點**；總裝層與各 sub 物件包一致採用 `/ROOT`，不另立命名，使工具鏈得以無條件鎖定。
+- **唯一例外：鏡頭的渲染設定置於 `/Render`**（`/ROOT` 的同層兄弟）。渲染設定不是場景內容，不應隨場景被引用；且渲染器透過 `renderSettingsPrimPath` 或型別遍歷定位它，與路徑無關。此結構亦與 Houdini Solaris 原生行為一致。
 - **解耦哲學**：Asset 內部不硬編碼特定名稱（如 `/Chair`），而是在被引用端（Consumer）消費時，由外部 Stage 自由指派語意路徑（如 `/ROOT/Environment/Props/OfficeChair_01`）。
 - **Sub 物件以 Reference 嫁接**：`modelDefault/`、`lookDefault/` 等 sub 物件包各為自成一體的封裝單元，由 Pipeline 在總裝層以 `references` 嫁接至 `/ROOT`；清單順序即意見強弱。
 - **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與嫁接決策一律僅由總裝層宣告，sub 物件包**嚴禁出現**；除材質包的 `material:binding` 此一契約例外，部門不得在 `/ROOT` 寫入任何屬性。

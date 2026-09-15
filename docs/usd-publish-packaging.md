@@ -137,7 +137,7 @@ def PointInstancer "ForestTrees"
 
 > [!CAUTION]
 > **Pipeline `/ROOT` 鐵律：`/ROOT` 的結構性意見為 Pipeline 工程專有，部門一律不得宣告**
-> 1. **全 Pipeline 一律以 `/ROOT` 為根**：總裝層與各 sub 物件包**一致採用 `/ROOT`**，不另立命名。此為既有的 [`/ROOT` 解耦哲學](usd-asset-layer.md)之延伸——全工作室只有一套根節點約定，所有自動化工具得以無條件鎖定 `/ROOT`，無須分支判斷。
+> 1. **全 Pipeline 一律以 `/ROOT` 為根**：總裝層與各 sub 物件包**一致採用 `/ROOT`**，不另立命名。此為既有的 [`/ROOT` 解耦哲學](usd-asset-layer.md)之延伸——全工作室只有一套根節點約定，所有自動化工具得以無條件鎖定 `/ROOT`，無須分支判斷。**唯一例外為鏡頭的渲染設定 `/Render`**，其刻意置於 `/ROOT` 之外，理由詳見 [Shot Layers 篇 §4](usd-shot-layers.md)。
 > 2. **sub 物件以 Reference 嫁接**：每個 sub 物件包（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）皆為**自成一體的封裝單元**，內部以 `def Xform "ROOT"` 定義自身的根，並在其下經營自身分支。部門只對自己的包負責，**無須、亦不得**知悉總裝層的存在。
 > 3. **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與各 sub 物件包的嫁接決策，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）宣告**。sub 物件包內**嚴禁出現 `kind`、嚴禁出現 `variantSets`**——這兩者定義的是該單元在全域流程中的身分與形態組合，屬 Pipeline 職權。
 > 4. **嚴禁在 `/ROOT` 寫入非白名單意見**：sub 物件包除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。唯一例外為**材質包的 `material:binding`**——契約明訂該綁定必須落在 `/ROOT` 且必須隨 look 版本走，無法由他處產生，詳見 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)。
@@ -284,6 +284,8 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **時序單元已宣告範圍** | 動畫、FX Element 等時序發布單元皆已宣告 `startTimeCode` / `endTimeCode`，且涵蓋手把影格 | 同上 |
    | **Camera 焦距單位正確** | `focalLength` / aperture 以「scene unit 的十分之一」計；公尺制下 35mm 應為 `0.35`。誤填會使 FOV 正常但 DOF 錯亂，須於手寫與轉檔產出的鏡頭逐一驗證 | 同上 |
    | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#9-asset-resolver-的逆向鎖定機制version-pinning) |
+   | **指定的 RenderSettings 存在**<br>*（送農場前）* | 提交參數或 `renderSettingsPrimPath` 所指的 `RenderSettings` Prim 確實存在且合成後可解析 | [Render 層](usd-shot-layers.md) |
+   | **製作資料未寫死** | Lighting 發布版本內不得寫死解析度與影格範圍，該類製作資料由 Pipeline 注入 | 同上 |
    | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
 
    > [!CAUTION]

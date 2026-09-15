@@ -8,7 +8,7 @@
 
 > [!IMPORTANT]
 > **30 秒核心原則**
-> 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。
+> 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。**唯一例外為渲染設定 `/Render`**，其為 `/ROOT` 的同層兄弟——渲染設定不是場景內容，不應隨場景被引用（見 §4）。
 > 2. **LIVRPS Sublayer 強弱順序**：頂層 `subLayers` 順序決定意見權重（Index 越小權限越強）：
 >    `Lighting (最強) > FX (次強) > Animation (中等) > Environment (最弱)`
 > 3. **各部門內部雙層堆疊**：四大主要圖層內部普遍採用 `Master → Overrides → Base` 結構；`overrides.usd` 本身作為聚合容器，再 Sublayer 各任務微型覆寫檔案。
@@ -156,7 +156,7 @@ over "ROOT"
 ```
 
 ### 4. Lighting Layer (`lighting.usd`) —— 最強（終審裁決）
-定義光源、環境光、RenderSettings、Light Linking 與最終渲染品質：
+定義光源、環境光、Light Linking 與最終渲染品質；並一併產出 `/Render` 命名空間下的渲染設定（詳見 [§4 Render 層](#4-render-層render-命名空間)）：
 ```usda
 #usda 1.0
 (
@@ -187,7 +187,85 @@ over "ROOT"
 
 ---
 
-## 4. 部門內部圖層結構：Master 與 Overrides 堆疊
+## 4. Render 層：`/Render` 命名空間
+
+渲染設定（`RenderSettings` / `RenderProduct` / `RenderVar`）是鏡頭的**終端配置**，其命名空間位於 **`/Render`——`/ROOT` 的同層兄弟，而非其子孫**。
+
+> [!IMPORTANT]
+> **這是「統一根節點 `/ROOT`」鐵律的唯一例外，且為刻意設計**
+> 鐵律要求所有內容一律掛在 `/ROOT` 底下，但其兩項立論在渲染設定上**皆不適用**：
+> 1. **名稱解耦不需要**：`RenderSettings` 不會被消費端引用並重新命名，它是該鏡頭的終端產物，不具備跨專案複用的性質。
+> 2. **工具不靠路徑尋找**：渲染器透過 `renderSettingsPrimPath` 這項 Layer Metadata、或按 Prim 型別遍歷來定位它，與所在路徑無關。
+>
+> 更關鍵的是**一項正面理由**：**渲染設定不是場景內容，不應隨場景一起被引用**。若置於 `/ROOT` 底下，任何人 Reference 該鏡頭的 `</ROOT>` 都會把渲染設定一併拖入——這顯然是錯的。置於 `/Render` 可天然隔離。
+>
+> 此結構亦與 Houdini Solaris 的原生行為一致（實測 22.0：`Render Settings LOP` 預設即建立於 `/Render/rendersettings`），無須逐次調整 LOP 參數。
+
+### 1. 命名空間結構
+
+沿用 Houdini Solaris 的預設佈局，全專案統一：
+
+```text
+/Render                                   (Scope)
+├── <settings_name>                       (RenderSettings)   例：final / preview / techpass
+└── Products/                             (Scope)
+    ├── <product_name>                    (RenderProduct)
+    └── Vars/                             (Scope)
+        └── <var_name>                    (RenderVar)        例：beauty / depth / cryptomatte
+```
+
+### 2. 一個鏡頭並存多套 `RenderSettings`
+
+同一顆鏡頭通常需要數種產出組態，各自獨立成一個 `RenderSettings` Prim：
+
+| 用途 | 典型差異 |
+| :--- | :--- |
+| `preview` | 半解析度、低取樣、僅 beauty，供日常確認 |
+| `final` | 全解析度、正式取樣與降噪、完整 AOV |
+| `techpass` | Cryptomatte、Deep、Utility Pass，供合成使用 |
+
+> [!TIP]
+> **要用哪一套，是「提交當下」的選擇，不是發布時的決定**
+> `renderSettingsPrimPath` 在發布的圖層中通常不予宣告；實際由 USD Render ROP 或農場提交工具在送算時指定。如此一來，同一份已發布的鏡頭無須重新發布，即可切換不同產出組態。
+
+### 3. 職責邊界：哪些該由 Lighting 決定，哪些不該
+
+`/Render` 由 **`lighting.usd` 一併產出**，不另立發布單元——Lighting TD 本就是實際調校畫質與 AOV 的人，且這些設定與燈光強耦合（Light Linking、per-light LPE）。
+
+但**並非 `/Render` 裡的每一項都屬於 Lighting 的職權**：
+
+| 項目 | 決定者 | 理由 |
+| :--- | :--- | :--- |
+| 取樣數、降噪、光線深度、AOV 組成 | **Lighting** | 屬畫質與外觀範疇 |
+| 解析度、`pixelAspectRatio` | **Pipeline 注入** | 源自專案規格，非單一鏡頭可決定 |
+| 影格範圍 | **Pipeline 注入** | 源自剪輯與鏡頭規格；寫死將使鏡頭改長度即逼 Lighting 重新發布 |
+| 送算當下的臨時調整 | **提交層覆寫** | 如半解析度試算、只出特定 AOV，不應污染已發布版本 |
+
+> [!CAUTION]
+> **嚴禁將製作資料寫死於 Lighting 的發布版本**
+> 解析度與影格範圍屬製作管理系統的資料。若由 Lighting 手動填入並隨版本發布，則剪輯每次改動鏡頭長度，都會迫使一個內容毫無變化的 Lighting 版本重新發布；久之版本號將失去意義。
+>
+> 正確作法是由 Pipeline 於鏡頭總成或提交階段，以薄覆寫層注入當下的製作資料。
+
+### 4. 提交階段的臨時覆寫
+
+送算時的調整一律以**提交層**處理，不修改任何已發布圖層：
+
+```usda
+# 提交工具產生的臨時層，疊於 shot.usd 之上
+over "Render"
+{
+    over "final"
+    {
+        int2 resolution = (960, 540)      # 半解析度試算
+        rel products = [ </Render/Products/beauty_only> ]
+    }
+}
+```
+
+---
+
+## 5. 部門內部圖層結構：Master 與 Overrides 堆疊
 
 在實際 Pipeline 中，四大圖層本身並非單一扁平檔案，而是各自採用 **Master → Overrides → Base** 的 Sublayer 結構：
 
@@ -237,7 +315,7 @@ shot.usd
 
 ---
 
-## 5. 跨部門稀疏覆寫（Cross-Department Sparse Overrides）
+## 6. 跨部門稀疏覆寫（Cross-Department Sparse Overrides）
 
 ### 為什麼不需要符合自身 Scene Tree？
 
@@ -249,7 +327,7 @@ shot.usd
 
 ---
 
-## 6. 跨部門覆寫實務情境代碼範例
+## 7. 跨部門覆寫實務情境代碼範例
 
 ### 情境 A：Lighting 覆寫 Environment（背景道具微調）
 * **檔案**：`lighting_overrides/bg_prop_prune.usd`
@@ -403,7 +481,7 @@ over "ROOT"
 
 ---
 
-## 7. 跨部門覆寫的合法方向矩陣
+## 8. 跨部門覆寫的合法方向矩陣
 
 依據 Sublayer 堆疊權重規則（`Lighting > FX > Anim > Env`），覆寫方向具有**單向性**：
 
@@ -416,7 +494,7 @@ over "ROOT"
 
 ---
 
-## 8. 架構優勢與防坑指南
+## 9. 架構優勢與防坑指南
 
 ### Pipeline 架構優勢
 1. **多人並行協作零衝突（Zero File Lock）**：
@@ -457,7 +535,7 @@ over "ROOT"
 
 ---
 
-## 9. 鏡頭交付與進版對齊
+## 10. 鏡頭交付與進版對齊
 
 > 📖 發布邊界、目錄封裝與進版機制詳見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 
