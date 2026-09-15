@@ -140,7 +140,7 @@ def Xform "ROOT" (
 
 > [!IMPORTANT]
 > **下游覆寫方式與獨立 Prim 完全不同**
-> `PointInstancer` 換取極致輕量的代價，是**實例不具備 Prim 身分**——它們僅是陣列中的索引，命名空間裡沒有對應路徑。因此下游部門慣用的 `over` + `visibility` 在此**毫無作用**（不報錯，單純沒反應）。
+> `PointInstancer` 換取極致輕量的代價，是**實例不具備 Prim 身分**——它們僅是陣列中的索引，命名空間裡沒有對應路徑。Instancer 本身仍是可正常 `over` 的 Prim，但**覆寫對象從「那顆物件」變成「Instancer 上的陣列屬性」**，下游慣用的 `over` + `visibility` 在此**毫無作用**（不報錯，單純沒反應）。
 >
 > | 需求 | 獨立 Prim | `PointInstancer` 實例 |
 > | :--- | :--- | :--- |
@@ -148,7 +148,9 @@ def Xform "ROOT" (
 > | 個別指定材質 | `over` + `rel material:binding` | **不可行**；須新增原型並以 `protoIndices` 指派 |
 > | 個別微調 Transform | `over` + `xformOp:*` | **不可行**；須改寫 `positions` / `orientations` 陣列 |
 >
-> **選型判準**：需要下游逐顆覆寫的物件（英雄道具、會被動畫接管的家具）應以 `Instanceable Xform` 逐顆擺放；僅需整體存在、不會被個別指名的自然散佈才使用 `PointInstancer`。詳見 [Shot Layers 篇跨部門覆寫](usd-shot-layers.md)。
+> **選型判準**：需要下游逐顆覆寫的物件（英雄道具、會被動畫接管的家具）應以 `Instanceable Xform` 逐顆擺放；僅需整體存在、不會被個別指名的自然散佈才使用 `PointInstancer`。
+>
+> **另須留意陣列屬性的覆寫互斥性**：`invisibleIds` 等陣列屬性由最強意見全取、不逐元素合併，多個部門各自覆寫同一顆 Instancer 會互相蓋掉。若預期多方需各自控制，應依用途拆分為多顆 Instancer。詳見 [Shot Layers 篇跨部門覆寫](usd-shot-layers.md)。
 
 > [!TIP]
 > **Pipeline 解耦最佳實踐：Points Primitive 獨立發布為 Pure USD 單元**

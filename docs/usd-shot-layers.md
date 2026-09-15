@@ -284,9 +284,9 @@ over "ROOT"
 
 > [!CAUTION]
 > **若目標是 `PointInstancer` 的其中一個實例，上述寫法完全無效**
-> `PointInstancer` 的實例**不是 Prim**——它們只是 `positions` / `protoIndices` 等陣列中的一筆索引，在命名空間中根本不存在，因此**沒有任何路徑可供 `over`**。
+> `PointInstancer` **本身是 Prim，可正常以 `over` 覆寫**；但它的**個別實例不是 Prim**——實例只是 `positions` / `protoIndices` 等陣列中的一筆索引，命名空間裡沒有 `.../ForestTrees/Tree_01723` 這種路徑存在，因此**無法對單一實例下 `over`**。
 >
-> 海量散佈（森林、碎石、草皮）一律以 `PointInstancer` 承載，所以「隱藏那棵擋鏡頭的樹」在散佈場景中必須改用實例級的機制：
+> 換言之：**覆寫的對象從「那棵樹」變成「那顆 Instancer 的屬性」**。海量散佈（森林、碎石、草皮）一律以 `PointInstancer` 承載，所以「隱藏那棵擋鏡頭的樹」必須改寫 Instancer 上的實例級屬性：
 >
 > ```usda
 > over "ROOT" { over "Environment" { over "SetDressing"
@@ -305,6 +305,18 @@ over "ROOT"
 > **同一限制亦適用於材質**：無法為單一實例指定專屬 `material:binding`。若需外觀差異，只能在原型層級處理——增加一個原型並以 `protoIndices` 指派，或改用 `Instanceable Xform` 逐顆擺放。
 >
 > 因此 Lighting 在動手前必須先確認目標的承載形式：**獨立 Prim 用 `over`，`PointInstancer` 實例用 `invisibleIds`**。兩者無法互換，用錯不會報錯、只是毫無反應。
+
+> [!WARNING]
+> **`invisibleIds` 是單一陣列屬性，多部門覆寫會互相蓋掉而非合併**
+> 這是 `PointInstancer` 覆寫最容易出事的地方。`invisibleIds` 是一個 `int64[]`，屬性解析採**最強意見全取**——陣列**不會逐元素合併**。
+>
+> 因此當 FX 在 `fx_overrides` 隱藏了被爆炸波及的 `[4408, 4409]`，而 Lighting 在更強的圖層隱藏了擋鏡頭的 `[1723]`，最終生效的是 **`[1723]`**——FX 那兩棵樹會**默默重新出現**，且雙方都不會收到任何警告。
+>
+> 這與一般稀疏覆寫「各改各的屬性、互不干擾」的直覺完全相反。因應方式：
+> - **單一負責人原則**：同一顆 `PointInstancer` 的 `invisibleIds`，全鏡頭只由**一個**覆寫圖層維護，其他部門以需求單形式集中提出。
+> - **若確需多方各自控制**，則該散佈不適合以單一 `PointInstancer` 承載——應依用途拆分為多顆 Instancer（如 `ForestTrees_BG` 與 `ForestTrees_Hero`），使各自的 `invisibleIds` 不再競爭。
+>
+> 同一風險適用於 `PointInstancer` 的所有陣列屬性（`protoIndices`、`positions`、`orientations`、`scales`）。
 
 ### 情境 B：Lighting 覆寫 Animation（角色 Lookdev 修補）
 * **檔案**：`lighting_overrides/char_eye_highlight_fix.usd`
