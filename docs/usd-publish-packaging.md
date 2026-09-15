@@ -326,21 +326,21 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 >
 > 亦即：**一份在 Houdini 產出、未宣告 `upAxis` 的檔案，在 Houdini 中看起來完全正常，送進標準 USD 環境（usdview、Maya-USD、Unreal 或客戶端）即躺倒 90 度**。這正是「工作站正常、交付後才出事」的典型路徑。
 >
-> 尺度更為兇險：Houdini 未覆寫 `metersPerUnit` 的 fallback，其值為 `0.01`——與本架構採用的公尺制**恰好相反**。漏宣告的資產不會「維持中性」，而是被解讀為公分、**縮小為百分之一**。
+> 尺度更為兇險：Houdini 未覆寫 `metersPerUnit` 的 fallback，其值為 `0.01`——與本架構採用的公尺制**恰好相反**。漏宣告的 Asset 不會「維持中性」，而是被解讀為公分、**縮小為百分之一**。
 >
 > 所幸 Houdini 的 LOP Stage 會**明確寫入** `metersPerUnit = 1` 與 `upAxis = "Y"`，故正常經 Solaris 產出的圖層不受影響；真正的風險在**手寫圖層、轉檔工具產物與第三方交付**。
 >
 > 因此結論不是「記住預設值是什麼」，而是——**永遠明確宣告，不倚賴任何 fallback**。
 
 > [!CAUTION]
-> **核心認知：USD 對這三項「完全不做自動轉換」**
+> **核心認知**：USD 對這三項「**完全不做自動轉換**」
 > 這是最關鍵、也最反直覺的一點。當一顆 Asset 被 Reference / Payload 引入鏡頭時：
 > - **被引用層的 `metersPerUnit` 與 `upAxis` 會被完全忽略**——Stage 只採用 **root layer** 的宣告。
 > - USD **不會**依兩者差異縮放幾何，**也不會**旋轉座標系。
 >
 > 因此這兩項 metadata 的性質是「**宣告**」而非「**轉換指令**」。一顆以公尺建模（數值 `1.8` 代表 1.8 公尺）的角色，被引入公分制專案後，USD 不會報錯、不會警告，它就是變成 **1.8 公分高**。
 >
-> **發布時必須確保幾何數值本身即符合專案單位**，不得倚賴 metadata 宣告來救。外包交付、第三方資產庫與跨專案複用是此類災難的三大來源，必須於匯入關口換算並驗證。
+> **發布時必須確保幾何數值本身即符合專案單位**，不得倚賴 metadata 宣告來救。外包交付、第三方 Asset 庫與跨專案複用是此類災難的三大來源，必須於匯入關口換算並驗證。
 
 ### 1. 單位與座標系（`metersPerUnit` / `upAxis`）
 
@@ -367,7 +367,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 > 又因 fallback 可於站台層級配置，**漏宣告的後果會隨環境而異**：可能在工作站上看起來正常、送到農場或交付客戶後才躺倒。這使「明確宣告」從建議升格為必要。
 
 > [!CAUTION]
-> **Camera 焦距在公尺制下不是「35」，而是「0.35」**
+> **Camera 焦距在公尺制下不是**「**35**」，**而是**「**0.35**」
 > 依 `UsdGeomCamera` 慣例，`focalLength`、`horizontalAperture`、`verticalAperture` 的單位為 **scene unit 的十分之一**：
 >
 > | 專案單位 | 十分之一 scene unit | 35mm 鏡頭寫成 |
@@ -375,7 +375,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 > | 公分（`0.01`） | 1 mm | `focalLength = 35.0` |
 > | **公尺（`1`，本架構）** | 10 cm | **`focalLength = 0.35`** |
 >
-> **最危險的是「填 35 看起來也對」**：視角（FOV）只取決於 `focalLength / horizontalAperture` 的**比值**，兩者同時錯在同一個單位上時比值不變，**構圖完全正常**。
+> **最危險的是**「**填 35 看起來也對**」：視角（FOV）只取決於 `focalLength / horizontalAperture` 的**比值**，兩者同時錯在同一個單位上時比值不變，**構圖完全正常**。
 >
 > 但**景深會徹底錯亂**：`focusDistance` 是 world unit（公尺），而 `focalLength` 是十分之一 world unit。在公尺專案誤寫 `focalLength = 35`，USD 眼中那是 **3.5 公尺的焦距**，配上 5 公尺對焦距離算出的 DOF 毫無物理意義。
 >
@@ -384,7 +384,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ### 2. 時間軸（`timeCodesPerSecond`）
 
 > [!CAUTION]
-> **`timeCodesPerSecond` 不一致會引發「隱式時間縮放」**
+> **`timeCodesPerSecond` 不一致會引發**「**隱式時間縮放**」
 > 當某個 sublayer 宣告的 `timeCodesPerSecond` 與 root layer 不同時，USD 會依兩者比值自動對該 sublayer 的時間樣本施加縮放：
 >
 > ```text

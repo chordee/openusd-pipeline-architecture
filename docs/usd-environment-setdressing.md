@@ -140,7 +140,7 @@ def Xform "ROOT" (
 
 > [!IMPORTANT]
 > **下游覆寫方式與獨立 Prim 完全不同**
-> `PointInstancer` 換取極致輕量的代價，是**實例不具備 Prim 身分**——它們僅是陣列中的索引，命名空間裡沒有對應路徑。Instancer 本身仍是可正常 `over` 的 Prim，但**覆寫對象從「那顆物件」變成「Instancer 上的陣列屬性」**，下游慣用的 `over` + `visibility` 在此**毫無作用**（不報錯，單純沒反應）。
+> `PointInstancer` 換取極致輕量的代價，是**實例不具備 Prim 身分**——它們僅是陣列中的索引，命名空間裡沒有對應路徑。Instancer 本身仍是可正常 `over` 的 Prim，但覆寫對象從「**那顆物件**」變成「**Instancer 上的陣列屬性**」，下游慣用的 `over` + `visibility` 在此**毫無作用**（不報錯，單純沒反應）。
 >
 > | 需求 | 獨立 Prim | `PointInstancer` 實例 |
 > | :--- | :--- | :--- |

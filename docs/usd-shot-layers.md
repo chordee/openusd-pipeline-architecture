@@ -364,7 +364,7 @@ over "ROOT"
 > **若目標是 `PointInstancer` 的其中一個實例，上述寫法完全無效**
 > `PointInstancer` **本身是 Prim，可正常以 `over` 覆寫**；但它的**個別實例不是 Prim**——實例只是 `positions` / `protoIndices` 等陣列中的一筆索引，命名空間裡沒有 `.../ForestTrees/Tree_01723` 這種路徑存在，因此**無法對單一實例下 `over`**。
 >
-> 換言之：**覆寫的對象從「那棵樹」變成「那顆 Instancer 的屬性」**。海量散佈（森林、碎石、草皮）一律以 `PointInstancer` 承載，所以「隱藏那棵擋鏡頭的樹」必須改寫 Instancer 上的實例級屬性：
+> 換言之：覆寫的對象從「**那棵樹**」變成「**那顆 Instancer 的屬性**」。海量散佈（森林、碎石、草皮）一律以 `PointInstancer` 承載，所以「隱藏那棵擋鏡頭的樹」必須改寫 Instancer 上的實例級屬性：
 >
 > ```usda
 > over "ROOT" { over "Environment" { over "SetDressing"
@@ -518,7 +518,7 @@ over "ROOT"
 > **Muting 的正當用途**是在自己的 session 中快速 A／B 比對、逐層排查是哪個覆寫造成問題。一旦判定要移除，**必須落實為發布動作**。
 
 > [!WARNING]
-> **亦不可「直接編輯已發布的 `overrides.usd` 把 sublayer 註解掉」**
+> **亦不可**「**直接編輯已發布的 `overrides.usd` 把 sublayer 註解掉**」
 > 已發布的版次目錄一律轉為唯讀、位元組層級不可變（見 [發布封裝篇](usd-publish-packaging.md)）。就地修改已發布檔案會破壞該版本的歷史確定性——所有引用它的鏡頭都會被無聲改變，且無從追溯。
 >
 > 正確作法是**發布新版的 `overrides.usd` 容器**，於 `subLayers` 清單中不再列入該修補檔。這既保留了完整的版本軌跡（哪一版拿掉了哪個修補一目了然），也讓被移除的修補檔原封不動地留在原處，隨時可重新掛回。
