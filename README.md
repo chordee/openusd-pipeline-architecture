@@ -63,7 +63,7 @@
 - **版本控管的架構取捨**：不採用 VariantSet 控版（避免回溯修改歷史註冊檔），改採目錄進版（`v001`, `v002`...）並自動維護 `asset_latest.usd`。
 - **Sub 物件無 latest 與推進連動**：Asset 底下的 `modelDefault/`、`lookDefault/` 等 sub 物件自身不設 `latest`；每次子組件進版，直接驅動單元物件 Asset 整體進版，並由 Pipeline 自動更新根目錄唯一的 `asset_latest.usd`。
 - **跨平臺適配**：全平臺統一採用 `subLayers = [@./v###/asset.usd@]` 包裝圖層，不使用 Symlink——共用儲存上只存在單一檔案，且唯有真實 Layer 才能被 Asset Resolver 攔截。包裝圖層必須完整複製版本層的 Layer Metadata，否則 `upAxis` 等設定將回落至預設值。
-- **歷史確定性**：日常製作預設引用 `asset_latest.usd` 享受無感更新；提交渲染與發布時，由自訂 **Asset Resolver** 讀取審批快照，在記憶體中將 `asset_latest` 逆向鎖定為具體歷史版本，保證 100% 畫面可重現。
+- **歷史確定性**：日常製作預設引用 `asset_latest.usd` 享受無感更新；提交渲染與發布時，由自訂 **Asset Resolver** 於 `Resolve()` 攔截並重寫路徑，將 `asset_latest` 逆向鎖定為具體歷史版本。情境以 `ArResolverContext` 攜帶；鎖定清單須**遞移涵蓋整棵依賴樹**，且鎖定情境下找不到清單必須 fail loud。此機制保證的是 **USD 組合結果的確定性**，畫面完全重現尚須貼圖、快取與渲染器版本各自的封存策略。
 
 ### 7. 材質綁定契約：幾何零材質、零綁定
 - **幾何發布單元一律不得攜帶材質**：`modelDefault/`、FX `layers/` 等幾何包內，**嚴禁出現任何 `Material` / `Shader` Prim，亦嚴禁宣告任何 `material:binding`**（含 `GeomSubset` 上的分面綁定）；外觀 100% 交由 look / material 圖層全權決定。

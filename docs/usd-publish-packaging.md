@@ -278,6 +278,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色資產結構](usd-asset-layer.md#7-角色資產結構character-asset) |
    | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 必須明確宣告 `elementSize`，否則 imaging 端無法切分每點影響數 | 同上 |
    | **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其所包裹的版本層逐項相同 | [`latest` 實現機制](#5-latest-動態入口的實現機制) |
+   | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#8-asset-resolver-的逆向鎖定機制version-pinning) |
    | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
 
    > [!CAUTION]
@@ -548,24 +549,87 @@ over "ROOT"
 ```text
                         ┌── 日常製作模式 (Work Mode) ────► 解析為最新版實體 (v003)
                         │
-引用路徑: @.../latest.usd@
+引用路徑: @.../asset_latest.usd@
                         │
                         └── 渲染/封裝模式 (Render Mode) ──► 【Asset Resolver 介入】
                                                             鎖定並重定向至當下核准的舊版本 (v002)
 ```
 
-### Asset Resolver 的三大介入能力
+### 1. 攔截點：重寫路徑字串，而非解析圖層內容
+
+Resolver 攔截的是 **`ArResolver::Resolve()` 收到的路徑字串**。當它看到 `…/chair/asset_latest.usd` 時，直接回傳 `…/chair/v002/asset.usd` 的實體路徑——**完全不需要開啟或解析包裝圖層的內容**。
+
+```text
+Composition 要求解析  @…/chair/asset_latest.usd@
+        │
+        ▼
+  ArResolver::Resolve()
+        │
+        ├── Work Context    ──►  …/chair/v003/asset.usd   (latest 實際指向)
+        └── Render Context  ──►  …/chair/v002/asset.usd   (審批快照指定)
+```
+
+> [!IMPORTANT]
+> **這是 `latest` 必須採用包裝圖層而非 Symlink 的根本原因**
+> 包裝圖層讓 `asset_latest.usd` 成為一個**真實存在的路徑**，Resolver 得以在 `Resolve()` 攔截它。若改用 Symlink，AR 在解析時很可能直接將其 realpath 為 `v003/asset.usd`，Resolver **根本看不到 `latest` 這個字串**，逆向鎖定完全失效。詳見 [§5 `latest` 實現機制](#5-latest-動態入口的實現機制)。
+
+### 2. 情境傳遞：使用 `ArResolverContext`，而非環境變數
+
+`Work` 與 `Render` 的區分應透過 OpenUSD 原生的 **`ArResolverContext`** 攜帶——它可綁定至特定 Stage、支援巢狀與堆疊，且生命週期與 Stage 一致。
+
+> [!WARNING]
+> **不要以環境變數傳遞情境**
+> 農場節點常同時執行多個任務，環境變數是行程級的全域狀態，**會互相污染**——甲鏡頭的鎖定情境可能被乙鏡頭覆寫。且環境變數無法隨 Stage 攜帶，同一行程內若需同時開啟工作態與鎖定態的兩個 Stage 即無解。
+
+### 3. 三大介入能力
 
 1. **情境感知解析（Context-Aware Resolution）**：
-   - 當 Stage 處於 `Work` Context 時，解析 `@.../latest.usd@` 傳回最新的磁碟路徑（`v003`）。
-   - 當 Stage 提交至農場渲染（`Render` Context）或進入審查階段時，Resolver 讀取資料庫（Shot Tracking / Production DB）中該鏡頭核准的快照（Approved Snapshot），在記憶體中自動將 `latest` 轉譯為當時核准的版本（如 `v002`）。
+   - 當 Stage 處於 `Work` Context 時，解析 `@.../asset_latest.usd@` 傳回最新的磁碟路徑（`v003`）。
+   - 當 Stage 提交至農場渲染（`Render` Context）或進入審查階段時，Resolver 讀取該鏡頭核准的快照，在記憶體中自動將 `latest` 轉譯為當時核准的版本（如 `v002`）。
 
 2. **零實體檔案修改（No Destructive Edits）**：
-   - 原始 `shot.usd` 檔案內的寫法依然乾淨地保持為 `@.../latest.usd@`，不需要由腳本去把全場所有路徑暴力替換成 `v002`。
+   - 原始 `shot.usd` 檔案內的寫法依然乾淨地保持為 `@.../asset_latest.usd@`，不需要由腳本去把全場所有路徑暴力替換成 `v002`。
    - 所有鎖定行為完全發生在 USD 的 `ArResolver` 解析抽象層，保證檔案本身的整潔與可維護性。
 
 3. **版本歷史凍結（Freeze & Release）**：
-   - 專案定剪或鏡頭 Final 交付時，可透過 Resolver 輸出一份完整的 `pinning_manifest.json`，永久鎖定全鏡頭所有 `latest` 所對應的真實版本，確保五年後重新打開該 USD 仍能精準渲染出 100% 相同的畫面。
+   - 專案定剪或鏡頭 Final 交付時，可輸出一份完整的鎖定清單，記錄全鏡頭所有 `latest` 當下所對應的真實版本。
+
+### 4. 實作注意事項
+
+> [!CAUTION]
+> **一、鎖定清單必須遞移涵蓋整棵依賴樹**
+> 只記錄鏡頭**直接引用**的那一層是不夠的。以角色為例：
+>
+> ```text
+> shot.usd
+>  └─► chars/hero/char_latest.usd            ──► char/v002        ← 記了
+>       └─► assets/char/hero/asset_latest.usd ──► asset/v003       ← 漏了就前功盡棄
+> ```
+>
+> 綁定角色鎖在 `v002` 之後，它內部引用的幾何材質 Asset 仍是 `asset_latest`——建模一進版，畫面照樣改變。**凡解析過程中命中 `*_latest.usd` 的節點，全部都要入帳。**
+>
+> 包內以相對路徑鎖定的 sub 物件（如 `v002/asset.usd` 內的 `@../modelDefault/v002/…@`）本來就已凍結，無須記錄。
+
+> [!CAUTION]
+> **二、鎖定情境下找不到清單，必須 fail loud**
+> 這是最容易被寫錯的一項。若實作成「找不到就回落 latest」，農場會在沒有鎖定的情況下**默默算完整卷**——這正是整套機制要防範的事，卻因為回落邏輯而完全失效，且毫無跡象。
+>
+> 建議行為依情境分流：
+> - **`Work`**：找不到即回落 `latest`，屬正常路徑，不應告警（否則日常製作會被噪音淹沒）。
+> - **`Render` / `Delivery`**：找不到即**中斷任務並報錯**。
+
+> [!WARNING]
+> **三、清單應在「提交當下」產生，而非「渲染當下」**
+> 若等到農場節點開始渲染才去讀取當時的 `latest`，則提交到實際執行之間的空窗期內，上游任何一次進版都會被吃進去——排隊愈久風險愈大，而這與不做鎖定並無二致。
+
+> [!WARNING]
+> **四、路徑鍵值應保留 `${PROJECT_ROOT}` 變數形式**
+> 若清單以**已展開的絕對路徑**為鍵，專案目錄一經搬遷或交付客戶，全部歷史鎖定清單即同時失效——這與 [Expression Variable 機制](#4-路徑引用雙重標準與-stage-expression-variable-專案路徑替換)的設計初衷直接矛盾。保留變數形式，鎖定清單才能隨專案一起遷移。
+
+> [!NOTE]
+> **鎖定機制保證的是「USD 組合結果的確定性」，不是「畫面的完全重現」**
+> 逆向鎖定能確保五年後重新開啟該鏡頭時，composed 出來的 USD 場景樹與當初完全一致。但最終畫面是否相同，還取決於貼圖與快取實體是否仍在、Shader 與渲染器版本、以及 OCIO 色彩設定等 USD 之外的因素。**這些需要各自的封存策略**，不在本機制的保證範圍內。
+
 
 ---
 
@@ -631,6 +695,6 @@ def Xform "ROOT" (
 | **包裝圖層 Metadata** | 必須完整複製版本層的全部 Layer Metadata | Layer Metadata 不透過 `subLayers` 傳遞；遺漏將導致 `upAxis` 回落預設值、`timeCodesPerSecond` 不一致引發隱式時間縮放 |
 | **版本控管機制** | 獨立目錄進版搭配 `latest` 指向 | 權衡取捨：不以 VariantSet 控版，確保發布不可變性 |
 | **生產期引用** | 預設引用 `latest.usd` | 享受無感即時更新 |
-| **渲染/發布鎖定** | 透過 Asset Resolver 執行 Version Pinning | 保障生產可重現性與渲染穩定性 |
+| **渲染/發布鎖定** | 透過 Asset Resolver 於 `Resolve()` 重寫 `*_latest.usd` 路徑；情境以 `ArResolverContext` 攜帶 | 鎖定清單須遞移涵蓋依賴樹；鎖定情境下找不到清單須 fail loud |
 | **Asset Loader 載入規範** | Query（檢索）與 Load（掛載）兩段式架構 | 遵循原生 Composition Arcs（Ref/Payload/Sublayer），支援自由指定 Target Prim Path |
 | **Loader 實例化與繼承** | 支援 `instanceable` 與 `/__CLASS__/{name}` 多重 inherits | 達成高效記憶體共享與多標籤廣播覆寫 |
