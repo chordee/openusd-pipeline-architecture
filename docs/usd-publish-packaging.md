@@ -329,11 +329,57 @@ publish/                                <-- 專案作用域
 > **`libraries/` 是每個作用域層級都具備的逸出艙**
 > Pure USD 單元依定義**結構不受限**，因此不能與受約束的分類混放——QC 需要能明確判斷「此處是否套用 Asset 結構檢查」。`libraries/` 即為此而設，並且**在專案、序列、鏡頭三層各自獨立存在**：
 >
-> - `publish/libraries/` — 全專案通用的診斷 Stage、校色卡、共用攝影機 Rig
+> - `publish/libraries/` — 全專案通用的 Class 廣播層、診斷 Stage、校色卡、共用攝影機 Rig
 > - `publish/shots/<seq>/libraries/` — 跨鏡頭但限於該序列者，如整場戲共用的 Light Rig
 > - `publish/shots/<seq>/<shot>/libraries/` — 該鏡頭專屬者，如 Layout 拆分出的散佈點雲
 >
 > 它出現的**位置**即宣告了該單元的作用域；容器本身的語意在三層完全相同。
+
+
+專案級 `libraries/` 最典型的單元是 **Class 廣播層**：一份設計好的 `/__CLASS__` 覆寫，需要時直接 `subLayers` 疊進場景即告生效，不需要時移除或 Layer Muting 即可。
+
+```text
+publish/libraries/BoundsProxyBroadcast/
+├── BoundsProxyBroadcast_latest.usda
+├── v001/BoundsProxyBroadcast.usd
+└── v002/BoundsProxyBroadcast.usd
+```
+
+```usda
+# v002/BoundsProxyBroadcast.usd
+# 將所有帶 interior_dressing 標籤的物件切為包圍盒顯示，供 Layout 輕量作業
+#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+    timeCodesPerSecond = 24
+)
+
+class "__CLASS__"
+{
+    class "interior_dressing" (
+        prepend apiSchemas = ["GeomModelAPI"]
+    )
+    {
+        uniform token model:drawMode = "bounds"
+        uniform bool model:applyDrawMode = 1
+    }
+}
+```
+
+啟用端只需將它疊進圖層堆疊，不必改動任何 Asset 或鏡頭內容：
+
+```usda
+subLayers = [
+    @`"${PROJECT_ROOT}/publish/libraries/BoundsProxyBroadcast/BoundsProxyBroadcast_latest.usda"`@,
+]
+```
+
+這正是 Pure USD 單元的典型樣貌：**沒有幾何、沒有 `/ROOT`、沒有固定的單元型別**——套用 Asset 的同構結構檢查毫無意義，但它確實需要進版與 `latest`。若把它放進 `assets/`，QC 將對一份根本不在 `/ROOT` 命名空間內作業的圖層索求 `/ROOT` 與 `kind`。
+
+> [!NOTE]
+> **`drawMode` 是少數該寫在 Class 根 Prim 上的廣播**
+> [Asset Loader 篇](usd-asset-loader.md)要求廣播意見「一律往下走」，那是針對 `material:binding`——綁定解析由目標 Prim **向上**尋找最近的帶綁定祖先，寫在 Class 根會把整顆 Asset 的材質層次抹平。`model:drawMode` 則相反：它本就是**模型根層級**的屬性，寫在 Class 根（即實例根 Prim）才是正確位置。`model:applyDrawMode` 則用於標籤落在非模型根 Prim 的情形（其預設值為 `false`）。
 
 綁定角色（`rig/`）獨立於 `assets/` 之外，是因為它與幾何材質 Asset **分屬不同審批週期**：Model／Lookdev 驗收一次交付 `assets/char/<unit>/`，Rigging 驗收一次交付 `rig/<unit>/`。鏡頭端引用的恆為後者。
 
