@@ -348,7 +348,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 > 又因 fallback 可於站台層級配置，**漏宣告的後果會隨環境而異**：可能在工作站上看起來正常、送到農場或交付客戶後才躺倒。這使「明確宣告」從建議升格為必要。
 
 > [!CAUTION]
-> **Camera 焦距在公尺制下不是**「**35**」，**而是**「**0.35**」
+> **Camera 焦距在公尺制下不是 `35`，而是 `0.35`**
 > 依 `UsdGeomCamera` 慣例，`focalLength`、`horizontalAperture`、`verticalAperture` 的單位為 **scene unit 的十分之一**：
 >
 > | 專案單位 | 十分之一 scene unit | 35mm 鏡頭寫成 |
@@ -356,7 +356,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 > | 公分（`0.01`） | 1 mm | `focalLength = 35.0` |
 > | **公尺（`1`，本架構）** | 10 cm | **`focalLength = 0.35`** |
 >
-> **最危險的是**「**填 35 看起來也對**」：視角（FOV）只取決於 `focalLength / horizontalAperture` 的**比值**，兩者同時錯在同一個單位上時比值不變，**構圖完全正常**。
+> **最危險的陷阱是填 35 看起來也對**：視角（FOV）只取決於 `focalLength / horizontalAperture` 的**比值**，兩者同時錯在同一個單位上時比值不變，**構圖完全正常**。
 >
 > 但**景深會徹底錯亂**：`focusDistance` 是 world unit（公尺），而 `focalLength` 是十分之一 world unit。在公尺專案誤寫 `focalLength = 35`，USD 眼中那是 **3.5 公尺的焦距**，配上 5 公尺對焦距離算出的 DOF 毫無物理意義。
 >
@@ -365,7 +365,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ### 2. 時間軸（`timeCodesPerSecond`）
 
 > [!CAUTION]
-> **`timeCodesPerSecond` 不一致會引發**「**隱式時間縮放**」
+> **`timeCodesPerSecond` 不一致會引發隱式時間縮放**
 > 當某個 sublayer 宣告的 `timeCodesPerSecond` 與 root layer 不同時，USD 會依兩者比值自動對該 sublayer 的時間樣本施加縮放：
 >
 > ```text
@@ -816,7 +816,7 @@ Composition 要求解析  @…/chair/asset_latest.usda@
 > - **`Render` / `Delivery`**：找不到即**中斷任務並報錯**。
 
 > [!WARNING]
-> **三、清單應在**「**提交當下**」**產生，而非**「**渲染當下**」
+> **三、清單應在提交當下產生，而非渲染當下**
 > 若等到農場節點開始渲染才去讀取當時的 `latest`，則提交到實際執行之間的空窗期內，上游任何一次進版都會被吃進去——排隊愈久風險愈大，而這與不做鎖定並無二致。
 
 > [!WARNING]
@@ -824,7 +824,7 @@ Composition 要求解析  @…/chair/asset_latest.usda@
 > 若清單以**已展開的絕對路徑**為鍵，專案目錄一經搬遷或交付客戶，全部歷史鎖定清單即同時失效——這與 [Expression Variable 機制](#5-路徑引用雙重標準與-stage-expression-variable-專案路徑替換)的設計初衷直接矛盾。保留變數形式，鎖定清單才能隨專案一起遷移。
 
 > [!NOTE]
-> **鎖定機制保證的是**「**USD 組合結果的確定性**」，**不是**「**畫面的完全重現**」
+> **鎖定機制保證的是 USD 組合結果的確定性，不是畫面的完全重現**
 > 逆向鎖定能確保五年後重新開啟該鏡頭時，composed 出來的 USD 場景樹與當初完全一致。但最終畫面是否相同，還取決於貼圖與快取實體是否仍在、Shader 與渲染器版本、以及 OCIO 色彩設定等 USD 之外的因素。**這些需要各自的封存策略**，不在本機制的保證範圍內。
 
 
