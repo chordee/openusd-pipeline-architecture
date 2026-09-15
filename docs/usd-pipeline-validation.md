@@ -102,7 +102,8 @@
 | 檢查項 | 判定條件 | 級別 | 規範來源 |
 | :--- | :--- | :---: | :--- |
 | **`/ROOT` 已被定義** | 發布包合成後的 `/ROOT` 為 `IsDefined() == True` | 攔阻 | [`/ROOT` 鐵律](usd-publish-packaging.md) |
-| **`/ROOT` 未被部門污染** | Sub 物件包的 `/ROOT` 上無 `kind`、`variantSets` 或非白名單屬性（白名單僅含材質包的 `material:binding`） | 攔阻 | 同上 |
+| **`/ROOT` 未被部門污染** | Sub 物件包的 `/ROOT` 上無 `kind`、`variantSets` 或非白名單屬性（白名單僅含 `collection`） | 攔阻 | 同上 |
+| **`/ROOT` 無 `xformOp`** | 發布單元的根恆為 identity；角色的 `SkelRoot` 為唯一型別例外 | 攔阻 | 同上 |
 | **Shot 部門圖層未污染 `/ROOT`** | 部門圖層在 `/ROOT` 上無任何屬性或元數據意見 | 攔阻 | 同上 |
 | **`kind` 階層狀況** | 列出所有掉出 Model Hierarchy 的 model 及其斷點 | **報告** | [`usdkind` 治理](usd-asset-layer.md) |
 | **已聲明能力未失效** | 已指定 `drawMode` 等 Model 能力的 Prim，其 Model Hierarchy 實際有效 | 攔阻 | 同上 |
@@ -115,7 +116,8 @@
 | **幾何零綁定** | 幾何發布單元內無任何 `material:binding`，含 `GeomSubset` 上的分面綁定 | 攔阻 | 同上 |
 | **覆寫 `over` 命中** | look / material / skel 圖層內每個 `over` 路徑，合成後皆對應到 `IsDefined()` 為真的 Prim | 攔阻 | 同上 |
 | **Class 廣播命中率** | 列出 Class 廣播實際套用到的實例數與未命中清單 | **報告** | [Class Inherits](usd-asset-loader.md) |
-| **Collection Binding 例外已登記** | 動用 `bindMaterialAs = "strongerThanDescendants"` 者，已於 Asset 管理系統標記待整改 | 建議 | [材質綁定契約](usd-asset-layer.md) |
+| **覆寫深度充足** | 下游覆寫意見所在深度不淺於既有綁定；淺於者將靜默落敗 | **報告** | [材質綁定契約](usd-asset-layer.md) |
+| **不合規 Asset 已登記** | 因 Asset 自帶 direct binding 而動用 collection binding 者，已於 Asset 管理系統標記待整改 | 建議 | 同上 |
 
 ### 3. 骨架與蒙皮
 

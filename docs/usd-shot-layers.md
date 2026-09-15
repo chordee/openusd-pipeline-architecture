@@ -156,6 +156,8 @@ over "ROOT"
 ```
 
 ### 4. Lighting Layer (`lighting.usd`) —— 最強（終審裁決）
+> 📖 詳細架構請見：[USD Lighting Layer 燈光層架構與最終仲裁權](usd-lighting-layer.md)
+
 定義光源、環境光、Light Linking 與最終渲染品質；並一併產出 `/Render` 命名空間下的渲染設定（詳見 [§4 Render 層](#4-render-層render-命名空間)）：
 ```usda
 #usda 1.0

@@ -9,13 +9,13 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 > 1. **統一 `/ROOT` 命名空間**：Asset 檔案內部所有模型與材質一律掛載在 `/ROOT` 底下（`defaultPrim = "ROOT"`，`kind = "component"`）。
 > 2. **Asset 雙核心組裝**：一個完整的 `asset.usd` 本身即是由 Pipeline 以 **Reference** 將幾何包（`modelDefault/`）與材質包（`lookDefault/`）兩者嫁接至 `/ROOT` 而成；各 sub 物件包皆為自成一體的封裝單元，擁有自己的 `/ROOT`。
 > 3. **預設節點路徑**：
->    - 預設模型幾何：`/ROOT/ModelDefault`
->    - 預設材質外觀：`/ROOT/LookDefault`
+>    - 預設模型幾何：`/ROOT/Model`
+>    - 預設材質外觀：`/ROOT/Look`
 > 4. **雙維度 VariantSet 與按需自動啟動機制**：
->    - **基準態（Baseline）**：以 `ModelDefault` 與 `LookDefault` 的唯一性作為標準基準。在只有單一幾何或外觀時保持結構最簡，不強制包裝多餘的 VariantSet。
+>    - **基準態（Baseline）**：以 `Model` 與 `Look` 的唯一性作為標準基準。在只有單一幾何或外觀時保持結構最簡，不強制包裝多餘的 VariantSet。
 >    - **按需自動啟動**：一旦檢測到出現額外變體（如 `ModelLow`、`ModelHigh`，或 `LookRed`、`LookBlue`），Pipeline 自動化機制即刻啟動對應的 `model` 或 `look` VariantSet，並將既有的 `Default` 設為預設選取項，達成無感向下相容。
->    - **Model 變體**：如 `ModelDefault`、`ModelLow`、`ModelHigh`，透過 `model` variant set 切換幾何複雜度。
->    - **Look 變體**：如 `LookDefault`、`LookRed`、`LookBlue`，透過 `look` variant set 切換材質與著色效果。
+>    - **Model 變體**：如 `Model`、`ModelLow`、`ModelHigh`，透過 `model` variant set 切換幾何複雜度。
+>    - **Look 變體**：如 `Look`、`LookRed`、`LookBlue`，透過 `look` variant set 切換材質與著色效果。
 > 5. **版本控管的架構取捨**：經事先考量與權衡，VariantSet 專用於形態與外觀變體，版本迭代則統一採用目錄進版與 `latest` 機制，避免回溯修改上層註冊檔。詳見專題筆記：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)。
 > 6. **Purpose 對稱完整性與 ModelAPI DrawMode 治理**：
 >    - **Purpose 齊全原則**：幾何若定義了 `purpose`，**`render` 與 `proxy` 必須兩者皆齊全**；若無對應代理網格則一律保持為 `default`，防止 Viewport 與渲染農場顯示不同步。
@@ -60,16 +60,26 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 
        ▼ 組裝與展開後在 Stage 的結構 ▼
 
-/ROOT (Xform, kind = component)
-├── material:binding             <-- 綁定一律寫在 /ROOT，向下繼承給全部幾何
-├── ModelDefault/                <-- (或切換為 ModelLow / ModelHigh)
-│   └── Mesh/                    <-- 幾何零材質、零綁定
-└── LookDefault/                 <-- (或切換為 LookRed / LookBlue)
-    └── Materials/
+/ROOT (Xform, kind = component)          <-- 其上不承載任何屬性
+├── Model/                               <-- 分支名固定；由 model variant 決定引用哪一包
+│   └── Body (Mesh)                      <-- 幾何零材質、零綁定
+│         └── material:binding           <-- 由 Look 包以 over 寫入
+└── Look/                                <-- 分支名固定；由 look variant 決定引用哪一包
+    └── M_Base (Material)
 ```
 
-> [!NOTE]
-> `material:binding` 刻意寫在 `/ROOT` 而非 `LookDefault` 底下：`/ROOT` 被引用進鏡頭後即映射為實例根 Prim，使下游的唯一覆寫點收斂於此。完整規範詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
+> [!IMPORTANT]
+> **分支名固定為 `Model` 與 `Look`，不隨 variant 改變**
+> 三個層級的命名各司其職，不可混為一談：
+>
+> | 層級 | 命名 | 說明 |
+> | :--- | :--- | :--- |
+> | **VariantSet 名** | `model`、`look` | 兩個正交維度 |
+> | **Variant 選項名** | `Default`、`Low`、`High` / `Default`、`Red`、`Blue` | 選項不重複維度名 |
+> | **資料夾名** | `modelDefault/`、`modelLow/`、`lookDefault/`、`lookRed/` | 同層兄弟目錄，**必須帶維度前綴才能區別** |
+> | **Prim 分支名** | `/ROOT/Model`、`/ROOT/Look` | **固定不變**，各 variant 包一律定義同名分支 |
+>
+> 分支名固定是材質包得以 `over "Model"` 寫入綁定、且**切換 `model` variant 仍然生效**的前提。若各精度包各用其名，look 的 `over` 一換 variant 即靜默落空。
 
 ---
 
@@ -104,12 +114,12 @@ USD 的 Reference / Payload 機制會自動將來源檔的 `/ROOT` 映射為消�
 
 ## 3. 幾何圖層 (`model.usd`) 與 Model VariantSet
 
-模型部門獨立發佈幾何資料。在 Pipeline 自動化架構中，幾何圖層遵循「**以 `ModelDefault` 唯一性為基準、按需自動啟動 VariantSet**」的設計：
+模型部門獨立發佈幾何資料。在 Pipeline 自動化架構中，幾何圖層遵循「**以 `Model` 唯一性為基準、按需自動啟動 VariantSet**」的設計：
 
-### 1. 基準態：`ModelDefault` 的唯一性
+### 1. 基準態：`Model` 的唯一性
 - 在日常製作中，絕大多數一般道具（Props）僅需單一標準精度模型。
-- **極簡優先**：此時 `model.usd` 內部僅包含 `/ROOT/ModelDefault`，不強制生成空的或只有單一選項的 VariantSet 結構，保持圖層與記憶體開銷的極致輕量。
-- **預先對齊路徑**：即使尚未啟動 VariantSet，幾何 Prim 亦統一命名為 `ModelDefault`，為後續可能的升級預留錨點。
+- **極簡優先**：此時 `model.usd` 內部僅包含 `/ROOT/Model`，不強制生成空的或只有單一選項的 VariantSet 結構，保持圖層與記憶體開銷的極致輕量。
+- **預先對齊路徑**：即使尚未啟動 VariantSet，幾何 Prim 亦統一命名為 `Model`，為後續可能的升級預留錨點。
 
 幾何部門交付的內容極其單純——一個自成一體的幾何包，內部只有自己的分支：
 
@@ -122,7 +132,7 @@ USD 的 Reference / Payload 機制會自動將來源檔的 `/ROOT` 映射為消�
 
 def Xform "ROOT"
 {
-    def Scope "ModelDefault"
+    def Scope "Model"
     {
         def Mesh "Body" { /* 標準中精度網格資料；零材質、零綁定 */ }
     }
@@ -287,12 +297,12 @@ over "ROOT"
 
 ## 4. 材質圖層 (`look.usd`) 與 Look VariantSet
 
-Lookdev 部門獨立發佈材質資料。材質層同樣貫徹「**以 `LookDefault` 唯一性為基準、按需自動啟動 VariantSet**」的設計：
+Lookdev 部門獨立發佈材質資料。材質層同樣貫徹「**以 `Look` 唯一性為基準、按需自動啟動 VariantSet**」的設計：
 
-### 1. 基準態：`LookDefault` 的唯一性
+### 1. 基準態：`Look` 的唯一性
 - 在未拆分色彩或塗裝變體前，Asset 僅有單一標準外觀。
-- **無負擔綁定**：材質包僅定義 `/ROOT/LookDefault`，並在自身 `/ROOT` 寫出綁定，不強制生成空的 VariantSet。
-- **唯一性基準**：以 `LookDefault` 作為預設材質與著色方案的絕對基準。
+- **無負擔綁定**：材質包僅定義 `/ROOT/Look`，並在自身 `/ROOT` 寫出綁定，不強制生成空的 VariantSet。
+- **唯一性基準**：以 `Look` 作為預設材質與著色方案的絕對基準。
 
 材質部門交付的同樣是一個自成一體的材質包：
 
@@ -305,29 +315,36 @@ Lookdev 部門獨立發佈材質資料。材質層同樣貫徹「**以 `LookDefa
 
 def Xform "ROOT"
 {
-    def Scope "LookDefault"
+    def Scope "Look"
     {
         def Material "M_Base" { /* 標準灰黑色金屬材質 */ }
     }
 
-    # 綁定寫在材質包自身的 /ROOT，經 Reference 嫁接後即落在 Asset 的 /ROOT，
-    # 向下繼承給 ModelDefault 底下全部幾何。
-    # 幾何包恪守零綁定鐵律，故此繼承意見絕不會被後代蓋過。
-    rel material:binding = </ROOT/LookDefault/M_Base>
+    # 以 over 進入幾何分支寫出綁定；/ROOT 上不留任何屬性
+    over "Model"
+    {
+        over "Body" { rel material:binding = </ROOT/Look/M_Base> }
+    }
 }
 ```
 
 > [!IMPORTANT]
-> **綁定一律寫在材質包自身的 `/ROOT` 層級**
-> 綁定宣告於材質包的 `/ROOT` 而非下探至個別 Mesh，此寫法的成立前提是幾何包恪守「零材質、零綁定」鐵律——詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
+> **材質包以 `over` 進入幾何分支寫出綁定，`/ROOT` 上不留任何意見**
+> 此作法有一項決定性的理由：**`GeomSubset` 分面綁定只能寫在各 subset 上**。一顆 Mesh 需要分面綁多材質時，`/ROOT` 層級的綁定根本做不到。既然多材質情形非 `over` 不可，單材質情形也走同一條路，規則才一致——這亦與 [FX Element 的材質層](usd-fx-layer.md)完全同構。
 >
-> 其直接效益是：切換 `model` variant（`ModelDefault` / `ModelLow` / `ModelHigh`）時，由於綁定落在共同祖先 `/ROOT`，**任一精度的幾何都自動承接正確材質**，Look 與 Model 兩個維度得以真正正交、互不牽動。
+> 前提是幾何包恪守「零材質、零綁定」鐵律，`over` 寫入的綁定才不會與既有意見競爭。詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
+
+> [!WARNING]
+> **`over` 落空是靜默的**
+> 材質包的 `over` 依賴幾何包的 Prim 名稱。若建模端改了 Mesh 名，該 `over` **不產生任何作用**——USD 不報錯，只渲染出無材質的結果。
+>
+> 因此 Mesh 名稱一經發布即視為**對外介面**，不得隨意更動；QC 亦須驗證材質層每個 `over` 路徑皆命中實際存在的 Prim。
 
 ### 2. 按需自動啟動：`LookRed` / `LookBlue` 誕生
 - 當劇情、場景陳設或藝術指導要求提供多款塗裝時（例如發布了 `lookRed/` 或 `lookBlue/`）：
 - **各塗裝各自成包**：`lookRed/v001/lookRed.usd` 內部同樣為 `def Xform "ROOT" { def Scope "LookRed" { ... }; rel material:binding = </ROOT/LookRed/M_Red> }`，結構與 `lookDefault` 完全同構。
 - **自動觸發封裝**：Pipeline 自動化組裝工具檢測到多個 Look 組件並存，**於總裝層自動啟動 `look` VariantSet 封裝流程**，各 variant 以 Reference 指向對應的材質包。
-- **以 `LookDefault` 為安全鎖定**：強制設定 `variants = { string look = "LookDefault" }`。既有鏡頭由於預設回落至 `LookDefault`，畫面外觀 100% 保持穩定，達成零風險的平滑升級。
+- **以 `Look` 為安全鎖定**：強制設定 `variants = { string look = "Default" }`。既有鏡頭由於預設回落至 `Look`，畫面外觀 100% 保持穩定，達成零風險的平滑升級。
 
 > 📖 總裝層的 VariantSet 實際寫法，詳見本篇 [§6.2 變體啟動後的總裝寫法](#2-變體啟動後的總裝寫法)。
 
@@ -362,44 +379,90 @@ OpenUSD 的材質綁定解析規則是：**先找該 Prim 自身的 direct bindi
 | Asset 自身 `lookDefault`（含 `look` variant） | **References / Payload** | 基礎 | Asset 出廠預設外觀 |
 | 幾何層 | —— | **不參與** | 零 binding，不產生任何意見 |
 
-依 LIVRPS 秩序（`Local > Inherits > Variants > References > Payloads > Specializes`），此三層自然形成「鏡頭覆寫 > 類別廣播 > Asset 預設」的正確優先序，**無需任何額外機制**。
+依 LIVRPS 秩序（`Local > Inherits > Variants > References > Payloads > Specializes`），組合弧的強弱關係為「鏡頭覆寫（Local）> 類別廣播（Inherits）> Asset 預設（References）」。
 
 > [!CAUTION]
-> **上述優先序的成立前提：三者必須落在「同一顆 Prim」上**
-> 綁定解析的實際規則是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」——**組合弧強弱只在同一顆 Prim 上才有意義**。一旦意見分處不同層級，「較近的祖先」會無條件勝出，與組合弧強弱完全無關：
+> **但組合弧強弱只在「同一顆 Prim」上才有意義**
+> 綁定解析的實際規則是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」。一旦意見分處不同深度，**較近的祖先無條件勝出**，與組合弧強弱完全無關：
 >
-> | 綁定所在 Prim | 來源 | 對 `…/Table_01/ModelDefault/Frame` 而言 |
+> | 綁定所在 Prim | 來源 | 對 `…/Table_01/Model/Body` 而言 |
 > | :--- | :--- | :--- |
-> | `…/Table_01/ModelDefault/Frame` | 任何來源 | **最近祖先，無條件勝出** |
-> | `…/Table_01` | Lighting 覆寫（Local） | 較遠，落敗 |
-> | `…/Table_01` | Asset `lookDefault`（References） | 較遠，落敗 |
+> | `…/Table_01/Model/Body` | Asset 的 look 包（References） | **最近祖先，勝出** |
+> | `…/Table_01` | Lighting 覆寫（Local） | 較遠，**落敗** |
 >
-> 因此本契約要求**所有整體性綁定一律收斂在實例根 Prim（即 Asset 的 `/ROOT`）**，三方在同一顆 Prim 上競爭，優先序才會如上表所述。
+> 由於本契約要求材質包以 `over` 進入幾何分支寫出綁定（見 §5.2），Asset 自身的綁定深度必然深於實例根。**下游若在實例根寫覆寫，將靜默落敗。**
+
+### 2. 下游覆寫的兩種作法，由覆寫者依意圖選擇
+
+上述深度規則並非缺陷，而是**兩種不同意圖的分野**。本架構不規定該用哪一種：
+
+| 意圖 | 作法 | 是否需知悉 Asset 內部 |
+| :--- | :--- | :---: |
+| **整顆換材質**（這張桌子改用深色木） | 於實例根施加 **collection-based binding**，並設 `bindMaterialAs = "strongerThanDescendants"` | **否** |
+| **局部或分面**（只有桌面要深，桌腳不動） | 往下 `over` 至該 Mesh 或 `GeomSubset` | 是——但此意圖本就必須指名目標 |
+
+**整顆換材質**的慣用寫法：
+
+```usda
+over "Table_01" (
+    prepend apiSchemas = ["MaterialBindingAPI", "CollectionAPI:allGeom"]
+)
+{
+    uniform token collection:allGeom:expansionRule = "expandPrims"
+    rel collection:allGeom:includes = </ROOT/Environment/Props/Table_01>
+
+    rel material:binding:collection:allGeom = </ROOT/Lighting/Materials/M_Table_Darker>
+    # 關鍵：預設為 weakerThanDescendants，必須顯式改為 strongerThanDescendants
+    uniform token material:binding:collection:allGeom:bindMaterialAs = "strongerThanDescendants"
+}
+```
+
+> [!IMPORTANT]
+> **唯一的不變量：覆寫必須確實生效**
+> 規範不限定形狀，只要求結果正確。可程式判定的條件是——**覆寫意見所在的深度，不得淺於既有綁定**：
 >
-> 若確有需求下探至 Asset 內部個別 Prim 廣播（如 [Asset Loader 篇 §5.3](usd-asset-loader.md) 的 Class 往下走），**該廣播即會反轉優先序、壓過 Lighting 在實例根的個別微調**。此為刻意的取捨，動用前務必確認團隊已知悉，並在同一深度提供覆寫管道。
+> | Asset 綁在 | 下游覆寫在 | 結果 |
+> | :--- | :--- | :--- |
+> | `Model/Body` | `Model/Body`（同一顆） | Local 強於 References，**覆寫勝** ✓ |
+> | `Model/Body` | `Model`（較淺） | 較遠的祖先，**靜默落敗** ✗ |
+> | `Model/Body` | 實例根 ＋ collection binding | 機制專為此設計，**覆寫勝** ✓ |
+>
+> 中間那列是真正的坑：寫了、不報錯、畫面沒變。因此 QC 應**偵測並報告**覆寫意見淺於既有綁定之情形，詳見 [Pipeline 驗證篇](usd-pipeline-validation.md)。
 
-### 2. `lookDefault` 的綁定寫法
+### 3. 材質包的綁定寫法
 
-綁定一律寫在 **Asset 根 Prim `/ROOT`** 上，靠命名空間繼承傳遞給底下全部幾何：
+材質包以 `over` 進入幾何分支寫出綁定，**`/ROOT` 上不留任何屬性**：
 
 ```usda
 # lookDefault/v001/lookDefault.usd
-over "ROOT"
+def Xform "ROOT"
 {
-    def Scope "LookDefault"
+    def Scope "Look"
     {
         def Material "M_Base" { /* 標準材質 */ }
     }
 
-    # 綁定寫在 /ROOT，向下繼承給 ModelDefault 底下所有 Mesh。
-    # 幾何層零 binding，因此此繼承意見不會被任何後代蓋過。
-    rel material:binding = </ROOT/LookDefault/M_Base>
+    # over 進幾何分支；幾何包恪守零綁定鐵律，故此意見無競爭對手
+    over "Model"
+    {
+        over "Body" { rel material:binding = </ROOT/Look/M_Base> }
+    }
 }
 ```
 
-**這個位置是刻意選擇的**：`/ROOT` 被 Reference 進鏡頭後會映射為實例根 Prim（如 `/ROOT/Environment/Props/Table_01`），使得下游的唯一覆寫點就落在該實例根上。Lighting 與 Loader 因此**完全不需要知道 Asset 內部的 Mesh 結構**，`model` variant 切換為 `ModelLow` / `ModelHigh` 時綁定也自動跟著生效。
+採此寫法的三項理由：
 
-### 3. 唯一的例外邊界：`GeomSubset` 分面綁定
+1. **分面綁定別無選擇**：`GeomSubset` 的綁定只能寫在各 subset 上（見 §5.4）。多材質情形非 `over` 不可，單材質亦走同一條路，規則才一致。
+2. **`/ROOT` 保持乾淨**：`/ROOT` 只承載「這個單元是什麼」（`kind`、`variantSets`），不承載「它長什麼樣」。詳見 [`/ROOT` 鐵律](usd-publish-packaging.md)。
+3. **與 FX 完全同構**：[FX Element 的材質層](usd-fx-layer.md)本即以 `over` 寫回體積與粒子，兩端規則統一。
+
+> [!CAUTION]
+> **分支名固定是此寫法成立的前提**
+> `over "Model"` 之所以能跨 `model` variant 生效，是因為各精度包**一律定義同名的 `/ROOT/Model` 分支**（見 §1 的命名表）。若各包各用其名，切換 variant 時 look 的 `over` 即靜默落空。
+>
+> 同理，Mesh 名稱一經發布即為**對外介面**。建模端改名會使材質層的 `over` 失效——不報錯、只是沒有材質。
+
+### 4. 唯一的例外邊界：`GeomSubset` 分面綁定
 
 單一 Mesh 需分面綁定多種材質時，職責切分如下：
 
@@ -411,12 +474,12 @@ over "ROOT"
 # lookDefault/v001/lookDefault.usd
 over "ROOT"
 {
-    over "ModelDefault"
+    over "Model"
     {
         over "Body"
         {
-            over "seat_fabric"   { rel material:binding = </ROOT/LookDefault/M_Fabric> }
-            over "frame_metal"   { rel material:binding = </ROOT/LookDefault/M_Metal> }
+            over "seat_fabric"   { rel material:binding = </ROOT/Look/M_Fabric> }
+            over "frame_metal"   { rel material:binding = </ROOT/Look/M_Metal> }
         }
     }
 }
@@ -425,7 +488,7 @@ over "ROOT"
 > [!WARNING]
 > 這是本契約中**唯一**由 look 層下探至幾何內部路徑的情境，代價是 look 層與幾何的 subset 命名產生耦合。因此 `GeomSubset` 的名稱一經發布即視為**對外介面**，建模端不得隨意改名——改名會使 look 層的 `over` 靜默落空。QC 必須驗證 look 層每個 `over` 路徑都命中實際存在的 Prim。
 
-### 4. 發佈期強制執行（Publish-time Enforcement）
+### 5. 發佈期強制執行（Publish-time Enforcement）
 
 Houdini、Maya 等 DCC 的 USD 匯出器**預設就會在 Mesh 上寫入 direct binding**，因此本鐵律無法僅靠人工紀律維持，必須由發布工具強制執行：
 
@@ -433,9 +496,16 @@ Houdini、Maya 等 DCC 的 USD 匯出器**預設就會在 Mesh 上寫入 direct 
 2. **Pre-flight QC 必檢項**（見 [發布封裝篇 §2 階段二](usd-publish-packaging.md)）：掃描幾何發布單元，發現任何殘留的 binding 或 Material Prim 即**中斷發布並報錯**。
 3. **失效模式提醒**：只要有一顆 Asset 夾帶了 direct binding，該 Asset 的所有下游覆寫都會靜默失效。這種問題在畫面上難以歸因，務必守在發布關口。
 
-### 5. 例外機制：不合規外部 Asset 的 Collection-Based Binding
+### 6. Collection-Based Binding 的兩種用途
 
-外包交付、第三方 Asset 庫或歷史遺留 Asset，可能無法滿足零綁定鐵律。此時**唯一**能從祖先壓過後代 direct binding 的機制，是 `UsdShadeMaterialBindingAPI` 的 collection-based binding：
+`UsdShadeMaterialBindingAPI` 的 collection-based binding 搭配 `bindMaterialAs = "strongerThanDescendants"`，是**唯一**能從祖先壓過後代 direct binding 的機制。它在本架構中有兩種正當用途：
+
+| 用途 | 情境 |
+| :--- | :--- |
+| **下游整顆換材質**（正規手段） | Lighting 要替換整顆 Asset 的外觀，又不願知悉其內部結構。見 §5.2 |
+| **壓過不合規 Asset 的自帶綁定**（例外處置） | 外包交付、第三方 Asset 庫或歷史遺留 Asset 未能滿足零綁定鐵律 |
+
+兩者語法相同，差別僅在**為何需要它**。
 
 ```usda
 over "Table_01" (
@@ -445,20 +515,19 @@ over "Table_01" (
     uniform token collection:allGeom:expansionRule = "expandPrims"
     rel collection:allGeom:includes = </ROOT/Environment/Props/Table_01>
 
-    rel material:binding:collection:allGeom = [
-        </ROOT/Environment/Props/Table_01/LookDefault/M_Base>,
-        </ROOT/Lighting/Materials/M_Table_Darker>
-    ]
+    rel material:binding:collection:allGeom = </ROOT/Lighting/Materials/M_Table_Darker>
     # 關鍵：預設為 weakerThanDescendants，必須顯式改為 strongerThanDescendants
-    # 才能壓過 Asset 內部 Mesh 自帶的 direct binding
     uniform token material:binding:collection:allGeom:bindMaterialAs = "strongerThanDescendants"
 }
 ```
 
 > [!IMPORTANT]
-> 此機制是**例外而非常態**。每次動用都代表有一顆 Asset 未達發布標準，應同時在 Asset 管理系統標記待整改，而非讓 collection binding 淪為繞過鐵律的常規手段。
+> **僅第二種用途須登記待整改**
+> 用於下游換材質時，它是**正規手段**，無須任何額外處置。
+>
+> 但若動用它的原因是「該 Asset 自帶了不該存在的 direct binding」，則每次動用都代表**有一顆 Asset 未達發布標準**，應同時在 Asset 管理系統標記待整改——否則不合規的 Asset 會一直留在庫中，每個下游都要重複處理一次。
 
-### 6. 與 `instanceable` 的關係
+### 7. 與 `instanceable` 的關係
 
 `instanceable = true` 的 Prim，其內部（Prototype）**不可被 author 任何 opinion**。但本契約將全部綁定收斂在**實例根 Prim**上，而實例根位於 Prototype 之外，因此 Lighting 與 Loader 的整體外觀覆寫**不受 instancing 限制**。
 
@@ -524,15 +593,15 @@ def Xform "ROOT" (
     # 清單順序決定 VariantSet 之間的強弱：look 恆強於 model
     prepend variantSets = ["look", "model"]
     variants = {
-        string look = "LookDefault"     # 一律以 Default 為安全預設
+        string look = "Default"     # 一律以 Default 為安全預設
         string model = "Default"
     }
 )
 {
     variantSet "look" = {
-        "LookDefault" ( prepend references = @../lookDefault/v001/lookDefault.usd@</ROOT> ) {}
-        "LookRed"     ( prepend references = @../lookRed/v001/lookRed.usd@</ROOT> ) {}
-        "LookBlue"    ( prepend references = @../lookBlue/v001/lookBlue.usd@</ROOT> ) {}
+        "Default" ( prepend references = @../lookDefault/v001/lookDefault.usd@</ROOT> ) {}
+        "Red"     ( prepend references = @../lookRed/v001/lookRed.usd@</ROOT> ) {}
+        "Blue"    ( prepend references = @../lookBlue/v001/lookBlue.usd@</ROOT> ) {}
     }
 
     variantSet "model" = {
@@ -640,8 +709,8 @@ def SkelRoot "ROOT" (
 /ROOT (SkelRoot, kind = component)
 ├── Geometry/                <-- 幾何材質 Asset 的 /ROOT 映射至此
 │   ├── material:binding     <-- 綁定落在此層，不觸及角色的 /ROOT
-│   ├── ModelDefault/Body
-│   └── LookDefault/Materials
+│   ├── Model/Body
+│   └── Look/Materials
 ├── Skel (Skeleton)          <-- joints / bindTransforms / restTransforms
 │   └── BlendShapes/         <-- BlendShape 本體（靜態形狀資料）
 └── AnimData (SkelAnimation) <-- 鏡頭層注入，發布包內不存在
@@ -657,7 +726,7 @@ def SkelRoot "ROOT" (
 > **綁定落在 `Geometry` 而非角色的 `/ROOT`**
 > 幾何材質 Asset 的 `material:binding` 寫在它自己的 `/ROOT` 上，經 Reference 映射後落於 `Geometry`。因此**沒有任何 sub 包需要碰角色的 `/ROOT`**，[`/ROOT` 鐵律](usd-publish-packaging.md)的白名單例外在角色這邊完全用不到。
 >
-> 這同時解決了一個常見錯誤：若改為引用 `</ROOT/ModelDefault>` 以求「只取幾何」，`/ROOT` 上的綁定不會隨之帶入，角色將完全失去材質。**一律引用完整的 `</ROOT>`。**
+> 這同時解決了一個常見錯誤：若改為引用 `</ROOT/Model>` 以求「只取幾何」，`/ROOT` 上的綁定不會隨之帶入，角色將完全失去材質。**一律引用完整的 `</ROOT>`。**
 
 ### 3. `skel/` 包的內容與蒙皮權重的 `over`
 
@@ -687,7 +756,7 @@ def Xform "ROOT"
     # 以 over 寫回幾何包的 Mesh，注入蒙皮資料
     over "Geometry"
     {
-        over "ModelDefault"
+        over "Model"
         {
             over "Body" ( prepend apiSchemas = ["SkelBindingAPI"] )
             {
@@ -777,10 +846,10 @@ over "ROOT"
 | 規範項目 | 規則說明 | 範例 / 命名 |
 | :--- | :--- | :--- |
 | **根節點** | 一律為 `/ROOT`，標記 `kind = "component"` | `/ROOT` |
-| **幾何預設路徑** | 預設模型 Primitive 名稱 | `/ROOT/ModelDefault` |
-| **材質預設路徑** | 預設材質 Primitive 名稱 | `/ROOT/LookDefault` |
+| **幾何預設路徑** | 預設模型 Primitive 名稱 | `/ROOT/Model` |
+| **材質預設路徑** | 預設材質 Primitive 名稱 | `/ROOT/Look` |
 | **Model VariantSet** | 幾何精細度或形態切換集合 | `model` 集（`Default`, `Low`, `High`） |
-| **Look VariantSet** | 外觀色彩、磨損度或 Shader 切換集合 | `look` 集（`LookDefault`, `LookRed`, `LookBlue`） |
+| **Look VariantSet** | 外觀色彩、磨損度或 Shader 切換集合 | `look` 集（`Look`, `LookRed`, `LookBlue`） |
 | **Purpose 完整性** | `render` 與 `proxy` 必須兩者齊備，否則保持 `default` | 避免 Viewport 與渲染農場顯示不同步 |
 | **Viewport 優化首選** | 透過 `UsdGeomModelAPI` 之 `drawMode` 進行個別降級 | `model:drawMode = "bounds"` / `"cards"` |
 | **Asset 交付形式** | Sublayer `lookDefault`（上）與 `modelDefault`（下） | `asset_latest.usd` / `asset.usd` |
