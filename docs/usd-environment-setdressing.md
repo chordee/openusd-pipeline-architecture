@@ -157,7 +157,7 @@ def Xform "ROOT" (
 > 若將海量點位陣列直接寫死在 `layout.usd` 主圖層中，每次微調散佈疏密都必須迫使整顆鏡頭的 Layout 總成進版，引發下游連鎖更新。
 > **解耦作法**：
 > 1. 將 `PointInstancer` 的純點雲 Primitive（`positions`, `orientations`, `scales`, `protoIndices`）獨立發布為專屬的 **Pure USD Unit**（如 `ScatterForest/`）。
-> 2. Pure USD 單元同樣遵循 `latest` 機制（維護 `scatter_forest_latest.usda` 與 `v###/` 歷史版次）。
+> 2. Pure USD 單元同樣遵循 `latest` 機制（維護 `ScatterForest_latest.usda` 與 `v###/` 歷史版次）。
 > 3. `layout.usd` 主圖層僅需透過 **`latest`** 方式將該點雲單元 Reference / Payload 引回。
 > 4. **效益**：日後 Layout 藝術家微調點位時，只需推進 `ScatterForest/` 自身版次，**免去推進 Layout 整體版號**，下游環節亦可單獨取用點雲進行碰撞或 FX 模擬。詳見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)。
 

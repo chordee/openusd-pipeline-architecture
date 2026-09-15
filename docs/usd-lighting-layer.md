@@ -159,12 +159,12 @@ def Xform "ROOT" (
 Light Rig 沒有幾何、沒有快取，內容純粹是光源與其參數——正符合 [Pure USD 單元](usd-publish-packaging.md)的定位：
 
 ```text
-/projects/show_A/publish/shots/sq01/LightRigInterior/   <-- 【Pure USD 單元目錄】
-├── lightrig_interior_latest.usda
+/projects/show_A/publish/shots/sq01/libraries/LightRigInterior/   <-- 【Pure USD 單元目錄】
+├── LightRigInterior_latest.usda
 ├── v001/
-│   └── lightrig_interior.usd
+│   └── LightRigInterior.usd
 └── v002/
-    └── lightrig_interior.usd
+    └── LightRigInterior.usd
 ```
 
 ### 2. 由各鏡頭的 `lighting_base` 引用
@@ -177,7 +177,7 @@ over "ROOT"
     {
         # 引用 Sequence 級共用 Light Rig
         def Scope "Rig" (
-            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/LightRigInterior/lightrig_interior_latest.usda"`@</ROOT/Lighting>
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/libraries/LightRigInterior/LightRigInterior_latest.usda"`@</ROOT/Lighting>
         ) {}
 
         # 本鏡頭專屬的補光

@@ -10,7 +10,7 @@
 >    - 無論是什麼 Asset（如 `Chair`、`Table`、`Car`），**資料夾內部的檔案結構與命名完全統一**！
 >    - 入口檔案一律單純命名為 `asset.usd`（各版次目錄內）與動態入口 `asset_latest.usda`（Asset 根目錄內），嚴禁在內部檔名摻雜具體 Asset 名稱。
 >    - 內部固定拆分子資料夾：`modelDefault/`、`lookDefault/`、`textureDefault/` 等，其內部各自進版（`v001/modelDefault.usd`）。FX Element 亦然（如 `element.usd` / `element_latest.usda`）。
->    - **包裝單元之上的分類目錄亦受規範**：頂層按**作用域**切分（`assets/`、`rig/`、`shots/`、`libraries/`），任一目錄**不得兼任分類目錄與包裝單元**，且**單元名全專案唯一**——工具遂能以「目錄內是否直接存在 `*_latest.usda`」單一判準可靠定界。
+>    - **包裝單元之上的分類目錄亦受規範**：發布樹由**作用域層級**（專案／序列／鏡頭）與**分類容器**兩條正交的軸構成，同一分類可出現在不同作用域（如 `assets/fx/` 與 `shots/<seq>/<shot>/fx/`），`libraries/` 則在三個層級各自存在。任一目錄**不得兼任分類目錄與包裝單元**，且**單元名全專案唯一**——工具遂能以「目錄內是否直接存在 `*_latest.usda`」單一判準可靠定界。
 > 2. **輸出子目錄收斂（Save Paths Relative to Output）**：Pipeline 優先利用 Flatten 打平 Implicit Layers；對於結構上無法 Flatten 而被 Houdini 自動轉換為實體的圖層，必須透過 ROP 設定強制將路徑收斂在輸出資料夾的子目錄（如 `./layers/`）內，避免散落外溢。
 > 3. **路徑引用雙重標準與 Expression Variable 專案替換**：
 >    - **包內互連 → 相對路徑（`@./...@`）**：確保單一發布包搬移或跨平臺時不壞鏈。
@@ -50,12 +50,12 @@ Pipeline 中常有無法歸類於傳統 Asset（Model/Look）或特定鏡頭部�
 Layout 部門將 `PointInstancer` 的 points primitive（純點雲數據與索引陣列）獨立剝離，發布為專屬的 **Pure USD Unit**：
 
 ```text
-/projects/show_A/publish/shots/sq01/sh010/layout/ScatterForest/   <-- 【Pure USD 單元目錄】
-├── scatter_forest_latest.usda                                  <-- 全域唯一最新動態入口
+/projects/show_A/publish/shots/sq01/sh010/libraries/ScatterForest/   <-- 【Pure USD 單元目錄】
+├── ScatterForest_latest.usda                                        <-- 全域唯一最新動態入口
 ├── v001/
-│   └── scatter_forest.usd                                      <-- 包含 positions, scales 等數據
+│   └── ScatterForest.usd                                            <-- 包含 positions, scales 等數據
 └── v002/
-    └── scatter_forest.usd                                      <-- 微調後的點雲快取
+    └── ScatterForest.usd                                            <-- 微調後的點雲快取
 ```
 
 **在 Layout 主圖層中的消費方式**：
@@ -70,13 +70,13 @@ def PointInstancer "ForestTrees"
 
     # 2. 以 latest 引用獨立發布的 Pure USD 點雲單元
     # 內部定義了 positions, orientations, scales, protoIndices 等屬性
-    prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/layout/ScatterForest/scatter_forest_latest.usda"`@</ROOT/ScatterPoints>
+    prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/libraries/ScatterForest/ScatterForest_latest.usda"`@</ROOT/ScatterPoints>
 }
 ```
 
 * **架構優勢**：
-  1. **局部迭代不推進整體版本**：Layout 藝術家日後即便微調了 10 次樹木點位散佈，只需在 `ScatterForest/` 單元內部持續進版至 `v010` 並更新 `scatter_forest_latest.usda`；**整個鏡頭的 `layout.usd` 完全不需要進版**，維持版本高度穩定。
-  2. **跨環節極速復用**：FX 部門若需要獲取樹木位置以進行落葉飄散模擬或燃燒效果，可直接獨立引用該 `scatter_forest_latest.usda`，無需加載整個 Layout 主場景。
+  1. **局部迭代不推進整體版本**：Layout 藝術家日後即便微調了 10 次樹木點位散佈，只需在 `ScatterForest/` 單元內部持續進版至 `v010` 並更新 `ScatterForest_latest.usda`；**整個鏡頭的 `layout.usd` 完全不需要進版**，維持版本高度穩定。
+  2. **跨環節極速復用**：FX 部門若需要獲取樹木位置以進行落葉飄散模擬或燃燒效果，可直接獨立引用該 `ScatterForest_latest.usda`，無需加載整個 Layout 主場景。
 
 ---
 
@@ -289,43 +289,53 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 本章沿用全 Pipeline 一貫的態度：**約束不變量，不約束形狀**。分類的層數與名稱交由專案決定，與 `kind` 階層、容器命名的處理方式一致。
 
-### 1. 頂層按作用域切分
+### 1. 兩條正交的軸：作用域層級與分類容器
+
+發布樹由兩條互不相干的軸構成——**作用域層級**（專案／序列／鏡頭）決定單元的可見範圍，**分類容器**決定它是什麼。同一種分類容器可出現在不同作用域層級，語意相同、作用域不同。
 
 ```text
-publish/
-├── assets/                       <-- 跨鏡頭可重用，結構受約束
-│   ├── props/<unit>/                 → asset.usd
-│   ├── char/<unit>/                  → asset.usd   (幾何材質角色)
-│   ├── env/<...>/<unit>/             → asset.usd
-│   ├── nature/<unit>/                → asset.usd
-│   ├── fx/<unit>/                    → asset.usd ／ element.usd
-│   └── sets/<unit>/                  → set.usd
+publish/                                <-- 專案作用域
+├── assets/                                 跨鏡頭可重用，結構受約束
+│   ├── props/<unit>/                           → asset.usd
+│   ├── char/<unit>/                            → asset.usd   (幾何材質角色)
+│   ├── env/<...>/<unit>/                       → asset.usd
+│   ├── nature/<unit>/                          → asset.usd
+│   ├── fx/<unit>/                              → element.usd ／ asset.usd
+│   └── sets/<unit>/                            → set.usd
+├── rig/<unit>/                             綁定角色 → char.usd
+├── libraries/<unit>/                       Pure USD，不套結構檢查
 │
-├── rig/<unit>/                   <-- 綁定角色，鏡頭端實際引用的消費單元
-│                                     → char.usd
-│
-├── shots/<seq>/<shot>/           <-- 單一鏡頭專屬，結構受約束
-│   ├── layout/<unit>/
-│   ├── anim/<unit>/                  → anim.usd
-│   └── lighting/<unit>/
-│
-└── libraries/<...>/<unit>/       <-- Pure USD 單元，不套結構檢查
+└── shots/
+    ├── <seq>/                          <-- 序列作用域
+    │   ├── libraries/<unit>/               Pure USD（如跨鏡頭共用的 Light Rig）
+    │   │
+    │   └── <shot>/                     <-- 鏡頭作用域
+    │       ├── layout/<unit>/
+    │       ├── anim/<unit>/                → anim.usd
+    │       ├── fx/<unit>/                  → element.usd
+    │       ├── lighting/<unit>/
+    │       └── libraries/<unit>/           Pure USD（如點雲散佈）
 ```
 
-四個根目錄的劃分依據**不是內容型別，而是作用域與規範適用性**：
-
-| 根目錄 | 作用域 | 結構規範 |
+| 作用域層級 | 位置 | 可見範圍 |
 | :--- | :--- | :--- |
-| `assets/` | 跨鏡頭可重用 | 受同構包裝約束 |
-| `rig/` | 跨鏡頭可重用 | 受同構包裝約束 |
-| `shots/` | 單一鏡頭專屬 | 受同構包裝約束 |
-| `libraries/` | 跨鏡頭可重用 | **不受約束** |
+| 專案 | `publish/` 之下 | 全專案任一鏡頭 |
+| 序列 | `shots/<seq>/` 之下 | 該序列各鏡頭 |
+| 鏡頭 | `shots/<seq>/<shot>/` 之下 | 該鏡頭 |
 
-> [!NOTE]
-> **`libraries/` 獨立成根的理由是工具面的，不是內容面的**
-> Pure USD 單元依定義**結構不受限**。將其集中於單一根目錄後，QC 才能明確知道「此處不套 Asset 結構檢查」，而不必逐單元判斷該適用哪套規則。
+**分類容器不專屬於任一作用域層級。** 最明顯的是 FX：`assets/fx/` 放的是跨鏡頭重複取用的元素，`shots/<seq>/<shot>/fx/` 放的是該鏡頭專屬的模擬產出——兩者都是 FX，差別只在可見範圍。單元該落在哪一層，取決於**它預期被誰取用**，而非由哪個部門產出。
 
-綁定角色（`rig/`）獨立於 `assets/` 之外，是因為它與幾何材質 Asset **分屬不同審批週期**：Model／Lookdev 驗收一次交付 `assets/char/<unit>/`，Rigging 驗收一次交付 `rig/<unit>/`。鏡頭端引用的恆為後者。分類目錄命名的是**產出它的工序**，與 shot 側的 `layout/`、`anim/`、`lighting/` 同構。
+> [!IMPORTANT]
+> **`libraries/` 是每個作用域層級都具備的逸出艙**
+> Pure USD 單元依定義**結構不受限**，因此不能與受約束的分類混放——QC 需要能明確判斷「此處是否套用 Asset 結構檢查」。`libraries/` 即為此而設，並且**在專案、序列、鏡頭三層各自獨立存在**：
+>
+> - `publish/libraries/` — 全專案通用的診斷 Stage、校色卡、共用攝影機 Rig
+> - `publish/shots/<seq>/libraries/` — 跨鏡頭但限於該序列者，如整場戲共用的 Light Rig
+> - `publish/shots/<seq>/<shot>/libraries/` — 該鏡頭專屬者，如 Layout 拆分出的散佈點雲
+>
+> 它出現的**位置**即宣告了該單元的作用域；容器本身的語意在三層完全相同。
+
+綁定角色（`rig/`）獨立於 `assets/` 之外，是因為它與幾何材質 Asset **分屬不同審批週期**：Model／Lookdev 驗收一次交付 `assets/char/<unit>/`，Rigging 驗收一次交付 `rig/<unit>/`。鏡頭端引用的恆為後者。
 
 ### 2. 分類目錄不得同時是包裝單元
 
@@ -395,13 +405,13 @@ rig/teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 | FX Element | `element.usd` | `assets/fx/<unit>/` |
 | Set | `set.usd` | `assets/sets/<unit>/` |
 | Animation | `anim.usd` | `shots/<seq>/<shot>/anim/<unit>/` |
-| Pure USD | 單元名 | `libraries/<...>/<unit>/` |
+| Pure USD | 單元名 | 任一作用域的 `libraries/<unit>/` |
 
 分類目錄**不重複編碼型別**。`assets/fx/` 底下同時放碎塊 Component Asset（`asset.usd`）與可重用 FX Element（`element.usd`）並不構成歧義——工具讀入口檔名即知該套哪套契約，無須維護「目錄名 → 單元型別」對照表。
 
 > [!NOTE]
 > **Pure USD 單元是唯一以單元名為入口檔名者**
-> 如 `libraries/.../ScatterForest/scatter_forest_latest.usda`。這是 Pure USD「結構不受限」的直接後果：它沒有固定的單元型別，也就無型別名可用。
+> 如 `shots/<seq>/<shot>/libraries/ScatterForest/ScatterForest_latest.usda`。這是 Pure USD「結構不受限」的直接後果：它沒有固定的單元型別，也就無型別名可用。
 
 ### 6. 命名約定（本專案範例採用，非規範要求）
 
