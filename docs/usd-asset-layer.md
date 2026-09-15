@@ -479,7 +479,7 @@ over "Table_01" (
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
 )
@@ -513,7 +513,7 @@ def Xform "ROOT" (
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
 )
@@ -613,7 +613,7 @@ def Xform "ROOT" (
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
 )

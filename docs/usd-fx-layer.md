@@ -82,7 +82,7 @@ defaultPrim = "ROOT"                       over "ROOT" {
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
 )

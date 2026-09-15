@@ -282,6 +282,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **Stage Metadata 全專案一致** | 每個發布單元入口層的 `metersPerUnit`、`upAxis`、`timeCodesPerSecond` 皆已宣告且與專案設定相同 | [Stage Metadata 規範](#3-stage-metadata-全域規範單位座標系與時間軸) |
    | **幾何數值符合專案單位** | 匯入之外包／第三方 Asset 的實際尺度已換算驗證，不倚賴 metadata 宣告 | 同上 |
    | **時序單元已宣告範圍** | 動畫、FX Element 等時序發布單元皆已宣告 `startTimeCode` / `endTimeCode`，且涵蓋手把影格 | 同上 |
+   | **Camera 焦距單位正確** | `focalLength` / aperture 以「scene unit 的十分之一」計；公尺制下 35mm 應為 `0.35`。誤填會使 FOV 正常但 DOF 錯亂，須於手寫與轉檔產出的鏡頭逐一驗證 | 同上 |
    | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#9-asset-resolver-的逆向鎖定機制version-pinning) |
    | **`kind` 階層狀況**<br>*（報告，非攔阻）* | 列出所有掉出 Model Hierarchy 的 model 及其斷點，供發布者確認是否為預期；僅在已指定 `drawMode` 等 Model 能力卻實際失效時才中斷發布 | [`usdkind` 治理](usd-asset-layer.md) |
 
@@ -314,7 +315,20 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 >
 > 這意味著：**同一份未宣告 `upAxis` 的檔案，在不同的 USD 安裝下可能得到不同的結果**——工作站、農場節點、外包方、客戶端各自的配置未必一致。
 >
-> 因此結論不是「記住預設值是什麼」，而是——**永遠明確宣告，不倚賴任何 fallback**。各 DCC 隨附的 USD（如 Houdini、Maya）是否調整過此配置，應於實際部署環境中自行驗證。
+> **實測佐證（Houdini 22.0 / USD 0.26.5）**：
+>
+> | | `GetFallbackUpAxis()` | 未宣告時的 `metersPerUnit` |
+> | :--- | :--- | :--- |
+> | 標準 OpenUSD 發行版 | `Z` | `0.01` |
+> | **Houdini 隨附之 USD** | **`Y`**（已覆寫） | `0.01`（未覆寫） |
+>
+> 亦即：**一份在 Houdini 產出、未宣告 `upAxis` 的檔案，在 Houdini 中看起來完全正常，送進標準 USD 環境（usdview、Maya-USD、Unreal 或客戶端）即躺倒 90 度**。這正是「工作站正常、交付後才出事」的典型路徑。
+>
+> 尺度更為兇險：Houdini 未覆寫 `metersPerUnit` 的 fallback，其值為 `0.01`——與本架構採用的公尺制**恰好相反**。漏宣告的資產不會「維持中性」，而是被解讀為公分、**縮小為百分之一**。
+>
+> 所幸 Houdini 的 LOP Stage 會**明確寫入** `metersPerUnit = 1` 與 `upAxis = "Y"`，故正常經 Solaris 產出的圖層不受影響；真正的風險在**手寫圖層、轉檔工具產物與第三方交付**。
+>
+> 因此結論不是「記住預設值是什麼」，而是——**永遠明確宣告，不倚賴任何 fallback**。
 
 > [!CAUTION]
 > **核心認知：USD 對這三項「完全不做自動轉換」**
@@ -333,10 +347,16 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ```usda
 #usda 1.0
 (
-    metersPerUnit = 0.01     # 公分制
+    metersPerUnit = 1        # 公尺制
     upAxis = "Y"
 )
 ```
+
+> [!TIP]
+> **本架構採公尺 + Y-up，理由是與 Houdini 原生行為一致**
+> 實測 Houdini 22.0（USD 0.26.5）的 LOP Stage，其明確寫入的即為 `metersPerUnit = 1`、`upAxis = "Y"`；`Camera LOP` 亦正確地以「scene unit 的十分之一」寫出焦距（50mm → `focalLength = 0.5`）。
+>
+> 換言之，**公分制專案等同於持續與 Houdini 的原生行為對抗**：不僅 Camera 數值要換算，各模擬求解器的重力與尺度假設（Houdini 原生亦為公尺）也必須逐一調整。以 Houdini 為主的流程，公尺制可省去這一整類摩擦。
 
 > [!WARNING]
 > **標準 OpenUSD 的 `upAxis` fallback 是 `"Z"`，不是 `"Y"`**
@@ -344,13 +364,20 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 >
 > 又因 fallback 可於站台層級配置，**漏宣告的後果會隨環境而異**：可能在工作站上看起來正常、送到農場或交付客戶後才躺倒。這使「明確宣告」從建議升格為必要。
 
-> [!TIP]
-> **Camera 的 `focalLength` 與 aperture 受 `metersPerUnit` 牽動**
+> [!CAUTION]
+> **Camera 焦距在公尺制下不是「35」，而是「0.35」**
 > 依 `UsdGeomCamera` 慣例，`focalLength`、`horizontalAperture`、`verticalAperture` 的單位為 **scene unit 的十分之一**：
-> - `metersPerUnit = 0.01`（公分）→ 十分之一公分 = 1 mm → `focalLength = 35.0` 即為 35mm ✓ **與直覺一致**
-> - `metersPerUnit = 1`（公尺）→ 十分之一公尺 = 10 cm → 35mm 鏡頭須寫成 `focalLength = 0.35`
 >
-> 亦即「焦距直接填 35」只在**公分制**專案下才成立。改採公尺制時，全部鏡頭數值都要重算——這是單位選定後難以回頭的原因之一。
+> | 專案單位 | 十分之一 scene unit | 35mm 鏡頭寫成 |
+> | :--- | :--- | :--- |
+> | 公分（`0.01`） | 1 mm | `focalLength = 35.0` |
+> | **公尺（`1`，本架構）** | 10 cm | **`focalLength = 0.35`** |
+>
+> **最危險的是「填 35 看起來也對」**：視角（FOV）只取決於 `focalLength / horizontalAperture` 的**比值**，兩者同時錯在同一個單位上時比值不變，**構圖完全正常**。
+>
+> 但**景深會徹底錯亂**：`focusDistance` 是 world unit（公尺），而 `focalLength` 是十分之一 world unit。在公尺專案誤寫 `focalLength = 35`，USD 眼中那是 **3.5 公尺的焦距**，配上 5 公尺對焦距離算出的 DOF 毫無物理意義。
+>
+> 因此這類錯誤**不會在 Layout 或 Animation 階段顯現，會拖到 Lighting 開啟景深時才爆**。所幸 Houdini 的 `Camera LOP` 已正確處理（實測 50mm 寫出 `0.5`）；需留意的是**手寫圖層、轉檔工具與第三方交付**的鏡頭。
 
 ### 2. 時間軸（`timeCodesPerSecond`）
 
@@ -608,7 +635,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 (
     # 以下 metadata 必須與 v003/asset.usd 完全一致，缺一不可
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
     # 具時序內容的單元另需複製 startTimeCode / endTimeCode
@@ -803,7 +830,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
 )

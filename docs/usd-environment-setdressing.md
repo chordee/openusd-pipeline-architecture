@@ -67,7 +67,7 @@ def Xform "ROOT" (
             variants = { string look = "LookRed" }
         )
         {
-            double3 xformOp:translate = (120, 0, 0)
+            double3 xformOp:translate = (1.2, 0, 0)
             uniform token[] xformOpOrder = ["xformOp:translate"]
         }
 
@@ -76,7 +76,7 @@ def Xform "ROOT" (
             variants = { string look = "LookBlue" }
         )
         {
-            double3 xformOp:translate = (-120, 0, 0)
+            double3 xformOp:translate = (-1.2, 0, 0)
             uniform token[] xformOpOrder = ["xformOp:translate"]
         }
     }
@@ -128,7 +128,7 @@ def Xform "ROOT" (
 
             # 2. 真正的硬碟空間消耗點：數萬點的空間矩陣數據
             int[] protoIndices = [0, 1, 0, 0, 1, /* ...數十萬筆索引 */]
-            point3f[] positions = [(10.2, 0, 45.1), (-32.5, 0, 12.8), /* ...數十萬筆座標 */]
+            point3f[] positions = [(10.2, 0, 45.1), (-32.5, 0, 12.8), /* ...數十萬筆座標（公尺） */]
             quath[] orientations = [(1, 0, 0, 0), /* ...旋轉四元數 */]
             float3[] scales = [(1, 1, 1), /* ...隨機縮放 */]
         }

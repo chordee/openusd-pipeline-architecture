@@ -25,7 +25,7 @@
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    metersPerUnit = 0.01
+    metersPerUnit = 1
     upAxis = "Y"
     timeCodesPerSecond = 24
     framesPerSecond = 24
@@ -178,7 +178,7 @@ over "ROOT"
         {
             float inputs:intensity = 5000.0
             color3f inputs:color = (1.0, 0.95, 0.8)
-            double3 xformOp:translate = (100, 250, 150)
+            double3 xformOp:translate = (1, 2.5, 1.5)
             uniform token[] xformOpOrder = ["xformOp:translate"]
         }
     }
@@ -355,9 +355,9 @@ over "ROOT"
             {
                 # 覆寫杯子的 Transform 為動態動畫快取
                 double3 xformOp:translate.timeSamples = {
-                    1: (10, 80, 5),
-                    20: (10, 80, 5),
-                    25: (15, 110, 8)
+                    1: (0.1, 0.8, 0.05),
+                    20: (0.1, 0.8, 0.05),
+                    25: (0.15, 1.1, 0.08)
                 }
             }
         }

@@ -96,7 +96,7 @@ def Xform "HeroArmChair" (
     payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
-    double3 xformOp:translate = (120, 0, 45)
+    double3 xformOp:translate = (1.2, 0, 0.45)
     uniform token[] xformOpOrder = ["xformOp:translate"]
 }
 ```
@@ -123,7 +123,7 @@ def Xform "Chair_02" (
     payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
-    double3 xformOp:translate = (150, 0, 0)
+    double3 xformOp:translate = (1.5, 0, 0)
     uniform token[] xformOpOrder = ["xformOp:translate"]
 }
 ```
