@@ -204,6 +204,88 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 > **Pipeline 工具鏈鐵律：盡力維護 `usdkind`**
 > 若上游建模、綁定或發布工具遺失了 `kind` 宣告，或將幾何誤標在非 Model 容器下，USD 的 ModelAPI 將完全失效——導致 Viewport 無法以 Component 為單位選取物件，且 `drawMode = "bounds"` 也將無法啟動。因此，**Pipeline 輸出工具（Solaris ROP、Publish Hook、DCC 導出器）必須在任何時候，盡全力驗證並維護合規的 `kind` 標記！**
 
+### Model Hierarchy 連續性：唯一的硬性不變量
+
+`kind` 之所以必須嚴格維護，關鍵在於 OpenUSD 的 **Model Hierarchy 連續性規則**：
+
+> **一顆 Prim 要被納入 Model Hierarchy，其「父層必須是 `group` 類（`group` / `assembly`）」。**
+
+由此推導出兩條硬性限制，兩者皆為 USD 底層行為，無法以任何設定繞過：
+
+1. **祖先鏈不得中斷**：從根到任一 `component` 之間，**每一顆中間容器都必須標記 `group`**——不是「最上層那顆標一下」即可。中間任一顆遺漏，該 `component` 及其底下全部靜默掉出 Model Hierarchy。
+2. **`component` 之下不得再有 model**：`component` 是 Model Hierarchy 的葉節點、本身不是 `group`，因此**任何置於 `component` 底下的 model 都會掉出階層**，其 `drawMode` 與 Model 選取一併失效。
+
+> [!CAUTION]
+> **失效是靜默的**
+> 階層斷裂時 USD **不會報錯**，只是 `UsdPrim.IsModel()` 回傳 `False`、Viewport 無法以 Component 為單位選取、且 `model:drawMode` 完全不生效——亦即本篇力推的頭號 Viewport 優化手段直接失靈，卻毫無跡象可循。因此**必須由 QC 主動攔阻**。
+
+### 階層形狀由發布者決定，Pipeline 只驗證合規
+
+本架構**不預先規定容器的名稱與層數**。Layout 的組織方式本就因專案、因場景而異，硬訂一套容器分類法屬於過度設計，也與 `/ROOT` 解耦哲學（語意命名交給消費端）相悖。
+
+因此規範只約束**不變量**，形狀留給使用者：
+
+| 項目 | 規範 |
+| :--- | :--- |
+| **容器命名與層數** | **完全自由**。`Props`、`Furniture/Chairs`、`BG/Layer_A/...` 任意分層皆可 |
+| **祖先鏈上的容器** | 一律標記 `kind = "group"`（`Scope` 可直接帶 `kind`，無須改為 `Xform`） |
+| **`component` 的擺放位置** | **自由決定**，唯一限制是其底下不得再有 model |
+| **合規與否** | 由 Pipeline 於發布時 QC 驗證，不合規即攔阻並報錯 |
+
+### `kind` 的值由發布者決定，寫入位置仍屬 Pipeline
+
+`kind` 不可由發布工具無條件寫死為 `component`——同一類發布單元會因內容不同而需要不同的 `kind`：
+
+| 發布單元內容 | 建議 `kind` | 理由 |
+| :--- | :--- | :--- |
+| 自有幾何、無引用其他發布單元（一般道具） | `component` | Model Hierarchy 的葉節點 |
+| 內含其他已發布 Asset（Kitbash 車輛引用輪子 Asset） | `assembly` | `component` 底下不得再有 model |
+| Set Dressing / Environment Set | `assembly` | 內容 100% 為引用 |
+| FX Element：純自有內容（體積、火焰） | `component` | 葉節點 |
+| FX Element：以已發布 Asset 為 `PointInstancer` 原型 | `assembly` | 同上，避免 component 包 component |
+
+> [!IMPORTANT]
+> **職責劃分：發布者「決定」，Pipeline「寫入」並「驗證」**
+> - **決定**：由發布者依實際內容選定 `kind`。發布工具應**依內容自動推導預設值**（掃描是否引用其他發布單元），並允許發布者覆寫——執行 `PointInstancer` 的特效師最清楚自己的原型該如何歸類，該決定權交給他。
+> - **寫入**：`kind` 一律由 **Pipeline 於總裝層寫入**，sub 物件包內嚴禁宣告。此為 [`/ROOT` 鐵律](usd-publish-packaging.md)之一部分，不因決定權下放而改變。
+> - **驗證**：發布前 QC 沿祖先鏈逐層檢查——遇到非 `group` / `assembly` 的中間容器即報錯；`component` 底下出現 model 亦報錯。**設定錯誤在此攔阻，而非事先限制寫法。**
+
+> [!TIP]
+> **階層斷裂是「能力喪失」而非「格式錯誤」——刻意斷開有時是合理的**
+> 祖先鏈中斷並不會使 USD 檔案不合法，只是該 model 失去 Model Hierarchy 的能力（`IsModel()` 為 `False`、`drawMode` 不生效、無法以 Component 為單位選取）。因此 QC 要攔阻的是**非預期的斷裂**，而非一律強制連續。
+>
+> 最典型的合理例外是 **`PointInstancer` 的 `Prototypes` 分支**：原型本來就不會被單獨選取、也不需要各別降級顯示（降級由 Instancer 整體處理），因此其祖先容器**可以不標記 `group`**，任由原型掉出 Model Hierarchy。
+>
+> 是否要為該分支補上 `group`，**由執行該 `PointInstancer` 的藝術家依實際需求決定**——若希望原型仍可被單獨選取或指定 `drawMode`，就把祖先鏈補齊；若不需要，維持現狀即可。Pipeline 的職責是**驗證他的設定是否自洽**，而不是替他決定形狀。
+
+### 鏡頭級 `kind` 階層參考
+
+鏡頭組裝同樣適用上述規則。以下為**參考範例而非強制形狀**，只要祖先鏈連續即合規：
+
+```usda
+# shot.usd（Pipeline 總裝層）
+def Xform "ROOT" ( kind = "assembly" ) {}
+
+# environment.usd（部門輸出，只經營自身分支）
+over "ROOT"
+{
+    def Scope "Environment" ( kind = "group" )      # 部門分支
+    {
+        def Scope "Props" ( kind = "group" )        # 中間容器，命名與層數自由
+        {
+            def Xform "Table_01" (                  # component 由 Asset 帶入
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usd"`@</ROOT>
+            ) {}
+        }
+    }
+}
+```
+
+> [!NOTE]
+> **部門分支的 `kind` 由該部門圖層宣告**
+> `/ROOT` 本身的 `kind` 屬 Pipeline 總裝層（`shot.usd`）；而 `/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting` 等部門分支的 `kind = "group"`，由各部門圖層自行宣告——那是它自己的分支，不違反 `/ROOT` 鐵律。
+
+
 ---
 
 ## 4. 材質圖層 (`look.usd`) 與 Look VariantSet

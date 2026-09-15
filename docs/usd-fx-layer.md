@@ -87,7 +87,10 @@ defaultPrim = "ROOT"                       over "ROOT" {
 )
 
 def Xform "ROOT" (
-    kind = "component"
+    # 本範例的 Debris 原型引用了已發布的 Component Asset，
+    # 故須標記為 assembly；若元素為純自有內容（如單純的體積），則為 component。
+    # kind 由發布者依內容決定，Pipeline 寫入並於 QC 驗證階層合規。
+    kind = "assembly"
 
     # 以 Reference 將各 sub 單元包嫁接至 /ROOT。
     # 清單順序即意見強弱：越前面越強，故材質層恆強於幾何層。

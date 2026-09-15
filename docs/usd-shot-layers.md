@@ -37,7 +37,9 @@
     ]
 )
 
-def Xform "ROOT"
+def Xform "ROOT" (
+    kind = "assembly"
+)
 {
 }
 ```
@@ -84,7 +86,7 @@ over "ROOT"
             payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/asset_latest.usd"`@</ROOT>
         ) {}
         
-        def Scope "Props"
+        def Scope "Props" ( kind = "group" )
         {
             def Xform "Table_01" (
                 payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usd"`@</ROOT>
@@ -106,9 +108,9 @@ over "ROOT"
 
 over "ROOT"
 {
-    def Scope "Anim"
+    def Scope "Anim" ( kind = "group" )
     {
-        def Scope "Characters"
+        def Scope "Characters" ( kind = "group" )
         {
             # SkelRoot 必須套用 SkelBindingAPI，skel:* 綁定才成立
             def SkelRoot "Hero" ( prepend apiSchemas = ["SkelBindingAPI"] )
@@ -146,7 +148,7 @@ over "ROOT"
 
 over "ROOT"
 {
-    def Scope "FX"
+    def Scope "FX" ( kind = "group" )
     {
         # 掛載大型體積快取 (Payload 延遲加載)
         def Xform "hero_explosion" (
@@ -166,7 +168,7 @@ over "ROOT"
 
 over "ROOT"
 {
-    def Scope "Lighting"
+    def Scope "Lighting" ( kind = "group" )
     {
         def DomeLight "SkyDome"
         {

@@ -50,9 +50,9 @@ SkelRoot ──┼── 2. skel (Skeleton) ──► 由【Rig 環節】提供 
 
 over "ROOT"
 {
-    def Scope "Anim"
+    def Scope "Anim" ( kind = "group" )
     {
-        def Scope "Characters"
+        def Scope "Characters" ( kind = "group" )
         {
             # 必須宣告為 SkelRoot，Hydra / 渲染器才會啟動 GPU/CPU Skinning
             # 並且必須套用 SkelBindingAPI —— skel:* 全系列屬性與 relationship
@@ -118,10 +118,10 @@ over "ROOT"
 
 over "ROOT"
 {
-    def Scope "Anim"
+    def Scope "Anim" ( kind = "group" )
     {
         # 1. 鏡頭攝影機動態
-        def Scope "Cameras"
+        def Scope "Cameras" ( kind = "group" )
         {
             def Camera "ShotCam"
             {
@@ -143,7 +143,7 @@ over "ROOT"
         }
 
         # 2. 道具剛體動畫 (引用已發佈 Asset，只輸出矩陣時序)
-        def Scope "Props"
+        def Scope "Props" ( kind = "group" )
         {
             def Xform "HeroGun" (
                 references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/blaster/asset_latest.usd"`@</ROOT>

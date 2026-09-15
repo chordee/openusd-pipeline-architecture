@@ -275,7 +275,8 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **`/ROOT` 已被定義** | 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True` | [`/ROOT` 鐵律](#2-同構目錄包裝單元isomorphic-packaging-unit) |
    | **`/ROOT` 未被部門污染** | 部門輸出的 sub 圖層，在 `/ROOT` 上不得殘留任何屬性或元數據意見（含 `kind`） | 同上 |
    | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
-   | **`kind` 階層連續** | Model Prim 的祖先鏈皆為 `group` / `assembly`，中間無缺漏 | [`usdkind` 治理](usd-asset-layer.md) |
+   | **`kind` 階層連續** | Model Prim 的祖先鏈皆為 `group` / `assembly`；斷裂處須為已登記的合理例外（如 `PointInstancer` 的 `Prototypes` 分支） | [`usdkind` 治理](usd-asset-layer.md) |
+   | **`component` 為葉節點** | `component` 底下不得再出現任何 model；含引用其他發布單元者應標記為 `assembly` | 同上 |
 
    > [!CAUTION]
    > **幾何零材質、零綁定必須由工具強制剝除，不可仰賴人工紀律**

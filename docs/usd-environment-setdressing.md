@@ -50,7 +50,7 @@ def Xform "ROOT" (
     kind = "assembly"
 )
 {
-    def Scope "SetDressing"
+    def Scope "SetDressing" ( kind = "group" )
     {
         # 1. 引用單一道具 Asset（純路徑參照，不帶幾何快取，指向外部發布包 asset_latest.usd）
         def Xform "Table_Center" (
@@ -103,9 +103,11 @@ def Xform "ROOT" (
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+def Xform "ROOT" (
+    kind = "assembly"
+)
 {
-    def Scope "FoliageDressing"
+    def Scope "FoliageDressing" ( kind = "group" )
     {
         def PointInstancer "ForestTrees"
         {
@@ -164,7 +166,7 @@ over "ROOT"
     )
     {
         # 1. 地標與建築 Layout (單鏡頭或 Sequence 共用)
-        def Scope "Layout"
+        def Scope "Layout" ( kind = "group" )
         {
             def Xform "Terrain" (
                 payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usd"`@</ROOT>
@@ -175,7 +177,7 @@ over "ROOT"
         }
 
         # 2. 跨鏡頭共用的 Set Dressing Asset
-        def Scope "SetDressing"
+        def Scope "SetDressing" ( kind = "group" )
         {
             # 引用共用室內陳設
             def Xform "LivingRoomSet" (
