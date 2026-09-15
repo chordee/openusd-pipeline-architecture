@@ -57,7 +57,7 @@ defaultPrim = "ROOT"                       over "ROOT" {
 ├── element_latest.usd                                   <-- 全域唯一最新動態入口 (指向最新版 v002/element.usd)
 │
 ├── v001/                                                <-- 元素總版次目錄
-│   └── element.usd                                      <-- 固定名稱！Sublayer 鎖定 sub 單元特定版次
+│   └── element.usd                                      <-- 固定名稱！Reference 鎖定 sub 單元特定版次
 ├── v002/
 │   └── element.usd                                      <-- 固定名稱！
 │
@@ -84,18 +84,24 @@ defaultPrim = "ROOT"                       over "ROOT" {
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
-    subLayers = [
-        @../materials/v001/material.usd@,       # 材質維持在 v001
-        @../layers/v002/volume_pyro.usd@        # 新解算的體積圖層推進至 v002
-    ]
 )
 
 def Xform "ROOT" (
     kind = "component"
+
+    # 以 Reference 將各 sub 單元包嫁接至 /ROOT。
+    # 清單順序即意見強弱：越前面越強，故材質層恆強於幾何層。
+    prepend references = [
+        @../materials/v001/material.usd@</ROOT>,   # 材質維持在 v001
+        @../layers/v002/volume_pyro.usd@</ROOT>    # 新解算的體積圖層推進至 v002
+    ]
 )
 {
 }
 ```
+
+> [!NOTE]
+> FX Element 與 Asset 完全同構，同樣以 **Reference** 嫁接各 sub 單元包：每個 sub 單元（`volume_pyro.usd`、`material.usd`）皆為自成一體的封裝單元、擁有自己的 `/ROOT`，`kind` 則由總裝層獨佔宣告。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
 
 ### 2. 頂層唯一最新動態指標 (`element_latest.usd`)
 Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元素進版時，Pipeline 自動將其重定向指向最新版次：
@@ -112,7 +118,7 @@ Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元�
 ```
 
 ### 3. Sub 單元圖層內部結構範例 (如 `layers/v002/volume_pyro.usd`)
-被 Sublayer 引入的底層 sub 物件各自定義所屬的節點，掛載於 `/ROOT` 之下。
+被 Reference 嫁接的底層 sub 單元包各自定義所屬的節點，掛載於自身 `/ROOT` 之下。
 
 > [!IMPORTANT]
 > **Sub 單元職責邊界：`Material` 本體與 `material:binding` 一律由 `materials/` 負責**
@@ -122,7 +128,7 @@ Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元�
 > **為什麼 binding 歸材質層？關鍵在進版連動。**
 > `material:binding` 本質上是 look 的意見，不是幾何的意見。若把 binding 寫在 `volume_pyro.usd`，則 Lookdev 每次重構材質（拆分、改名、換 Shader 網路）都會使幾何層內的 binding 目標失效，**逼迫完全沒有變動的幾何層跟著重新發佈**，sub 單元拆分的意義蕩然無存。
 >
-> 交由材質層之後：Lookdev 推進 `materials/v002/` 時，新的 `Material` 與新的 binding 一併帶出，`element.usd` 只需改鎖版本，`layers/v001/` 原封不動。這也與 Asset 端 `lookDefault`（強層）覆寫 `modelDefault`（弱層）的 binding 模式**完全同構**。
+> 交由材質層之後：Lookdev 推進 `materials/v002/` 時，新的 `Material` 與新的 binding 一併帶出，`element.usd` 只需改鎖版本，`layers/v001/` 原封不動。這也與 Asset 端 `lookDefault`（`references` 清單在前、意見較強）覆寫 `modelDefault`（在後、較弱）的 binding 模式**完全同構**。
 >
 > **嚴禁在幾何層重複定義 `Material`。** 即使材質層位於較強層會在合成時勝出、表面上看不出異常，仍會埋下三個問題：
 > - **舊定義殘留**：材質推進至 `materials/v002/` 並改名時，幾何層那份舊 `Material` 不會消失，合成後新舊並存，舊的成為孤兒 Prim。
@@ -142,7 +148,7 @@ Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元�
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     # 1. 體積資料 (Pyro / Smoke / Fire)
     def Scope "Volumes"
@@ -207,7 +213,7 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     # 1. 特效自身材質庫 (Materials / Shaders)
     #    僅涵蓋 FX 原生、不存在於任何已發布 Asset 的外觀（體積、火焰、煙塵…）
@@ -305,7 +311,7 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     def Scope "Volumes"
     {
@@ -348,7 +354,7 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     def Scope "Particles"
     {

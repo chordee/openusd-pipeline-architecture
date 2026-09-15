@@ -90,7 +90,7 @@ def PointInstancer "ForestTrees"
 ├── asset_latest.usd                                     <-- 全域唯一最新動態指標 (指向最新版 v002/asset.usd)
 │
 ├── v001/                                                <-- Asset 總版次目錄
-│   └── asset.usd                                        <-- 固定名稱！Sublayer 鎖定子物件特定版次
+│   └── asset.usd                                        <-- 固定名稱！Reference 鎖定子物件特定版次
 ├── v002/
 │   └── asset.usd                                        <-- 固定名稱！
 │
@@ -122,39 +122,52 @@ def PointInstancer "ForestTrees"
 >    - 該新版 `v002/asset.usd` 內部以確定性的相對路徑鎖定具體子組件版本：
 >      ```usda
 >      # chair/v002/asset.usd
->      subLayers = [
->          @../lookDefault/v001/lookDefault.usd@,  # 未變更的材質保持在 v001
->          @../modelDefault/v002/modelDefault.usd@ # 新進版的幾何鎖定至 v002
->      ]
+>      def Xform "ROOT" (
+>          kind = "component"
+>          prepend references = [
+>              @../lookDefault/v001/lookDefault.usd@</ROOT>,  # 未變更的材質保持在 v001
+>              @../modelDefault/v002/modelDefault.usd@</ROOT> # 新進版的幾何鎖定至 v002
+>          ]
+>      ) {}
 >      ```
 > 3. **頂層自動維護唯一的 `asset_latest.usd`**：
 >    - 只有在整個 Asset 進版時，Pipeline 才會自動維護並將頂層的 `asset_latest.usd` 更新指向新生成的版次（如 `v002/asset.usd`）。
 >    - 這保證了歷史每個版本 `asset.usd` 的內部結構完全不可變（Immutable），且外部消費端永遠只需對接唯一的 `asset_latest.usd`。
 
 > [!CAUTION]
-> **Pipeline `/ROOT` 鐵律：根節點為 Pipeline 專有，部門輸出一律不得動它**
-> 1. **`/ROOT` 由總裝層獨佔定義**：`/ROOT` 及其 `kind` 元數據屬於全域流程的資產，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）以 `def Xform "ROOT"` 宣告一次**。
-> 2. **嚴禁部門輸出寫入 `/ROOT` 意見**：各部門發布的 sub 圖層（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）**只得在自身專屬分支（`/ROOT/ModelDefault`、`/ROOT/Volumes`…）之下作業**；對 `/ROOT` 本身僅能使用 `over "ROOT"` 作為純命名空間容器，**不得宣告 `kind`、不得寫入任何屬性**。
-> 3. **`over` 不會建立 Prim**：若整包圖層皆為 `over "ROOT"` 而無任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。因此總裝層的 `def` 責任**絕不可省略**。
+> **Pipeline `/ROOT` 鐵律：`/ROOT` 的結構性意見為 Pipeline 工程專有，部門一律不得宣告**
+> 1. **全 Pipeline 一律以 `/ROOT` 為根**：總裝層與各 sub 物件包**一致採用 `/ROOT`**，不另立命名。此為既有的 [`/ROOT` 解耦哲學](usd-asset-layer.md)之延伸——全工作室只有一套根節點約定，所有自動化工具得以無條件鎖定 `/ROOT`，無須分支判斷。
+> 2. **sub 物件以 Reference 嫁接**：每個 sub 物件包（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）皆為**自成一體的封裝單元**，內部以 `def Xform "ROOT"` 定義自身的根，並在其下經營自身分支。部門只對自己的包負責，**無須、亦不得**知悉總裝層的存在。
+> 3. **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與各 sub 物件包的嫁接決策，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）宣告**。sub 物件包內**嚴禁出現 `kind`、嚴禁出現 `variantSets`**——這兩者定義的是該單元在全域流程中的身分與形態組合，屬 Pipeline 職權。
+> 4. **嚴禁在 `/ROOT` 寫入非白名單意見**：sub 物件包除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。唯一例外為**材質包的 `material:binding`**——契約明訂該綁定必須落在 `/ROOT` 且必須隨 look 版本走，無法由他處產生，詳見 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)。
+> 5. **`over` 不會建立 Prim**：`over "ROOT"` 僅適用於純覆寫用途的圖層（Shot 部門圖層、`overrides` 容器、`latest` 包裝層）。若一個發布包內完全沒有任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。
+
+> [!WARNING]
+> **防護靠的是內容限制，不是命名**
+> 曾考慮讓 sub 物件包改用 `/SUB` 之類的另立根名，藉此與總裝層的 `/ROOT` 區隔。但此舉**達不到任何防護效果**：sub 物件包在自身根 Prim 上寫下的意見，經 Reference 嫁接後**一律會抵達總裝層的 `/ROOT`**（走 Reference 弧，弱於總裝層的 Local 意見，但確實存在）——污染與否取決於部門寫了什麼，**與那顆根叫什麼名字完全無關**。
+>
+> 因此本鐵律以**內容**劃界：部門可以定義自己包的 `/ROOT`，但不得在其上宣告 `kind`、`variantSets` 或任何非白名單屬性。強制手段是 QC 掃描，而非命名約定。
 
 依此鐵律，全 Pipeline 的 `/ROOT` 寫法統一如下：
 
 | 圖層角色 | 產生者 | `/ROOT` 寫法 | 說明 |
 | :--- | :--- | :--- | :--- |
-| **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | Pipeline | `def Xform "ROOT" ( kind = "..." )` | 唯一的定義點，同時宣告 `kind` |
-| **Shot 總裝層**（`shot.usd`） | Pipeline | `def Xform "ROOT"` | 鏡頭層唯一的定義點 |
-| **Asset / FX sub 圖層**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `over "ROOT"`（純容器，零屬性零元數據） | 僅作為進入自身分支的命名空間通道 |
-| **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | 部門輸出 | `over "ROOT"` | 同上，各自只經營 `/ROOT/<部門分支>` |
+| **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | Pipeline | `def Xform "ROOT" ( kind = "..." ; variantSets ; references )` | 總裝的根，獨佔 `kind` 與 `variantSets`，以 Reference 嫁接各 sub 物件包 |
+| **Asset / FX sub 物件包**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `def Xform "ROOT"`（零 `kind`、零 `variantSets`） | 自身封裝包的根，只經營自身分支 |
+| **Shot 總裝層**（`shot.usd`） | Pipeline | `def Xform "ROOT"` | 鏡頭層的根 |
+| **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | 部門輸出 | `over "ROOT"` | 以 Sublayer 疊入鏡頭，純覆寫，各自只經營 `/ROOT/<部門分支>` |
 | **`latest` 包裝層**（`asset_latest.usd`、`element_latest.usd`） | Pipeline | `over "ROOT"` 或留空 | 純指標層，不帶入任何場景意見 |
 | **各部門 `overrides` 容器** | 部門輸出 | `over "ROOT"` | 純堆疊與覆寫，不定義 |
 
 > [!TIP]
-> **此鐵律連帶帶來三項結構性效益**
+> **Sub 物件為何採 Reference 而非 Sublayer 嫁接**
+> Sublayer 會使所有 sub 圖層與總裝層**共用同一個命名空間**，部門輸出勢必直接在總裝的 `/ROOT` 上寫意見，所有權無從切分。改採 Reference 後：
+> - **封裝邊界清晰**：各 sub 物件包自成一體、可獨立開啟檢視，部門無須知悉總裝層的存在，交付介面單純。
 > - **`kind` 只被寫一次**：由 Pipeline 在總裝層統一宣告，杜絕各部門各自標記導致的階層不一致，確保 ModelAPI 與 `drawMode` 恆常可用。
-> - **Sub 物件在結構上就無法被單獨消費**：單獨開啟 `modelDefault.usd` 時 `/ROOT` 未被定義、遍歷不到，使「嚴禁下游繞過總成直接引用 sub 物件」從紙上約定升級為結構性保障。
-> - **藝術家零心智負擔**：部門只需專注於自身分支，`/ROOT` 的存在與否、`kind` 該標什麼，全數由 Pipeline 承擔。
+> - **VariantSet 得以收攏至總裝層**：`subLayers` 無法寫在 variant 區塊內，Reference 則可，使變體封裝完全由 Pipeline 掌管，部門只需單純交付各自的內容包。
+> - **意見強弱語意不變**：同一 Prim 上的多筆 `references` 依清單順序定強弱（越前面越強），與原先 `subLayers` 完全一致。
 >
-> 發布前 QC 必檢兩項：**（a）** 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`；**（b）** 部門輸出的 sub 圖層在 `/ROOT` 上不得殘留任何屬性或元數據意見。
+> 發布前 QC 必檢三項：**（a）** 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`；**（b）** sub 物件包的 `/ROOT` 上不得出現 `kind`、`variantSets` 或任何非白名單屬性（白名單僅含材質包的 `material:binding`）；**（c）** Shot 部門圖層不得在 `/ROOT` 上殘留任何屬性或元數據意見。
 
 ### 範例 B：FX Element 發布包目錄結構（以 `explosion_hero` 為例）
 FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
@@ -163,7 +176,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ├── element_latest.usd                                   <-- 全域唯一最新動態入口 (指向最新版 v002/element.usd)
 │
 ├── v001/                                                <-- 元素總版次目錄
-│   └── element.usd                                      <-- 固定名稱！Sublayer 鎖定 sub 單元特定版次
+│   └── element.usd                                      <-- 固定名稱！Reference 鎖定 sub 單元特定版次
 ├── v002/
 │   └── element.usd                                      <-- 固定名稱！
 │
@@ -309,9 +322,9 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
                                │                                                       │
                                │  v###/asset.usd                                       │
                                │    │                                                  │
-    【內部參照：包內相對路徑】   │    ├──► subLayers = [                                 │
-    向上跳一層仍在包裝邊界內     │    │      @../modelDefault/v###/modelDefault.usd@,    │
-    移動發布包時鏈結依然有效     │    │      @../lookDefault/v###/lookDefault.usd@       │
+    【內部參照：包內相對路徑】   │    ├──► references = [                                │
+    向上跳一層仍在包裝邊界內     │    │      @../lookDefault/v###/lookDefault.usd@</ROOT>,│
+    移動發布包時鏈結依然有效     │    │      @../modelDefault/v###/modelDefault.usd@</ROOT>│
                                │    │    ]                                             │
                                │    └──► payload = @./layers/sub.usd@                  │
                                │                                                       │
@@ -535,14 +548,13 @@ over "ROOT"
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
-    subLayers = [
-        # 【包內引用】：相對路徑！指向目標目錄底下的子圖層
-        @./layers/explosion_hero_materials.usd@
-    ]
 )
 
 def Xform "ROOT" (
     kind = "component"
+
+    # 【包內引用】：相對路徑！以 Reference 嫁接目標目錄底下的 sub 單元包
+    prepend references = @./layers/explosion_hero_materials.usd@</ROOT>
 )
 {
     # 【包內引用】：相對路徑！指向目標目錄底下的體積快取層

@@ -7,7 +7,7 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 > [!IMPORTANT]
 > **30 秒核心原則**
 > 1. **統一 `/ROOT` 命名空間**：Asset 檔案內部所有模型與材質一律掛載在 `/ROOT` 底下（`defaultPrim = "ROOT"`，`kind = "component"`）。
-> 2. **Asset 雙核心圖層組裝**：一個完整的 `asset.usd` 本身即是由 `model.usd`（幾何）與 `look.usd`（材質）兩者 Sublayer 組成。
+> 2. **Asset 雙核心組裝**：一個完整的 `asset.usd` 本身即是由 Pipeline 以 **Reference** 將幾何包（`modelDefault/`）與材質包（`lookDefault/`）兩者嫁接至 `/ROOT` 而成；各 sub 物件包皆為自成一體的封裝單元，擁有自己的 `/ROOT`。
 > 3. **預設節點路徑**：
 >    - 預設模型幾何：`/ROOT/ModelDefault`
 >    - 預設材質外觀：`/ROOT/LookDefault`
@@ -34,7 +34,7 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 /projects/show_A/publish/assets/props/chair/               <-- 【Asset 目錄，只有此層名稱不同】
 ├── asset_latest.usd                                     <-- 全域唯一最新動態入口 (指向最新版 v002/asset.usd)
 ├── v001/                                                <-- Asset 總版次目錄
-│   └── asset.usd                                        <-- 固定名稱！Sublayer 鎖定子物件特定版次
+│   └── asset.usd                                        <-- 固定名稱！Reference 鎖定子物件特定版次
 ├── v002/
 │   └── asset.usd                                        <-- 固定名稱！
 │
@@ -43,12 +43,16 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 │   │   └── modelDefault.usd                             <-- 幾何版本檔案
 │   └── v002/
 │       └── modelDefault.usd
+├── modelLow/                                            <-- 按需出現的變體 sub 物件目錄
+│   └── v001/modelLow.usd
 │
 ├── lookDefault/                                         <-- 固定的材質 sub 物件目錄 (無 latest！)
 │   ├── v001/
 │   │   └── lookDefault.usd                              <-- 材質版本檔案
 │   └── v002/
 │       └── lookDefault.usd
+├── lookRed/                                             <-- 按需出現的變體 sub 物件目錄
+│   └── v001/lookRed.usd
 │
 └── textureDefault/                                      <-- 固定的貼圖 sub 物件目錄 (無 latest！)
     ├── v001/
@@ -107,51 +111,37 @@ USD 的 Reference / Payload 機制會自動將來源檔的 `/ROOT` 映射為消�
 - **極簡優先**：此時 `model.usd` 內部僅包含 `/ROOT/ModelDefault`，不強制生成空的或只有單一選項的 VariantSet 結構，保持圖層與記憶體開銷的極致輕量。
 - **預先對齊路徑**：即使尚未啟動 VariantSet，幾何 Prim 亦統一命名為 `ModelDefault`，為後續可能的升級預留錨點。
 
-### 2. 按需自動啟動：`ModelLow` / `ModelHigh` 誕生
-- 當鏡頭效能或特寫需求出現，建模師額外發布了非預設精度模型時（例如出現了 `modelLow/` 或 `modelHigh/`）：
-- **自動觸發封裝**：Pipeline 發布工具檢測到多個精度組件並存，**自動啟動 `model` VariantSet 封裝流程**。
-- **以 `Default` 為安全鎖定**：自動封裝 `variantSet "model"`，並強制將 `variants = { string model = "Default" }` 設為預設選取項，將新增的精度納入選項：
+幾何部門交付的內容極其單純——一個自成一體的幾何包，內部只有自己的分支：
 
 ```usda
+# modelDefault/v002/modelDefault.usd （建模部門交付的幾何 sub 物件包）
 #usda 1.0
 (
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT" (
-    variants = {
-        string model = "Default"
-    }
-    prepend variantSets = "model"
-)
+def Xform "ROOT"
 {
-    variantSet "model" = {
-        # 1. 預設模型 (ModelDefault)
-        "Default" {
-            def Scope "ModelDefault"
-            {
-                def Mesh "Body" { /* 標準中精度網格資料 */ }
-            }
-        }
-        
-        # 2. 低模 (ModelLow - 用於遠景或 Crowd 大量實例)
-        "Low" {
-            def Scope "ModelLow"
-            {
-                def Mesh "Body" { /* 精簡面數網格 */ }
-            }
-        }
-        
-        # 3. 高模 (ModelHigh - 用於近景特寫或置換烘焙)
-        "High" {
-            def Scope "ModelHigh"
-            {
-                def Mesh "Body" { /* 高解析度細分曲面網格 */ }
-            }
-        }
+    def Scope "ModelDefault"
+    {
+        def Mesh "Body" { /* 標準中精度網格資料；零材質、零綁定 */ }
     }
 }
 ```
+
+> [!IMPORTANT]
+> **幾何包不宣告 `kind`、不宣告 `variantSets`**
+> 這兩者皆屬結構性宣告，一律由 Pipeline 於總裝層統一掌管；建模部門只需交付自身分支的幾何內容。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
+>
+> 幾何包同時必須恪守「零材質、零綁定」鐵律——`Material` Prim 與 `material:binding` 皆不得出現，詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
+
+### 2. 按需自動啟動：`ModelLow` / `ModelHigh` 誕生
+- 當鏡頭效能或特寫需求出現，建模師額外發布了非預設精度模型時（例如出現了 `modelLow/` 或 `modelHigh/`）：
+- **各精度各自成包**：`modelLow/v001/modelLow.usd` 內部同樣為 `def Xform "ROOT" { def Scope "ModelLow" { ... } }`，結構與 `modelDefault` 完全同構。
+- **自動觸發封裝**：Pipeline 發布工具檢測到多個精度組件並存，**於總裝層自動啟動 `model` VariantSet 封裝流程**，各 variant 以 Reference 指向對應的幾何包。
+- **以 `Default` 為安全鎖定**：強制將 `variants = { string model = "Default" }` 設為預設選取項，既有鏡頭畫面 100% 不受影響。
+
+> 📖 總裝層的 VariantSet 實際寫法，詳見本篇 [§6.2 變體啟動後的總裝寫法](#2-變體啟動後的總裝寫法)。
 
 * **實務優勢**：在 Shot 鏡頭組裝時，Layout 或 Crowd 部門可直接將 Asset 設為 `model = "Low"` 大幅提升 Viewport 效能，特寫鏡頭則切換為 `model = "High"`。
 
@@ -222,67 +212,47 @@ Lookdev 部門獨立發佈材質資料。材質層同樣貫徹「**以 `LookDefa
 
 ### 1. 基準態：`LookDefault` 的唯一性
 - 在未拆分色彩或塗裝變體前，Asset 僅有單一標準外觀。
-- **無負擔綁定**：`look.usd` 僅定義 `/ROOT/LookDefault`，並將材質直接綁定至 `/ROOT/ModelDefault`，不強制生成空的 VariantSet。
+- **無負擔綁定**：材質包僅定義 `/ROOT/LookDefault`，並在自身 `/ROOT` 寫出綁定，不強制生成空的 VariantSet。
 - **唯一性基準**：以 `LookDefault` 作為預設材質與著色方案的絕對基準。
 
-### 2. 按需自動啟動：`LookRed` / `LookBlue` 誕生
-- 當劇情、場景陳設或藝術指導要求提供多款塗裝時（例如發布了 `lookRed/` 或 `lookBlue/`）：
-- **自動觸發封裝**：Pipeline 自動化組裝工具檢測到多個 Look 組件並存，**自動啟動 `look` VariantSet 封裝流程**。
-- **以 `LookDefault` 為安全鎖定**：自動封裝 `variantSet "look"`，並強制設定 `variants = { string look = "LookDefault" }`。既有鏡頭由於預設回落至 `LookDefault`，畫面外觀 100% 保持穩定，達成零風險的平滑升級：
+材質部門交付的同樣是一個自成一體的材質包：
 
 ```usda
+# lookDefault/v001/lookDefault.usd （Lookdev 部門交付的材質 sub 物件包）
 #usda 1.0
 (
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT" (
-    variants = {
-        string look = "LookDefault"
-    }
-    prepend variantSets = "look"
-)
+def Xform "ROOT"
 {
-    variantSet "look" = {
-        # 1. 預設材質
-        "LookDefault" {
-            def Scope "LookDefault"
-            {
-                def Material "M_Base" { /* 標準灰黑色金屬材質 */ }
-            }
-            # 綁定寫在 /ROOT，向下繼承給 ModelDefault 底下全部幾何。
-            # 幾何層恪守零綁定鐵律，故此繼承意見絕不會被後代蓋過。
-            rel material:binding = </ROOT/LookDefault/M_Base>
-        }
-
-        # 2. 紅色變體 (LookRed)
-        "LookRed" {
-            def Scope "LookRed"
-            {
-                def Material "M_Red" { /* 紅色烤漆材質 */ }
-            }
-            rel material:binding = </ROOT/LookRed/M_Red>
-        }
-
-        # 3. 藍色變體 (LookBlue)
-        "LookBlue" {
-            def Scope "LookBlue"
-            {
-                def Material "M_Blue" { /* 藍色霧面材質 */ }
-            }
-            rel material:binding = </ROOT/LookBlue/M_Blue>
-        }
+    def Scope "LookDefault"
+    {
+        def Material "M_Base" { /* 標準灰黑色金屬材質 */ }
     }
+
+    # 綁定寫在材質包自身的 /ROOT，經 Reference 嫁接後即落在 Asset 的 /ROOT，
+    # 向下繼承給 ModelDefault 底下全部幾何。
+    # 幾何包恪守零綁定鐵律，故此繼承意見絕不會被後代蓋過。
+    rel material:binding = </ROOT/LookDefault/M_Base>
 }
 ```
 
-* **實務優勢**：當場景需要 50 輛同款汽車時，Reference 同一份 Asset，只需在 Shot 層各別指派 `look = "LookRed"` 或 `look = "LookBlue"`，即可實現零成本的外觀多樣性（Variation）。
-
 > [!IMPORTANT]
-> **各 Look 變體的綁定一律寫在 `/ROOT` 層級**
-> 如上方範例，三個 variant 的 `rel material:binding` 皆宣告於 variant 區塊的 `/ROOT` 上，而非下探至個別 Mesh。此寫法的成立前提是幾何層恪守「零材質、零綁定」鐵律——詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
+> **綁定一律寫在材質包自身的 `/ROOT` 層級**
+> 綁定宣告於材質包的 `/ROOT` 而非下探至個別 Mesh，此寫法的成立前提是幾何包恪守「零材質、零綁定」鐵律——詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
 >
-> 其直接效益是：切換 `model` variant（`ModelDefault` / `ModelLow` / `ModelHigh`）時，由於綁定掛在共同祖先 `/ROOT`，**任一精度的幾何都自動承接正確材質**，Look 與 Model 兩個維度得以真正正交、互不牽動。
+> 其直接效益是：切換 `model` variant（`ModelDefault` / `ModelLow` / `ModelHigh`）時，由於綁定落在共同祖先 `/ROOT`，**任一精度的幾何都自動承接正確材質**，Look 與 Model 兩個維度得以真正正交、互不牽動。
+
+### 2. 按需自動啟動：`LookRed` / `LookBlue` 誕生
+- 當劇情、場景陳設或藝術指導要求提供多款塗裝時（例如發布了 `lookRed/` 或 `lookBlue/`）：
+- **各塗裝各自成包**：`lookRed/v001/lookRed.usd` 內部同樣為 `def Xform "ROOT" { def Scope "LookRed" { ... }; rel material:binding = </ROOT/LookRed/M_Red> }`，結構與 `lookDefault` 完全同構。
+- **自動觸發封裝**：Pipeline 自動化組裝工具檢測到多個 Look 組件並存，**於總裝層自動啟動 `look` VariantSet 封裝流程**，各 variant 以 Reference 指向對應的材質包。
+- **以 `LookDefault` 為安全鎖定**：強制設定 `variants = { string look = "LookDefault" }`。既有鏡頭由於預設回落至 `LookDefault`，畫面外觀 100% 保持穩定，達成零風險的平滑升級。
+
+> 📖 總裝層的 VariantSet 實際寫法，詳見本篇 [§6.2 變體啟動後的總裝寫法](#2-變體啟動後的總裝寫法)。
+
+* **實務優勢**：當場景需要 50 輛同款汽車時，Reference 同一份 Asset，只需在 Shot 層各別指派 `look = "LookRed"` 或 `look = "LookBlue"`，即可實現零成本的外觀多樣性（Variation）。
 
 ---
 
@@ -418,20 +388,71 @@ over "Table_01" (
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
-    subLayers = [
-        @../lookDefault/v001/lookDefault.usd@,   # 材質維持在驗收通過的 v001
-        @../modelDefault/v002/modelDefault.usd@  # 幾何推進至最新發布的 v002
-    ]
 )
 
 def Xform "ROOT" (
     kind = "component"
+
+    # 以 Reference 將各 sub 物件包嫁接至 /ROOT。
+    # 清單順序即意見強弱：越前面越強，故 lookDefault 恆強於 modelDefault。
+    prepend references = [
+        @../lookDefault/v001/lookDefault.usd@</ROOT>,   # 材質維持在驗收通過的 v001
+        @../modelDefault/v002/modelDefault.usd@</ROOT>  # 幾何推進至最新發布的 v002
+    ]
 )
 {
 }
 ```
 
-### 2. 頂層唯一最新動態指標 (`asset_latest.usd`)
+> [!IMPORTANT]
+> **為什麼採用 Reference 而非 Sublayer 嫁接 sub 物件**
+> 1. **`/ROOT` 的所有權得以徹底切分**：Sublayer 會讓所有 sub 圖層與總裝層共用同一個命名空間，部門輸出勢必直接在總裝的 `/ROOT` 上寫意見。改用 Reference 後，**每個 sub 物件包都是自成一體的封裝單元、擁有自己的 `/ROOT`**，由 Pipeline 決定嫁接位置，總裝層的 `/ROOT` 始終為 Pipeline 獨佔。
+> 2. **VariantSet 得以由 Pipeline 在總裝層統一封裝**：`variantSets` 屬於結構性宣告，理應由 Pipeline 掌管。Sublayer 無法寫在 variant 區塊內，Reference 則可（見下方 3.），使變體封裝完全收攏至總裝層，部門只需單純交付各自的幾何或材質包。
+> 3. **意見強弱依然明確**：同一 Prim 上的多筆 `references` 依清單順序定強弱（越前面越強），與原先 `subLayers` 的語意完全一致，`lookDefault` 覆寫 `modelDefault` 的能力不受影響。
+
+### 2. 變體啟動後的總裝寫法
+
+當 Pipeline 檢測到變體 sub 物件並存（如 `modelLow/`、`lookRed/`），即自動改以 VariantSet 形式封裝。**variant 區塊直接承載 Reference**，各變體對應各自的 sub 物件包：
+
+```usda
+# /projects/show_A/publish/assets/props/chair/v003/asset.usd
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "ROOT" (
+    kind = "component"
+
+    # 清單順序決定 VariantSet 之間的強弱：look 恆強於 model
+    prepend variantSets = ["look", "model"]
+    variants = {
+        string look = "LookDefault"     # 一律以 Default 為安全預設
+        string model = "Default"
+    }
+)
+{
+    variantSet "look" = {
+        "LookDefault" ( prepend references = @../lookDefault/v001/lookDefault.usd@</ROOT> ) {}
+        "LookRed"     ( prepend references = @../lookRed/v001/lookRed.usd@</ROOT> ) {}
+        "LookBlue"    ( prepend references = @../lookBlue/v001/lookBlue.usd@</ROOT> ) {}
+    }
+
+    variantSet "model" = {
+        "Default" ( prepend references = @../modelDefault/v002/modelDefault.usd@</ROOT> ) {}
+        "Low"     ( prepend references = @../modelLow/v001/modelLow.usd@</ROOT> ) {}
+        "High"    ( prepend references = @../modelHigh/v001/modelHigh.usd@</ROOT> ) {}
+    }
+}
+```
+
+> [!NOTE]
+> **這與「不以 VariantSet 控版」的架構取捨並不衝突**
+> [發布封裝篇 §6](usd-publish-packaging.md) 反對的是**以 VariantSet 承載版本序列**——那會迫使每次加版都回溯修改上層主檔。此處的 VariantSet 只承載**形態與外觀變體**，且各版次 `asset.usd` 皆由 Pipeline 在進版時整份重新生成，歷史版本依然 100% 凍結不可變。
+
+### 3. 頂層唯一最新動態指標 (`asset_latest.usd`)
 外部消費端（Environment、Layout、Animation）**一律且唯一引用頂層的 `asset_latest.usd`**。在 Asset 進版時，Pipeline 自動將其重定向指向最新的版次：
 
 ```usda
@@ -445,15 +466,18 @@ def Xform "ROOT" (
 )
 ```
 
-### 為什麼採用 Sublayer 堆疊 modelDefault 與 lookDefault？
+### 4. 以 Reference 嫁接 modelDefault 與 lookDefault 的架構效益
 1. **平行 Pipeline 作業（Parallel Workflow）**：
    - 建模師專注在 `modelDefault/` 的拓撲修改與進版。
    - Lookdev 藝術家專注在 `lookDefault/` 的材質調校與進版。
    - 任何一方進版，直接驅動 Asset 整體發布新版本並更新 `asset_latest.usd`，雙方完全平行作業而不互相鎖檔。
-2. **職責邊界的結構化保障**：
-   - `lookDefault` 位於 `modelDefault` 之上，確保外觀部門對 `/ROOT` 所寫的任何意見，恆強於幾何層的同名意見。
-   - 但須特別澄清：**Asset 的材質正確性並非倚賴此 Sublayer 順序**。依 OpenUSD 規則，後代 Prim 的 direct binding 恆強於祖先的繼承意見，**與圖層強弱完全無關**；`lookDefault` 站在上層也壓不過 Mesh 自帶的綁定。
-   - 真正的保障來自「幾何零材質、零綁定」鐵律——幾何層根本不產生任何競爭意見。詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
+2. **每個 sub 物件皆為自成一體的封裝單元**：
+   - 各 sub 物件包擁有自己的 `/ROOT`，在自身邊界內完整自洽，部門**無須、亦不得**知悉總裝層的存在。
+   - 嫁接位置與 `kind` 全數由 Pipeline 在總裝層決定，`/ROOT` 的所有權因此徹底切分乾淨。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
+3. **職責邊界的結構化保障**：
+   - `lookDefault` 位於 `references` 清單前方，確保外觀部門對 `/ROOT` 所寫的任何意見，恆強於幾何包的同名意見。
+   - 但須特別澄清：**Asset 的材質正確性並非倚賴此清單順序**。依 OpenUSD 規則，後代 Prim 的 direct binding 恆強於祖先的繼承意見，**與組合弧強弱完全無關**；`lookDefault` 排在前面也壓不過 Mesh 自帶的綁定。
+   - 真正的保障來自「幾何零材質、零綁定」鐵律——幾何包根本不產生任何競爭意見。詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
 
 ---
 
