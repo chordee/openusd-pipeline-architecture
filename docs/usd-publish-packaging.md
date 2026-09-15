@@ -275,7 +275,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    | **`/ROOT` 已被定義** | 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True` | [`/ROOT` 鐵律](#2-同構目錄包裝單元isomorphic-packaging-unit) |
    | **`/ROOT` 未被部門污染** | 部門輸出的 sub 圖層，在 `/ROOT` 上不得殘留任何屬性或元數據意見（含 `kind`） | 同上 |
    | **`SkelBindingAPI` 已套用** | 承載 `skel:*` 屬性的 Prim 皆已 `prepend apiSchemas = ["SkelBindingAPI"]` | [Skel 規範](usd-animation-layer.md) |
-   | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色資產結構](usd-asset-layer.md#7-角色資產結構character-asset) |
+   | **幾何零蒙皮資料** | 幾何發布單元內不得出現 `primvars:skel:*` 或 `skel:skeleton`——蒙皮資料屬骨架包，以 `over` 注入 | [角色 Asset 結構](usd-asset-layer.md#7-角色-asset-結構character-asset) |
    | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 必須明確宣告 `elementSize`，否則 imaging 端無法切分每點影響數 | 同上 |
    | **包裝圖層 Metadata 一致** | `*_latest.usd` 的全部 Layer Metadata 與其所包裹的版本層逐項相同 | [`latest` 實現機制](#5-latest-動態入口的實現機制) |
    | **鎖定清單遞移完整**<br>*（送農場前）* | 解析過程命中的每個 `*_latest.usd` 皆已入帳，無僅鎖第一層之情形 | [逆向鎖定機制](#8-asset-resolver-的逆向鎖定機制version-pinning) |
@@ -549,7 +549,7 @@ sets/livingroom/v003/set.usd
 
 > [!CAUTION]
 > **由此推導出的三項後果，必須讓團隊確實知悉**
-> 1. **「發布即凍結」的直覺會誤導**：開啟 `sets/livingroom/v003/` 看到的畫面，**不等於**該版本當初發布時的畫面。要回到當初，必須連同當時的鎖定清單一起解析。
+> 1. 「**發布即凍結**」的直覺會誤導：開啟 `sets/livingroom/v003/` 看到的畫面，**不等於**該版本當初發布時的畫面。要回到當初，必須連同當時的鎖定清單一起解析。
 > 2. **Resolver 鎖定的四項注意事項是必要條件，而非建議**：既然檔案層不保證合成結果，可重現性就**完全**倚賴鎖定機制。其中「遞移涵蓋整棵依賴樹」與「鎖定情境下 fail loud」任一項失守，整套承諾即告瓦解。
 > 3. **交付與封存不可直接複製目錄**：直接打包發布目錄交付客戶或長期封存時，其中的 `latest` 會指向**打包當下的最新版**，而非交付所核准的版本。正確作法是先以鎖定清單解析後再行打包（或 Flatten），或將鎖定清單一併交付並要求對方以相同 Resolver 開啟。
 
@@ -656,7 +656,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
 > - **`Render` / `Delivery`**：找不到即**中斷任務並報錯**。
 
 > [!WARNING]
-> **三、清單應在「提交當下」產生，而非「渲染當下」**
+> **三、清單應在**「**提交當下**」**產生，而非**「**渲染當下**」
 > 若等到農場節點開始渲染才去讀取當時的 `latest`，則提交到實際執行之間的空窗期內，上游任何一次進版都會被吃進去——排隊愈久風險愈大，而這與不做鎖定並無二致。
 
 > [!WARNING]
@@ -664,7 +664,7 @@ Composition 要求解析  @…/chair/asset_latest.usd@
 > 若清單以**已展開的絕對路徑**為鍵，專案目錄一經搬遷或交付客戶，全部歷史鎖定清單即同時失效——這與 [Expression Variable 機制](#4-路徑引用雙重標準與-stage-expression-variable-專案路徑替換)的設計初衷直接矛盾。保留變數形式，鎖定清單才能隨專案一起遷移。
 
 > [!NOTE]
-> **鎖定機制保證的是「USD 組合結果的確定性」，不是「畫面的完全重現」**
+> **鎖定機制保證的是**「**USD 組合結果的確定性**」，**不是**「**畫面的完全重現**」
 > 逆向鎖定能確保五年後重新開啟該鏡頭時，composed 出來的 USD 場景樹與當初完全一致。但最終畫面是否相同，還取決於貼圖與快取實體是否仍在、Shader 與渲染器版本、以及 OCIO 色彩設定等 USD 之外的因素。**這些需要各自的封存策略**，不在本機制的保證範圍內。
 
 

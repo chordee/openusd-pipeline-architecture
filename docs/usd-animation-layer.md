@@ -42,10 +42,10 @@ SkelRoot ──┼── 2. Skel ──────► 由【Rig 環節】提供
 | **`AnimData` (SkelAnimation)** | **Animation 階段** | **Animator 唯一輸出的檔案**。僅含各 Joint 隨時間變化的旋轉／位移／縮放陣列，以及 `blendShapeWeights`。 | **極小** (數十 KB ~ 數 MB) |
 
 > [!IMPORTANT]
-> **前兩者已於角色資產階段組裝完畢，動畫層只交付第三者**
+> **前兩者已於角色 Asset 階段組裝完畢，動畫層只交付第三者**
 > `Geometry` 與 `Skel` 皆封裝在**綁定角色**（`char_latest.usd`）之內，其 `/ROOT` 即為 `SkelRoot`。動畫層只需**單次引用**該綁定角色，再疊上自己輸出的 `SkelAnimation` 即可——無須、也不應分頭引用幾何與骨架。
 >
-> 完整的角色資產結構詳見 [Asset Layer 篇 §7 角色資產結構](usd-asset-layer.md)。
+> 完整的角色 Asset 結構詳見 [Asset Layer 篇 §7 角色 Asset 結構](usd-asset-layer.md#7-角色-asset-結構character-asset)。
 
 ### 骨架角色組裝 USDA 範例
 

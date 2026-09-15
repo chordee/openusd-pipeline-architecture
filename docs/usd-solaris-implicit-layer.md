@@ -8,7 +8,7 @@
 
 > [!IMPORTANT]
 > **30 秒核心思維**
-> 1. **核心目標並非「盲目阻擋 Implicit Layer 輸出」**：而是**利用 Solaris 盡量 Flatten（打平）所有的 Implicit Layer**；對於結構上無法被 Flatten 的圖層，則需受控地導出。
+> 1. **核心目標並非**「**盲目阻擋 Implicit Layer 輸出**」：而是**利用 Solaris 盡量 Flatten（打平）所有的 Implicit Layer**；對於結構上無法被 Flatten 的圖層，則需受控地導出。
 > 2. **無法 Flatten 時的自動轉換**：當節點網路結構包含跨圖層引用或特定層級覆寫時，Houdini 為了符合 OpenUSD 規範，**會在輸出時自動將無法 Flatten 的 Implicit Layer 轉換為磁碟實體檔案（Explicit Layer）**。
 > 3. **輸出目錄第一道防線**：必須啟用 **Save Paths Relative to Output**，強制將所有自動轉換生成的子檔案約束在目標目錄的子資料夾（如 `./layers/`）內，嚴禁散落外溢。
 > 4. **最佳解法是源頭顯式化**：教導製作人員學會使用 `Configure Layer` 節點主動設定 Save Path，將隱式匿名層顯式化（Explicit Layer），從根源掌控檔案產出。

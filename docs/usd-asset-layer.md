@@ -250,7 +250,7 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 | **內部各組件可各別選取／各別指定 `drawMode`**（Set Dressing、Environment Set、大型建築群） | `assembly` | 把祖先鏈補齊為 `group`，使各組件保有 Model 能力 |
 
 > [!IMPORTANT]
-> **職責劃分：發布者「決定」，Pipeline「寫入」並「報告」**
+> **職責劃分**：發布者「**決定**」，Pipeline「**寫入**」並「**報告**」
 > - **決定**：由發布者依選取粒度意圖選定 `kind`。發布工具應提供合理預設並允許覆寫——執行 `PointInstancer` 的特效師最清楚自己的原型該如何歸類，該決定權交給他。
 > - **寫入**：`kind` 一律由 **Pipeline 於總裝層寫入**，sub 物件包內嚴禁宣告。此為 [`/ROOT` 鐵律](usd-publish-packaging.md)之一部分，不因決定權下放而改變。
 > - **報告**：發布前 QC 沿祖先鏈走一遍，**列出所有掉出 Model Hierarchy 的 model 及其斷點**，供發布者確認。**這是提示而非攔阻**——唯有發布者明確聲明該 Prim 需要 Model 能力（例如已為其指定 `drawMode`）卻實際失效時，才視為錯誤並中斷發布。
@@ -435,7 +435,7 @@ Houdini、Maya 等 DCC 的 USD 匯出器**預設就會在 Mesh 上寫入 direct 
 
 ### 5. 例外機制：不合規外部 Asset 的 Collection-Based Binding
 
-外包交付、第三方資產庫或歷史遺留 Asset，可能無法滿足零綁定鐵律。此時**唯一**能從祖先壓過後代 direct binding 的機制，是 `UsdShadeMaterialBindingAPI` 的 collection-based binding：
+外包交付、第三方 Asset 庫或歷史遺留 Asset，可能無法滿足零綁定鐵律。此時**唯一**能從祖先壓過後代 direct binding 的機制，是 `UsdShadeMaterialBindingAPI` 的 collection-based binding：
 
 ```usda
 over "Table_01" (
@@ -456,7 +456,7 @@ over "Table_01" (
 ```
 
 > [!IMPORTANT]
-> 此機制是**例外而非常態**。每次動用都代表有一顆 Asset 未達發布標準，應同時在資產管理系統標記待整改，而非讓 collection binding 淪為繞過鐵律的常規手段。
+> 此機制是**例外而非常態**。每次動用都代表有一顆 Asset 未達發布標準，應同時在 Asset 管理系統標記待整改，而非讓 collection binding 淪為繞過鐵律的常規手段。
 
 ### 6. 與 `instanceable` 的關係
 
@@ -574,7 +574,7 @@ def Xform "ROOT" (
 
 ---
 
-## 7. 角色資產結構（Character Asset）
+## 7. 角色 Asset 結構（Character Asset）
 
 角色與一般道具的關鍵差異在於：**幾何材質與綁定分屬不同部門、不同審批週期，且幾何材質本身對下游具備獨立的消費價值**（可作為靜態道具擺放、製作破碎版本、或不綁定直接使用）。
 
