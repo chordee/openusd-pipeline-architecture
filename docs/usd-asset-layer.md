@@ -204,59 +204,56 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 > **Pipeline 工具鏈鐵律：盡力維護 `usdkind`**
 > 若上游建模、綁定或發布工具遺失了 `kind` 宣告，或將幾何誤標在非 Model 容器下，USD 的 ModelAPI 將完全失效——導致 Viewport 無法以 Component 為單位選取物件，且 `drawMode = "bounds"` 也將無法啟動。因此，**Pipeline 輸出工具（Solaris ROP、Publish Hook、DCC 導出器）必須在任何時候，盡全力驗證並維護合規的 `kind` 標記！**
 
-### Model Hierarchy 連續性：唯一的硬性不變量
+### Model Hierarchy 連續性：機制與取捨
 
-`kind` 之所以必須嚴格維護，關鍵在於 OpenUSD 的 **Model Hierarchy 連續性規則**：
+`kind` 之所以必須謹慎維護，關鍵在於 OpenUSD 的 **Model Hierarchy 連續性規則**：
 
 > **一顆 Prim 要被納入 Model Hierarchy，其「父層必須是 `group` 類（`group` / `assembly`）」。**
 
-由此推導出兩條硬性限制，兩者皆為 USD 底層行為，無法以任何設定繞過：
+此規則是 USD 的底層行為，無法以任何設定繞過。其影響有兩種表現形式，但**本質是同一件事**——某顆 model 在什麼情況下會掉出 Model Hierarchy：
 
-1. **祖先鏈不得中斷**：從根到任一 `component` 之間，**每一顆中間容器都必須標記 `group`**——不是「最上層那顆標一下」即可。中間任一顆遺漏，該 `component` 及其底下全部靜默掉出 Model Hierarchy。
-2. **`component` 之下不得再有 model**：`component` 是 Model Hierarchy 的葉節點、本身不是 `group`，因此**任何置於 `component` 底下的 model 都會掉出階層**，其 `drawMode` 與 Model 選取一併失效。
+1. **祖先鏈中斷**：從根到某顆 `component` 之間，任一中間容器未標記 `group`，該 `component` 及其底下即掉出階層。
+2. **置於 `component` 之下**：`component` 本身不是 `group`，因此任何放在 `component` 底下的 model 同樣掉出階層。
 
-> [!CAUTION]
-> **失效是靜默的**
-> 階層斷裂時 USD **不會報錯**，只是 `UsdPrim.IsModel()` 回傳 `False`、Viewport 無法以 Component 為單位選取、且 `model:drawMode` 完全不生效——亦即本篇力推的頭號 Viewport 優化手段直接失靈，卻毫無跡象可循。因此**必須由 QC 主動攔阻**。
+> [!IMPORTANT]
+> **掉出階層是「能力喪失」，不是「格式錯誤」——而且經常正是所欲的結果**
+> 掉出 Model Hierarchy 時 USD **不會報錯**，檔案完全合法；失去的只是該 Prim 的 Model 能力：`UsdPrim.IsModel()` 回傳 `False`、無法以 Component 為單位選取、`model:drawMode` 不生效。
+>
+> 而這在許多情境下**正是設計意圖**：
+> - **Kitbash Asset**：一台由多顆已發布輪子 Asset 組成的車，概念上就是「一個東西」。標記為 `component` 時，下游選取到的是整台車——這正是想要的行為。內部的輪子掉出階層，避免了它們被各別選取。
+> - **`PointInstancer` 的 `Prototypes` 分支**：原型本來就不該被單獨選取、也不需各別降級（降級由 Instancer 整體處理）。
+>
+> 反過來說，若強行要求「`component` 之下不得有 model」而把 kitbash 車輛改標為 `assembly`，選取粒度就會變成各別輪子，**反而破壞了它應有的行為**。
+>
+> 因此本架構**不強制階層連續**。真正該被攔阻的只有一種情況：**發布者期待某顆 model 具備 Model 能力，卻因階層斷裂而靜默失效**。
 
-### 階層形狀由發布者決定，Pipeline 只驗證合規
+### 階層形狀由發布者決定，Pipeline 只負責報告
 
-本架構**不預先規定容器的名稱與層數**。Layout 的組織方式本就因專案、因場景而異，硬訂一套容器分類法屬於過度設計，也與 `/ROOT` 解耦哲學（語意命名交給消費端）相悖。
+本架構**不預先規定容器的名稱與層數，也不強制階層連續**。Layout 的組織方式本就因專案、因場景而異，硬訂一套容器分類法屬於過度設計，也與 `/ROOT` 解耦哲學（語意命名交給消費端）相悖。
 
-因此規範只約束**不變量**，形狀留給使用者：
+因此規範只描述**機制與取捨**，形狀完全留給使用者：
 
 | 項目 | 規範 |
 | :--- | :--- |
 | **容器命名與層數** | **完全自由**。`Props`、`Furniture/Chairs`、`BG/Layer_A/...` 任意分層皆可 |
-| **祖先鏈上的容器** | 一律標記 `kind = "group"`（`Scope` 可直接帶 `kind`，無須改為 `Xform`） |
-| **`component` 的擺放位置** | **自由決定**，唯一限制是其底下不得再有 model |
-| **合規與否** | 由 Pipeline 於發布時 QC 驗證，不合規即攔阻並報錯 |
+| **祖先鏈上的容器** | 希望其下的 model 保有 Model 能力時標記 `kind = "group"`（`Scope` 可直接帶 `kind`，無須改為 `Xform`）；不需要則可留空 |
+| **`component` 的擺放位置** | **完全自由**，其底下亦可再有 model——該 model 會掉出 Model Hierarchy，此結果在 Kitbash 等情境下正是所欲 |
+| **合規與否** | Pipeline 於發布時**報告**掉出階層的 model 清單，供發布者確認是否為預期；僅在發布者明確聲明需要該能力時才攔阻 |
 
-### `kind` 的值由發布者決定，寫入位置仍屬 Pipeline
+### `kind` 的值由發布者依「選取粒度意圖」決定
 
-`kind` 不可由發布工具無條件寫死為 `component`——同一類發布單元會因內容不同而需要不同的 `kind`：
+`kind` 不可由發布工具無條件寫死——但判斷依據**不是「內部有沒有引用其他單元」這類實作細節，而是「希望下游以什麼粒度選取與降級」的意圖**：
 
-| 發布單元內容 | 建議 `kind` | 理由 |
+| 希望下游的行為 | `kind` | 內部 model 的處置 |
 | :--- | :--- | :--- |
-| 自有幾何、無引用其他發布單元（一般道具） | `component` | Model Hierarchy 的葉節點 |
-| 內含其他已發布 Asset（Kitbash 車輛引用輪子 Asset） | `assembly` | `component` 底下不得再有 model |
-| Set Dressing / Environment Set | `assembly` | 內容 100% 為引用 |
-| FX Element：純自有內容（體積、火焰） | `component` | 葉節點 |
-| FX Element：以已發布 Asset 為 `PointInstancer` 原型 | `assembly` | 同上，避免 component 包 component |
+| **整體視為一個單位**選取與降級（一般道具、Kitbash 車輛、單顆 FX 元素） | `component` | 內部 model 掉出 Model Hierarchy——**正是所欲**，避免被各別選取 |
+| **內部各組件可各別選取／各別指定 `drawMode`**（Set Dressing、Environment Set、大型建築群） | `assembly` | 把祖先鏈補齊為 `group`，使各組件保有 Model 能力 |
 
 > [!IMPORTANT]
-> **職責劃分：發布者「決定」，Pipeline「寫入」並「驗證」**
-> - **決定**：由發布者依實際內容選定 `kind`。發布工具應**依內容自動推導預設值**（掃描是否引用其他發布單元），並允許發布者覆寫——執行 `PointInstancer` 的特效師最清楚自己的原型該如何歸類，該決定權交給他。
+> **職責劃分：發布者「決定」，Pipeline「寫入」並「報告」**
+> - **決定**：由發布者依選取粒度意圖選定 `kind`。發布工具應提供合理預設並允許覆寫——執行 `PointInstancer` 的特效師最清楚自己的原型該如何歸類，該決定權交給他。
 > - **寫入**：`kind` 一律由 **Pipeline 於總裝層寫入**，sub 物件包內嚴禁宣告。此為 [`/ROOT` 鐵律](usd-publish-packaging.md)之一部分，不因決定權下放而改變。
-> - **驗證**：發布前 QC 沿祖先鏈逐層檢查——遇到非 `group` / `assembly` 的中間容器即報錯；`component` 底下出現 model 亦報錯。**設定錯誤在此攔阻，而非事先限制寫法。**
-
-> [!TIP]
-> **階層斷裂是「能力喪失」而非「格式錯誤」——刻意斷開有時是合理的**
-> 祖先鏈中斷並不會使 USD 檔案不合法，只是該 model 失去 Model Hierarchy 的能力（`IsModel()` 為 `False`、`drawMode` 不生效、無法以 Component 為單位選取）。因此 QC 要攔阻的是**非預期的斷裂**，而非一律強制連續。
->
-> 最典型的合理例外是 **`PointInstancer` 的 `Prototypes` 分支**：原型本來就不會被單獨選取、也不需要各別降級顯示（降級由 Instancer 整體處理），因此其祖先容器**可以不標記 `group`**，任由原型掉出 Model Hierarchy。
->
-> 是否要為該分支補上 `group`，**由執行該 `PointInstancer` 的藝術家依實際需求決定**——若希望原型仍可被單獨選取或指定 `drawMode`，就把祖先鏈補齊；若不需要，維持現狀即可。Pipeline 的職責是**驗證他的設定是否自洽**，而不是替他決定形狀。
+> - **報告**：發布前 QC 沿祖先鏈走一遍，**列出所有掉出 Model Hierarchy 的 model 及其斷點**，供發布者確認。**這是提示而非攔阻**——唯有發布者明確聲明該 Prim 需要 Model 能力（例如已為其指定 `drawMode`）卻實際失效時，才視為錯誤並中斷發布。
 
 ### 鏡頭級 `kind` 階層參考
 
