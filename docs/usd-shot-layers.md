@@ -37,7 +37,9 @@
     ]
 )
 
-over "ROOT"
+def Xform "ROOT" (
+    kind = "assembly"
+)
 {
 }
 ```
@@ -75,19 +77,19 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
     def Scope "Environment" ( kind = "group" )
     {
         # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usd 之 </ROOT>）
         def Xform "Terrain" (
-            payload = @${PROJ_ROOT}/publish/assets/env/terrain/asset_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/asset_latest.usd"`@</ROOT>
         ) {}
         
-        def Scope "Props"
+        def Scope "Props" ( kind = "group" )
         {
             def Xform "Table_01" (
-                payload = @${PROJ_ROOT}/publish/assets/props/wooden_table/asset_latest.usd@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usd"`@</ROOT>
             ) {}
         }
     }
@@ -104,26 +106,25 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
-    def Scope "Anim"
+    def Scope "Anim" ( kind = "group" )
     {
-        def Scope "Characters"
+        def Scope "Characters" ( kind = "group" )
         {
-            def SkelRoot "Hero"
+            # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
+            def "Hero" (
+                prepend apiSchemas = ["SkelBindingAPI"]
+                prepend references = @`"${PROJECT_ROOT}/publish/chars/hero/char_latest.usd"`@</ROOT>
+            )
             {
-                # 引用角色骨架與幾何 Asset
-                def "geo" ( references = @${PROJ_ROOT}/publish/assets/char/hero/asset_latest.usd@</ROOT> ) {}
-                # 注入純動態時序資料 (Animation prim)
-                def Skeleton "skel" ( prepend apiSchemas = ["SkelBindingAPI"] )
-                {
-                    rel skel:animationSource = </ROOT/Anim/Characters/Hero/anim_data>
-                }
-                def SkelAnimation "anim_data"
+                # 動畫層唯一產出：純動態時序資料
+                def SkelAnimation "AnimData"
                 {
                     uniform token[] joints = ["Hips", "Spine", "Head"]
                     quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
                 }
+                rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
             }
         }
     }
@@ -140,13 +141,13 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
-    def Scope "FX"
+    def Scope "FX" ( kind = "group" )
     {
         # 掛載大型體積快取 (Payload 延遲加載)
         def Xform "hero_explosion" (
-            payload = @${PROJ_ROOT}/publish/fx/elements/hero_explosion/element_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/fx/elements/hero_explosion/element_latest.usd"`@</ROOT>
         ) {}
     }
 }
@@ -160,13 +161,15 @@ def Xform "ROOT"
     defaultPrim = "ROOT"
 )
 
-def Xform "ROOT"
+over "ROOT"
 {
-    def Scope "Lighting"
+    def Scope "Lighting" ( kind = "group" )
     {
         def DomeLight "SkyDome"
         {
-            asset inputs:texture:file = @${PROJ_ROOT}/assets/hdri/sunset.exr@
+            # 注意：asset 型「屬性值」不適用 Composition 階段的 Expression Variable，
+            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §4.2。
+            asset inputs:texture:file = @/projects/show_A/assets/hdri/sunset.exr@
             float inputs:intensity = 1.2
         }
         def RectLight "KeyLight"

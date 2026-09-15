@@ -19,8 +19,10 @@
 >    - 允許藝術家自由指定載入進來的擺放層級與命名（除了 `Sublayer` 外），充分利用發布端 `/ROOT` 解耦優勢。
 > 5. **Instanceable 原生實例化選項**：
 >    - 高密度道具可勾選 `instanceable = true`，享受 USD Core 內部 Stage 結構共享。
+>    - **代價**：Instance 內部不可 author 任何 opinion，等同放棄一切內部覆寫能力（含 Class 廣播）。記憶體效益與可覆寫性無法兼得。
 > 6. **預設 Class Inherits 多重標籤分類機制**：
 >    - 預設注入 `/__CLASS__/{專案註冊名稱}`，並允許藝術家追加或自訂 Class 標籤，達成跨物件的廣播式覆寫與分類管理。
+>    - **廣播意見一律往下走**，明確指向 Asset 內部目標 Prim，嚴禁直接寫在 Class 根 Prim 上（否則整顆 Asset 的材質層次將被抹平）。
 
 ---
 
@@ -91,7 +93,7 @@
 ```usda
 # 藝術家將 chair 載入並重命名為 HeroArmChair，語意高度貼合場景
 def Xform "HeroArmChair" (
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
     double3 xformOp:translate = (120, 0, 45)
@@ -109,7 +111,7 @@ def Xform "HeroArmChair" (
 # 透過 Loader 載入之多個實例
 def Xform "Chair_01" (
     instanceable = true
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
     double3 xformOp:translate = (0, 0, 0)
@@ -118,7 +120,7 @@ def Xform "Chair_01" (
 
 def Xform "Chair_02" (
     instanceable = true
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
     double3 xformOp:translate = (150, 0, 0)
@@ -131,6 +133,15 @@ def Xform "Chair_02" (
 2. **與 PointInstancer 的定位互補**：
    - `PointInstancer`：適合數萬至數百萬個純粒子點雲驅動的自然散佈（樹林、落葉），無法各別微調 Transform。
    - `Instanceable Xform`：適合幾十到幾百個由藝術家手工擺放、需各別精準旋轉微調或獨立切換 Variant 的場景道具。
+
+> [!CAUTION]
+> **勾選 `instanceable` 即等同放棄一切內部覆寫能力**
+> Instance 內部為 Instance Proxy，**不可 author 任何 opinion**。一旦標記 `instanceable`：
+> - 下游（Lighting、FX）**無法** `over` 進 Asset 內部改單一 Mesh 的材質或可見度，只能整顆實例開關。
+> - §5 的 Class 往下走廣播**完全失效**（其 `over` 全數落在 Prototype 內部）。
+> - `inherits` 本身參與 Prototype 識別，**不同的 Class 標籤組合會產生不同 Prototype**，標籤加得越雜、共享率越低。
+>
+> 因此 Loader 介面應明確提示此取捨：**記憶體效益與內部可覆寫性無法兼得**。凡預期會被下游細部覆寫的實例，一律不得勾選。
 
 ---
 
@@ -146,7 +157,7 @@ def Xform "Chair_02" (
 def Xform "OfficeChair_01" (
     # 預設自動注入：/__CLASS__/chair
     inherits = </__CLASS__/chair>
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 ) {}
 ```
 
@@ -161,25 +172,82 @@ def Xform "OfficeChair_01" (
         </__CLASS__/wooden_props>,
         </__CLASS__/interior_dressing>
     ]
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 ) {}
 ```
 
 ### 3. Class Inherits 的廣播式覆寫能力（Broadcasting Overrides）
-這套機制賦予了全 Pipeline 極為強大的批量治理能力：
+這套機制賦予了全 Pipeline 極為強大的批量治理能力。Class 的命名空間必須與 Loader 注入的 `inherits` 路徑完全一致（`/__CLASS__/{name}`）：
 
 ```usda
-# 在 lighting.usd 或 lookdev_override.usd 中定義 Class 屬性
-class "_class_wooden_props"
+# 在 lighting.usd 或 lookdev_override.usd 中定義 Class
+class "__CLASS__"
 {
-    # 一次宣告，全場所有繼承 wooden_props 的桌椅同步獲得此材質綁定或渲染標記
-    rel material:binding = </ROOT/Materials/M_GlobalWoodVarnish>
-    bool primvars:karma:light:shadow = true
+    class "wooden_props"
+    {
+        # 【正確】意見往下走，落在 Asset 內部的具體目標 Prim 上
+        over "ModelDefault"
+        {
+            over "Frame"
+            {
+                # 一次宣告，全場所有繼承 wooden_props 的桌椅，其木框同步套用此材質
+                rel material:binding = </ROOT/Lighting/Materials/M_GlobalWoodVarnish>
+            }
+        }
+    }
 }
 ```
 
+> [!CAUTION]
+> **廣播意見必須往下走，嚴禁直接寫在 Class 根 Prim 上**
+> Class 根 Prim 的意見會落在**實例根 Prim**（如 `/ROOT/Environment/Props/OfficeChair_01`），亦即 Asset 自身 `lookDefault` 綁定所在的同一顆 Prim。若將 `material:binding` 直接寫在 Class 根上：
+> 1. **整顆 Asset 的材質層次全數被抹平**：椅子的布面、金屬腳、木框會一律變成同一個 `M_GlobalWoodVarnish`。Asset 端辛苦拆分的多材質結構完全失效。
+> 2. **Asset 自身外觀被無聲取代**：依綁定契約，Class 走 Inherits 弧、恆強於 Asset 的 References 弧。藝術家只會看到椅子突然整顆變成木紋，卻查不出是哪裡來的意見。
+> 3. **失去與個別覆寫共存的空間**：Lighting 針對單一實例的微調同樣寫在實例根，兩者在同一顆 Prim 上正面競爭，無法分工。
+>
+> 因此廣播意見**一律往下走**，明確指向 Asset 內部的目標 Prim，才能達成「只改該改的部分」。
+
+#### 採用往下走時必須一併考量的四項代價
+
+> [!WARNING]
+> **一、綁定優先序會被反轉——這是最需要警覺的一項**
+> OpenUSD 的材質綁定解析是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」，**組合弧強弱只在同一顆 Prim 上有意義**。因此當意見分處不同層級時：
+>
+> | 綁定所在 Prim | 來源 | 對 `/…/OfficeChair_01/ModelDefault/Frame` 而言 |
+> | :--- | :--- | :--- |
+> | `…/OfficeChair_01/ModelDefault/Frame` | Class 往下走 | **最近祖先，勝出** |
+> | `…/OfficeChair_01` | Lighting 個別覆寫（Local） | 較遠，落敗 |
+> | `…/OfficeChair_01` | Asset 自身 `lookDefault`（References） | 較遠，落敗 |
+>
+> 亦即：**Class 往下走之後，其意見會無條件壓過 Lighting 在實例根所做的個別微調**，與 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)所定的「鏡頭覆寫 > 類別廣播 > Asset 預設」優先序**恰好相反**。
+>
+> **因應原則**：Lighting 若需推翻某個實例的 Class 廣播，**必須在同一深度**（即該實例的 `ModelDefault/Frame`）寫出覆寫，靠 Local 強於 Inherits 取勝；不可期待在實例根覆寫就能壓過。此點必須明確告知燈光組，否則會出現「改了沒反應」的狀況。
+
+> [!WARNING]
+> **二、與 Asset 內部結構產生耦合**
+> 往下走意味著 Class 必須知道 `ModelDefault/Frame` 這類路徑，這與 `/ROOT` 解耦哲學有所拉扯，且 `model` variant 切換為 `ModelLow` 時路徑即改變、廣播隨之落空。
+>
+> **因應原則**：廣播只應錨定於**架構保證存在的穩定路徑**（如規範明訂的 `ModelDefault` 分支），或改以 `GeomSubset` 的 `familyName` 等跨 Asset 一致的約定為目標。嚴禁錨定個別 Asset 的隨意命名。
+
+> [!WARNING]
+> **三、`over` 落空是靜默的**
+> Class 內的 `over` 若在某顆 Asset 上找不到對應路徑（例如該桌子根本沒有 `Frame`），USD **不會報錯、不會警告**，該實例單純不受影響。廣播給 100 顆 Asset 時，可能只有 60 顆生效而無人察覺。
+>
+> **因應原則**：Loader 或 QC 工具須提供「廣播命中率檢查」——列出實際套用到的實例數與未命中的清單。
+
+> [!CAUTION]
+> **四、與 `instanceable` 完全互斥**
+> `instanceable = true` 的 Prim，其內部為 Instance Proxy，**不可 author 任何 opinion**。Class 往下走的 `over` 全數落在 Prototype 內部，**完全無效**。
+>
+> 而本篇 §4 正好推薦高密度道具啟用 `instanceable`，兩者直接衝突。必須擇一：
+> - **需要 Class 往下廣播** → 該實例**不得**標記 `instanceable`。
+> - **需要 instancing 記憶體效益** → 廣播只能停留在實例根（整顆換材質），或改於 Asset 端以 `look` variant 解決。
+>
+> 另須注意：`inherits` 本身是組合弧，**會參與 Prototype 的識別**。§5.2 所鼓勵的「自由追加多重標籤」，每一種不同的標籤組合都會產生一份獨立 Prototype，直接侵蝕 instancing 的共享效益。Loader 應在介面上提示此代價。
+
 * **零侵入性**：燈光師不需要在場景中遍歷 100 把椅子逐一寫入 override，只需針對頂層 Class 定義一次，所有實例即刻生效。
 * **高內聚分類**：Class 在 USD 中不佔用空間實體，也不干擾階層的 Transform 幾何運算，是純粹的語意標籤。
+* **Relationship 目標不重映射**：`inherits` 與 Reference 不同，屬同一命名空間內的組合弧，**Class 內的 relationship 目標路徑不會被重映射**。因此可直接指向鏡頭層級的共用材質（如 `/ROOT/Lighting/Materials/...`），這正是廣播機制得以運作的關鍵。
 
 ---
 
@@ -201,7 +269,8 @@ class "_class_wooden_props"
    # Solaris Python Script / LOP Callback
    stage = hou.node(".").stage()
    prim_path = "/ROOT/Environment/Props/chair_01"
-   asset_usd_path = "${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd"
+   # Expression Variable 必須以反引號包裹字串運算式，否則不會展開
+   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`'
    
    # 1. 建立 Prim 並指派 kind
    prim = stage.DefinePrim(prim_path, "Xform")
@@ -229,5 +298,6 @@ class "_class_wooden_props"
 | **載入範圍** | 全發布元素皆可載入 | 涵蓋 Asset、SetDressing Assembly、FX Element、Pure USD Unit |
 | **USD 合成弧** | 嚴格維持原生 Composition Arcs | 僅使用 `Payload`、`Reference`、`Sublayer`，絕不搞專有節點 |
 | **擺放路徑** | 自由自訂 Target Prim Path | 擺脫檔名強綁定，完美發揮發布端 `/ROOT` 解耦彈性 |
-| **實例化** | 支援 `instanceable = true` | 達成 USD Core 內部 Stage 原生記憶體共享 |
+| **實例化** | 支援 `instanceable = true`，但與內部覆寫互斥 | 達成 Stage 原生記憶體共享；預期被下游細部覆寫者不得勾選 |
 | **繼承標籤** | 預設 `/__CLASS__/{name}`，允許自訂追加 | 達成廣播式屬性覆寫與多重語意標籤管理 |
+| **廣播寫法** | 意見一律往下走至目標 Prim，嚴禁寫在 Class 根上 | 保留 Asset 自身材質層次；須留意綁定優先序因此反轉 |

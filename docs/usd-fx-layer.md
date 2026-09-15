@@ -25,10 +25,10 @@
 defaultPrim = "ROOT"                       over "ROOT" {
 /ROOT                                          def Scope "FX" {
 ├── Volumes/                                       def Xform "explosion_hero" (
-│   └── density                                        payload = @${PROJ_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd@</ROOT>
+│   └── density                                        payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
 ├── Particles/                             )
 │   └── debris                                     def Xform "fire_ground" (
-└── Materials/                                         references = @${PROJ_ROOT}/publish/fx/elements/fire_ground/element_latest.usd@</ROOT>
+└── Materials/                                         references = @`"${PROJECT_ROOT}/publish/fx/elements/fire_ground/element_latest.usd"`@</ROOT>
     └── M_Explosion                                )
                                                }
                                            }
@@ -57,7 +57,7 @@ defaultPrim = "ROOT"                       over "ROOT" {
 ├── element_latest.usd                                   <-- 全域唯一最新動態入口 (指向最新版 v002/element.usd)
 │
 ├── v001/                                                <-- 元素總版次目錄
-│   └── element.usd                                      <-- 固定名稱！Sublayer 鎖定 sub 單元特定版次
+│   └── element.usd                                      <-- 固定名稱！Reference 鎖定 sub 單元特定版次
 ├── v002/
 │   └── element.usd                                      <-- 固定名稱！
 │
@@ -84,24 +84,34 @@ defaultPrim = "ROOT"                       over "ROOT" {
     defaultPrim = "ROOT"
     metersPerUnit = 0.01
     upAxis = "Y"
-    subLayers = [
-        @../materials/v001/material.usd@,       # 材質維持在 v001
-        @../layers/v002/volume_pyro.usd@        # 新解算的體積圖層推進至 v002
-    ]
 )
 
-over "ROOT" (
+def Xform "ROOT" (
+    # 一顆 FX 元素在下游應被視為「一個整體」來選取與降級，故標記為 component。
+    # 其 Debris 原型雖引用了已發布的 Component Asset，會因此掉出 Model Hierarchy，
+    # 但原型本就不該被單獨選取——此結果正是所欲，並非缺陷。
+    # kind 由發布者依「選取粒度意圖」決定，Pipeline 寫入並於 QC 報告階層狀況。
     kind = "component"
+
+    # 以 Reference 將各 sub 單元包嫁接至 /ROOT。
+    # 清單順序即意見強弱：越前面越強，故材質層恆強於幾何層。
+    prepend references = [
+        @../materials/v001/material.usd@</ROOT>,   # 材質維持在 v001
+        @../layers/v002/volume_pyro.usd@</ROOT>    # 新解算的體積圖層推進至 v002
+    ]
 )
 {
 }
 ```
 
+> [!NOTE]
+> FX Element 與 Asset 完全同構，同樣以 **Reference** 嫁接各 sub 單元包：每個 sub 單元（`volume_pyro.usd`、`material.usd`）皆為自成一體的封裝單元、擁有自己的 `/ROOT`，`kind` 則由總裝層獨佔宣告。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
+
 ### 2. 頂層唯一最新動態指標 (`element_latest.usd`)
 Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元素進版時，Pipeline 自動將其重定向指向最新版次：
 
 ```usda
-# /projects/show_A/publish/fx/elements/explosion_hero/element_latest.usd (Windows 包裝層或 Linux Symlink)
+# /projects/show_A/publish/fx/elements/explosion_hero/element_latest.usd （Sublayer 包裝圖層）
 #usda 1.0
 (
     defaultPrim = "ROOT"
@@ -112,7 +122,28 @@ Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元�
 ```
 
 ### 3. Sub 單元圖層內部結構範例 (如 `layers/v002/volume_pyro.usd`)
-被 Sublayer 引入的底層 sub 物件自身定義各類快取節點與材質，掛載於 `/ROOT` 之下：
+被 Reference 嫁接的底層 sub 單元包各自定義所屬的節點，掛載於自身 `/ROOT` 之下。
+
+> [!IMPORTANT]
+> **Sub 單元職責邊界：`Material` 本體與 `material:binding` 一律由 `materials/` 負責**
+> - **`layers/`（幾何層）**：只負責**幾何、體積與粒子**——Prim 結構、`field:*` 欄位綁定、快取路徑。**完全不觸碰材質**，既不定義 `Material`，也不宣告 `material:binding`。
+> - **`materials/`（材質層）**：定義 `/ROOT/Materials/` 底下的 `Material` 本體，**並以 `over` 在對應幾何 Prim 上寫出 `material:binding`**。
+>
+> **為什麼 binding 歸材質層？關鍵在進版連動。**
+> `material:binding` 本質上是 look 的意見，不是幾何的意見。若把 binding 寫在 `volume_pyro.usd`，則 Lookdev 每次重構材質（拆分、改名、換 Shader 網路）都會使幾何層內的 binding 目標失效，**逼迫完全沒有變動的幾何層跟著重新發佈**，sub 單元拆分的意義蕩然無存。
+>
+> 交由材質層之後：Lookdev 推進 `materials/v002/` 時，新的 `Material` 與新的 binding 一併帶出，`element.usd` 只需改鎖版本，`layers/v001/` 原封不動。這也與 Asset 端 `lookDefault`（`references` 清單在前、意見較強）覆寫 `modelDefault`（在後、較弱）的 binding 模式**完全同構**。
+>
+> **嚴禁在幾何層重複定義 `Material`。** 即使材質層位於較強層會在合成時勝出、表面上看不出異常，仍會埋下三個問題：
+> - **舊定義殘留**：材質推進至 `materials/v002/` 並改名時，幾何層那份舊 `Material` 不會消失，合成後新舊並存，舊的成為孤兒 Prim。
+> - **單獨取用時取得過期材質**：下游若獨立引用 `layers/v###/volume_pyro.usd`（如 FX 互相取用體積做碰撞或二次解算），拿到的是該圖層自帶的舊材質而不自知。
+> - **除錯成本**：同一批 Shader 參數在兩層皆有意見，弱層被靜默壓過，排查時必須同時翻兩個檔案。
+
+> [!WARNING]
+> **材質層的 `over` 必須命中實際存在的 Prim**
+> 材質層以 `over` 寫入 binding，代表它依賴幾何層的 Prim 路徑（`/ROOT/Volumes/ExplosionVolume` 等）。若特效師改名或搬動了該 Prim，這個 `over` 會**靜默地不產生任何作用**——USD 不會報錯，只會渲染出無材質的結果。
+>
+> 因此發布前 QC 必須驗證：**材質層內每一個 `over` 路徑，在合成後的 Stage 上皆對應到一個 `IsDefined()` 為真的 Prim**。此規則與 Asset 端 `lookDefault` → `modelDefault` 的檢查完全相同，可共用同一支驗證工具。
 
 ```usda
 # layers/v002/volume_pyro.usd
@@ -121,20 +152,30 @@ Shot 層（`fx.usd`）一律且唯一引用頂層的 `element_latest.usd`。元�
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     # 1. 體積資料 (Pyro / Smoke / Fire)
     def Scope "Volumes"
     {
         def Volume "ExplosionVolume"
         {
-            rel material:binding = </ROOT/Materials/M_ExplosionDensity>
-            def OpenVDBSurface "density" (
-                # VDB 快取檔案路徑與序列
-            ) {}
-            def OpenVDBSurface "temperature" (
-                # 溫度欄位快取
-            ) {}
+            # 幾何層不宣告 material:binding，改由 materials/v###/material.usd 寫出
+
+            # 【關鍵】Volume 必須以 field:<name> relationship 明確綁定各欄位，
+            # 僅把 OpenVDBAsset 放在子層級，渲染器不會讀到任何 field。
+            rel field:density = </ROOT/Volumes/ExplosionVolume/density>
+            rel field:temperature = </ROOT/Volumes/ExplosionVolume/temperature>
+
+            def OpenVDBAsset "density"
+            {
+                asset filePath = @./caches/density.0001.vdb@
+                token fieldName = "density"        # VDB 檔案內的 grid 名稱
+            }
+            def OpenVDBAsset "temperature"
+            {
+                asset filePath = @./caches/temperature.0001.vdb@
+                token fieldName = "temperature"
+            }
         }
     }
 
@@ -143,20 +184,86 @@ over "ROOT"
     {
         def PointInstancer "Debris"
         {
-            # 粒子點雲與實例化 Mesh
+            # 原型一律引用已發布的 Component Asset，自帶完整 lookDefault 外觀，
+            # FX 端不得、也不需要為其補綁材質。
+            def Scope "Prototypes"
+            {
+                def Xform "Chunk_A" (
+                    payload = @`"${PROJECT_ROOT}/publish/assets/fx/debris_concrete_a/asset_latest.usd"`@</ROOT>
+                ) {}
+                def Xform "Chunk_B" (
+                    payload = @`"${PROJECT_ROOT}/publish/assets/fx/debris_concrete_b/asset_latest.usd"`@</ROOT>
+                ) {}
+            }
+            rel prototypes = [
+                </ROOT/Particles/Debris/Prototypes/Chunk_A>,
+                </ROOT/Particles/Debris/Prototypes/Chunk_B>
+            ]
+            # protoIndices / positions / orientations 由 Value Clips 逐格供給
         }
     }
 
-    # 3. 特效自身材質庫 (Materials / Shaders)
-    def Scope "Materials"
-    {
-        def Material "M_ExplosionDensity"
-        {
-            # 專用體積材質 Shader
-        }
-    }
+    # 注意：此處不定義 /ROOT/Materials，亦不宣告任何 material:binding。
+    # 特效自身材質庫與全部綁定意見，由 materials/v###/material.usd 唯一負責。
 }
 ```
+
+對應的材質 sub 單元定義 `Material` 本體，並以 `over` 寫出綁定意見。它不定義任何幾何：
+
+```usda
+# materials/v001/material.usd
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+)
+
+def Xform "ROOT"
+{
+    # 1. 特效自身材質庫 (Materials / Shaders)
+    #    僅涵蓋 FX 原生、不存在於任何已發布 Asset 的外觀（體積、火焰、煙塵…）
+    def Scope "Materials"
+    {
+        def Material "M_ExplosionDensity" { /* 體積材質 Shader */ }
+    }
+
+    # 2. 攜帶綁定意見：對幾何層的 FX 原生 Prim 寫出 over + rel
+    #    本層位於 element.usd 的較強 sublayer，意見必然勝出
+    over "Volumes"
+    {
+        over "ExplosionVolume"
+        {
+            rel material:binding = </ROOT/Materials/M_ExplosionDensity>
+        }
+    }
+
+    # 注意：Particles/Debris 的原型為已發布 Asset，自帶 lookDefault，
+    #      此處不寫入任何綁定。
+}
+```
+
+> [!IMPORTANT]
+> **PointInstancer 的原型是已發布 Asset，自帶外觀，FX 不得補綁**
+> 依本 Pipeline 的既定設計（見 [Environment 與 Set Dressing 篇 §3](usd-environment-setdressing.md)），`PointInstancer` 的 `rel prototypes` 一律指向以 Reference / Payload 引入的**完整 Component Asset**。這些 Asset 內部已由 `lookDefault` 完成材質綁定，因此：
+> - **FX 材質層不得為原型補寫 `material:binding`**。這既多餘，又會與 Asset 自身的綁定形成意見競爭。
+> - FX Element 的 `materials/` sub 單元，職責僅限於**FX 原生、不存在於任何已發布 Asset 的外觀**——體積密度、火焰、煙塵等。
+>
+> **確有覆寫需求時的正確作法**：若 FX 需要改寫原型 Asset 的整體外觀（最典型的是破碎產生的新生內部斷面需專屬材質），依 [Asset Layer 篇 §5 材質綁定契約](usd-asset-layer.md#5-材質綁定契約material-binding-contract)，合規 Asset 的綁定一律寫在自身 `/ROOT`，該意見經 Payload 弧抵達原型 Prim；FX 材質層只需在**同一顆原型 Prim** 上寫出綁定，依 LIVRPS 秩序（`Local > Payload`）即可穩定勝出：
+>
+> ```usda
+> # materials/v002/material.usd
+> over "Particles" { over "Debris" { over "Prototypes"
+> {
+>     over "Chunk_A"
+>     {
+>         # 本層意見為 Local，恆強於原型 Asset 經 Payload 帶入的自身綁定
+>         rel material:binding = </ROOT/Materials/M_FractureInterior>
+>     }
+> } } }
+> ```
+>
+> 此覆寫為**整顆原型換材質**。若需分面保留原外觀、僅置換斷面，則屬 `GeomSubset` 層級的覆寫，需由原型 Asset 端預先發布對應的 subset 分割，FX 方能對其綁定。
+
+如此一來，材質重構（拆分、改名、換 Shader）只需推進 `materials/v002/`，`element.usd` 改鎖新版本即可，`layers/v001/volume_pyro.usd` 完全不必重新發佈。
 
 ---
 
@@ -181,7 +288,7 @@ over "ROOT"
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │   【專案所屬規範資料夾與 Pipeline 發布註冊】             │
-│   ${PROJ_ROOT}/publish/fx/elements/explosion_hero/     │
+│   ${PROJECT_ROOT}/publish/fx/elements/explosion_hero/  │
 │   ├── element_latest.usd (最新動態入口)                 │
 │   ├── v002/element.usd   (版次入口，僅數 KB)            │
 │   └── layers/v002/                                     │
@@ -208,28 +315,36 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     def Scope "Volumes"
     {
         def Volume "ExplosionVolume"
         {
-            rel material:binding = </ROOT/Materials/M_ExplosionDensity>
-            
+            # 幾何層不宣告 material:binding，改由 materials/v###/material.usd 寫出
+
+            # 【關鍵】以 field:<name> 綁定欄位，否則渲染器讀不到任何體積資料
+            rel field:density = </ROOT/Volumes/ExplosionVolume/density>
+
             # 指向獨立快取空間中的 VDB 序列
-            def OpenVDBSurface "density"
+            def OpenVDBAsset "density"
             {
-                asset filePath@substitutions = { ... }
+                token fieldName = "density"        # VDB 檔案內的 grid 名稱
+
+                # filePath 逐格切換，指向獨立快取空間中的序列檔案
                 asset filePath.timeSamples = {
                     1: @/mnt/fx_scratch/caches/explosion_hero/v002/vdb/density.0001.vdb@,
                     2: @/mnt/fx_scratch/caches/explosion_hero/v002/vdb/density.0002.vdb@
-                    # 或透過 Solaris Output Processor 替換為快取根變數 @${FX_CACHE_ROOT}/...@
                 }
             }
         }
     }
 }
 ```
+
+> [!WARNING]
+> **快取路徑不可依賴 Expression Variable**
+> `filePath` 是 asset 型**屬性值**而非組合弧，不適用 Composition 階段的 `${PROJECT_ROOT}` 展開（詳見 [發布封裝篇 §4.2](usd-publish-packaging.md)）。快取磁區的路徑差異應由 Output Processor 於輸出時寫入已解析的絕對路徑，或交由 Asset Resolver 的 search path 治理，不可在此留下未展開的運算式。
 
 #### B. 幾何快取序列包裹：USD Value Clips
 對於隨時間逐格變更拓撲或頂點的巨量剛體/布料/流體幾何快取（Geo Cache），使用 OpenUSD 原生的 **`Value Clips`** 機制：
@@ -243,20 +358,31 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     def Scope "Particles"
     {
         def PointInstancer "Debris" (
-            # 宣告 Value Clips 參數
+            # Value Clips 有「Template（樣板）」與「Explicit（明列）」兩種模式，
+            # 兩者互斥，絕不可混用。此處示範連號序列最常用的 Template 模式。
             clips = {
                 dictionary default = {
-                    string templateAssetPath = "/mnt/fx_scratch/caches/explosion_hero/v002/geo/debris.###.usd"
-                    double2 assetPaths = [ (1, "/mnt/fx_scratch/..."), (120, "/mnt/fx_scratch/...") ]
+                    # --- Template 模式必填欄位 ---
+                    string templateAssetPath = "/mnt/fx_scratch/caches/explosion_hero/v002/geo/debris.####.usd"
+                    double templateStartTime = 1
+                    double templateEndTime   = 120
+                    double templateStride    = 1
+
+                    # --- 兩種模式皆必填 ---
+                    # clip 檔案內部承載資料的 prim 路徑
                     string primPath = "/ROOT/Particles/Debris"
-                    double2 active = [ (1, 0) ]
+                    # Manifest 宣告「哪些屬性由 clip 提供」，供 USD 免開檔即可判斷，
+                    # 通常由 usdstitchclips 或發布工具自動產生
+                    asset manifestAssetPath = @./debris.manifest.usd@
                 }
             }
+            # 指定生效的 clip set（多組 clip set 時亦決定優先順序）
+            clipSets = ["default"]
         )
         {
         }
@@ -264,13 +390,20 @@ over "ROOT"
 }
 ```
 
+> [!IMPORTANT]
+> **Value Clips 模式互斥與必填欄位**
+> - **Template 模式**：`templateAssetPath` + `templateStartTime` + `templateEndTime` + `templateStride`。適用於連號檔名序列（`####` 為補零位數佔位符）。
+> - **Explicit 模式**：`asset[] assetPaths` + `double2[] times` + `double2[] active`。適用於非連號或不規則時間對應。
+> - 兩種模式**不可同時出現在同一個 clip set** 中；`assetPaths` 的型別是 `asset[]`，`times` 與 `active` 是 `double2[]`，切勿誤寫為 `double2`。
+> - `primPath` 與 `manifestAssetPath` 兩種模式皆為必要；缺少 manifest 會迫使 USD 開啟全部 clip 檔案以探查屬性，嚴重拖慢 Stage 開啟速度。
+
 ### 3. FX Element Entry 正式發布與專案註冊
 當龐大實體快取被包裹為輕量的 `layers/v002/volume_pyro.usd` 與 `layers/v002/debris_clip.usd` 後：
 - **Pipeline 發布流程介入**：Pipeline 發布工具生成最終的總裝圖層 `v002/element.usd`，並更新指向它的 `element_latest.usd`。
 - **寫入專案所屬資料夾**：這些總裝與輕量包裹圖層（總共僅數十 KB 到數 MB）**正式發布進專案標準資料夾**：
-  `${PROJ_ROOT}/publish/fx/elements/explosion_hero/`
+  `${PROJECT_ROOT}/publish/fx/elements/explosion_hero/`
 - **專案管理系統註冊**：在專案管理資料庫（Tracking / ShotGrid / Production DB）中正式簽入該版本（`v002`），完成驗收發布。
-- **下游乾淨消費**：下游環節（Lighting、Shot Assembly）只需透過常規的專案路徑引用 `${PROJ_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd`，即可無感加載這份體量龐大但架構極致整潔的特效。
+- **下游乾淨消費**：下游環節（Lighting、Shot Assembly）只需透過常規的專案路徑引用 `${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd`，即可無感加載這份體量龐大但架構極致整潔的特效。
 
 ---
 
@@ -292,7 +425,7 @@ over "ROOT"
     {
         # 特效元素 1：主爆炸 (巨大體積快取建議使用 payload 便於延遲載入)
         def Xform "explosion_hero" (
-            payload = @${PROJ_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/fx/elements/explosion_hero/element_latest.usd"`@</ROOT>
         )
         {
             # 可在此進行鏡頭層級的微調 Transform (如非必要盡量在元素內部定錨)
@@ -300,14 +433,14 @@ over "ROOT"
 
         # 特效元素 2：地面火焰 (持續性效果)
         def Xform "fire_ground" (
-            references = @${PROJ_ROOT}/publish/fx/elements/fire_ground/element_latest.usd@</ROOT>
+            references = @`"${PROJECT_ROOT}/publish/fx/elements/fire_ground/element_latest.usd"`@</ROOT>
         )
         {
         }
 
         # 特效元素 3：衝擊波粒子
         def Xform "shockwave_sparks" (
-            references = @${PROJ_ROOT}/publish/fx/elements/shockwave_sparks/element_latest.usd@</ROOT>
+            references = @`"${PROJECT_ROOT}/publish/fx/elements/shockwave_sparks/element_latest.usd"`@</ROOT>
         )
         {
         }
@@ -353,4 +486,4 @@ over "ROOT"
 2. **Solaris Implicit Layer 禁錮**：Houdini Solaris 導出時，所有生成的 Implicit Layers 必須限制在該目錄及其子目錄（如 `./layers/`）內，嚴禁外溢到目標資料夾以外。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：`element.usd` 引用包內的 `./layers/volume_pyro.usd` 一律使用相對路徑（`@./...@`），確保整個資料夾移動或打包時鏈結不壞。
-   - **包外引用**：若特效需要引用外部碰撞地表 Asset，輸出時由 Solaris Output Processor 自動改寫為 `@${PROJ_ROOT}/...@`，確保專案遷移或交接客戶時可一鍵切換。
+   - **包外引用**：若特效需要引用外部碰撞地表 Asset，輸出時由 Solaris Output Processor 自動改寫為 ``@`"${PROJECT_ROOT}/..."`@``，確保專案遷移或交接客戶時可一鍵切換。
