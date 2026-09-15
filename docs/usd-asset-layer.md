@@ -285,6 +285,20 @@ OpenUSD 的材質綁定解析規則是：**先找該 Prim 自身的 direct bindi
 
 依 LIVRPS 秩序（`Local > Inherits > Variants > References > Payloads > Specializes`），此三層自然形成「鏡頭覆寫 > 類別廣播 > Asset 預設」的正確優先序，**無需任何額外機制**。
 
+> [!CAUTION]
+> **上述優先序的成立前提：三者必須落在「同一顆 Prim」上**
+> 綁定解析的實際規則是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」——**組合弧強弱只在同一顆 Prim 上才有意義**。一旦意見分處不同層級，「較近的祖先」會無條件勝出，與組合弧強弱完全無關：
+>
+> | 綁定所在 Prim | 來源 | 對 `…/Table_01/ModelDefault/Frame` 而言 |
+> | :--- | :--- | :--- |
+> | `…/Table_01/ModelDefault/Frame` | 任何來源 | **最近祖先，無條件勝出** |
+> | `…/Table_01` | Lighting 覆寫（Local） | 較遠，落敗 |
+> | `…/Table_01` | Asset `lookDefault`（References） | 較遠，落敗 |
+>
+> 因此本契約要求**所有整體性綁定一律收斂在實例根 Prim（即 Asset 的 `/ROOT`）**，三方在同一顆 Prim 上競爭，優先序才會如上表所述。
+>
+> 若確有需求下探至 Asset 內部個別 Prim 廣播（如 [Asset Loader 篇 §5.3](usd-asset-loader.md) 的 Class 往下走），**該廣播即會反轉優先序、壓過 Lighting 在實例根的個別微調**。此為刻意的取捨，動用前務必確認團隊已知悉，並在同一深度提供覆寫管道。
+
 ### 2. `lookDefault` 的綁定寫法
 
 綁定一律寫在 **Asset 根 Prim `/ROOT`** 上，靠命名空間繼承傳遞給底下全部幾何：
