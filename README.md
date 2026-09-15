@@ -12,7 +12,7 @@
 
 ## 📚 專題筆記清單與核心權威索引
 
-全套架構由 10 篇互補且深度的專題筆記構成，涵蓋 Pipeline 所有核心面向：
+全套架構由 11 篇互補且深度的專題筆記構成，涵蓋 Pipeline 所有核心面向：
 
 | 筆記名稱 | 核心探討範疇 | 關鍵架構概念 |
 | :--- | :--- | :--- |
@@ -21,6 +21,7 @@
 | **[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)** | 世界舞台與場景陳設組裝 | Layout 與 Set Dressing 組合、虛擬組裝（零幾何實體）、`PointInstancer` 點雲數據消耗 |
 | **[USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)** | 角色骨架與道具時序動態 | 角色拆為幾何材質與綁定兩個發布單元、`SkelRoot` 底下三分支（`Geometry` + `Skel` + `AnimData`）、數 MB 極致輕量儲存 |
 | **[USD FX Layer 鏡頭特效層架構設計](docs/usd-fx-layer.md)** | 特效元素封裝與掛載機制 | `/ROOT/FX/<element_name>`、元素自身以 `/ROOT` 為基底、Payload 延遲載入體積與點雲 |
+| **[USD Lighting Layer 燈光層架構與最終仲裁權](docs/usd-lighting-layer.md)** | 最強層的權限行使、光源連結與跨鏡頭複用 | 能在上游修正者一律退回上游、`lightLink` / `shadowLink` 以排除而非列舉、Light Rig 發布為 Pure USD 單元 |
 | **[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)** | 通用封裝、路徑邊界與版本控制 | 目錄即包裝單元、內相對外絕對、`latest` 指向與 Asset Resolver 逆向鎖定 |
 | **[USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)** | 全元素載入與場景陳設工具架構 | Query/Load 兩段式分離、原生 Composition Arcs、自由指定 Prim Path、Instanceable、Class Inherits 標籤廣播 |
 | **[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)** | Solaris 導出虛擬層收斂與治理機制 | Flatten 打平優先、無法打平時強制落地子目錄（`./layers/`）、`Configure Layer` 主動顯式化（Explicit Layer） |
@@ -97,12 +98,12 @@
 
 | 專業崗位 | 核心推薦閱讀篇目 | 實踐重點 |
 | :--- | :--- | :--- |
-| **Pipeline / TD / 架構師** | 全部 10 篇（著重於 [USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)、[USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)、[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)） | 掌握包裝邊界驗證、Solaris ROP 配置、Implicit Layer 輸出治理、Asset Resolver 鎖定邏輯、發布 Hook 與 QC 規則模組實作。 |
+| **Pipeline / TD / 架構師** | 全部 11 篇（著重於 [USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md)、[USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)、[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)） | 掌握包裝邊界驗證、Solaris ROP 配置、Implicit Layer 輸出治理、Asset Resolver 鎖定邏輯、發布 Hook 與 QC 規則模組實作。 |
 | **Model / Lookdev TD** | [USD Asset Layer 架構設計](docs/usd-asset-layer.md)、[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md) | 理解幾何與材質雙層解耦、Model/Look VariantSet 封裝、以及 `/ROOT` 命名規範。 |
 | **Layout / Set Dresser** | [USD Asset Loader 工具架構設計](docs/usd-asset-loader.md)、[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)、[USD Solaris Implicit Layer 治理與輸出指南](docs/usd-solaris-implicit-layer.md)、[USD Asset Layer 架構設計](docs/usd-asset-layer.md) | 掌握 Loader Query/Load 擺放實務、Assembly 虛擬組裝、跨鏡頭 Set Asset 複用、`PointInstancer` 海量散佈優化、與避免 multi-input 產生外溢隱式圖層。 |
 | **Animator / Rigging TD** | [USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)、[USD Skel 骨架動畫設定指南](docs/usd-skel-guide.md) | 掌握角色雙單元切分（`asset` / `char`）與 `SkelRoot` 三分支，蒙皮權重歸骨架包以 `over` 注入，避免輸出全幾何快取。 |
 | **FX Artist / TD** | [USD FX Layer 鏡頭特效層架構設計](docs/usd-fx-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md) | 掌握 `/ROOT/FX/<element_name>` 註冊名掛載、獨立元素自帶 `/ROOT`、以及角色隱藏接管機制。 |
-| **Lighting / Render TD** | [USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)、[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md) | 掌握頂層權限覆寫、Light Linking、跨部門稀疏材質微調、與算圖版本鎖定（Pinning）。 |
+| **Lighting / Render TD** | [USD Lighting Layer 燈光層架構與最終仲裁權](docs/usd-lighting-layer.md)、[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)、[USD 發布封裝、路徑邊界與進版解析架構](docs/usd-publish-packaging.md) | 掌握最強層的節制原則、`lightLink` / `shadowLink` 連結機制、Light Rig 跨鏡頭複用、`/Render` 命名空間與算圖版本鎖定（Pinning）。 |
 
 ---
 
