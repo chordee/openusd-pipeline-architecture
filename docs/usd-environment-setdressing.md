@@ -54,7 +54,7 @@ def Xform "ROOT" (
     {
         # 1. 引用單一道具 Asset（純路徑參照，不帶幾何快取，指向外部發布包 asset_latest.usd）
         def Xform "Table_Center" (
-            payload = @${PROJ_ROOT}/publish/assets/props/table/asset_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/props/table/asset_latest.usd"`@</ROOT>
         )
         {
             double3 xformOp:translate = (0, 0, 0)
@@ -63,7 +63,7 @@ def Xform "ROOT" (
 
         # 2. 多張椅子配置：引用同一份 Asset，僅 Transform 不同
         def Xform "Chair_01" (
-            payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
             variants = { string look = "LookRed" }
         )
         {
@@ -72,7 +72,7 @@ def Xform "ROOT" (
         }
 
         def Xform "Chair_02" (
-            payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
             variants = { string look = "LookBlue" }
         )
         {
@@ -113,10 +113,10 @@ def Xform "ROOT"
             def "Prototypes"
             {
                 def Xform "PineTree_A" (
-                    payload = @${PROJ_ROOT}/publish/assets/nature/pine_a/asset_latest.usd@</ROOT>
+                    payload = @`"${PROJECT_ROOT}/publish/assets/nature/pine_a/asset_latest.usd"`@</ROOT>
                 ) {}
                 def Xform "PineTree_B" (
-                    payload = @${PROJ_ROOT}/publish/assets/nature/pine_b/asset_latest.usd@</ROOT>
+                    payload = @`"${PROJECT_ROOT}/publish/assets/nature/pine_b/asset_latest.usd"`@</ROOT>
                 ) {}
             }
             rel prototypes = [
@@ -167,10 +167,10 @@ def Xform "ROOT"
         def Scope "Layout"
         {
             def Xform "Terrain" (
-                payload = @${PROJ_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usd@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/cliff_path/asset_latest.usd"`@</ROOT>
             ) {}
             def Xform "MainCastle" (
-                payload = @${PROJ_ROOT}/publish/assets/env/architecture/castle/asset_latest.usd@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/env/architecture/castle/asset_latest.usd"`@</ROOT>
             ) {}
         }
 
@@ -179,12 +179,12 @@ def Xform "ROOT"
         {
             # 引用共用室內陳設
             def Xform "LivingRoomSet" (
-                references = @${PROJ_ROOT}/publish/sets/livingroom/set_latest.usd@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/sets/livingroom/set_latest.usd"`@</ROOT>
             ) {}
 
             # 引用共用植被散佈
             def Xform "OuterForest" (
-                references = @${PROJ_ROOT}/publish/sets/nature/foliage/set_latest.usd@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/sets/nature/foliage/set_latest.usd"`@</ROOT>
             ) {}
         }
     }
@@ -214,4 +214,4 @@ Set Dressing 與場景 Asset 在發布時，同樣必須遵守全 Pipeline 通�
 2. **Solaris Implicit Layer 禁錮**：所有導出的隱式圖層必須限制在目標目錄或其子目錄（如 `./layers/`）內，嚴禁外溢。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：主檔引用包內的子圖層或點雲快取一律使用相對路徑（`@./...@`）。
-   - **包外引用**：引用外部已發佈之家具與道具 Component Asset，輸出時由 Solaris Output Processor 自動改寫為 `@${PROJ_ROOT}/...@`，確保專案遷移或交接客戶時可一鍵切換。
+   - **包外引用**：引用外部已發佈之家具與道具 Component Asset，輸出時由 Solaris Output Processor 自動改寫為 ``@`"${PROJECT_ROOT}/..."`@``，確保專案遷移或交接客戶時可一鍵切換。

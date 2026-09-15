@@ -81,13 +81,13 @@ def Xform "ROOT"
     {
         # 引用外部發布之 Asset（由 Output Processor 替換為 Expression Variable，指向 asset_latest.usd 之 </ROOT>）
         def Xform "Terrain" (
-            payload = @${PROJ_ROOT}/publish/assets/env/terrain/asset_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/assets/env/terrain/asset_latest.usd"`@</ROOT>
         ) {}
         
         def Scope "Props"
         {
             def Xform "Table_01" (
-                payload = @${PROJ_ROOT}/publish/assets/props/wooden_table/asset_latest.usd@</ROOT>
+                payload = @`"${PROJECT_ROOT}/publish/assets/props/wooden_table/asset_latest.usd"`@</ROOT>
             ) {}
         }
     }
@@ -110,10 +110,14 @@ def Xform "ROOT"
     {
         def Scope "Characters"
         {
-            def SkelRoot "Hero"
+            # SkelRoot 必須套用 SkelBindingAPI，skel:* 綁定才成立
+            def SkelRoot "Hero" ( prepend apiSchemas = ["SkelBindingAPI"] )
             {
+                # 於 SkelRoot 綁定骨架，沿命名空間繼承給底下所有被 skin 的 Mesh
+                rel skel:skeleton = </ROOT/Anim/Characters/Hero/skel>
+
                 # 引用角色骨架與幾何 Asset
-                def "geo" ( references = @${PROJ_ROOT}/publish/assets/char/hero/asset_latest.usd@</ROOT> ) {}
+                def "geo" ( references = @`"${PROJECT_ROOT}/publish/assets/char/hero/asset_latest.usd"`@</ROOT> ) {}
                 # 注入純動態時序資料 (Animation prim)
                 def Skeleton "skel" ( prepend apiSchemas = ["SkelBindingAPI"] )
                 {
@@ -146,7 +150,7 @@ def Xform "ROOT"
     {
         # 掛載大型體積快取 (Payload 延遲加載)
         def Xform "hero_explosion" (
-            payload = @${PROJ_ROOT}/publish/fx/elements/hero_explosion/element_latest.usd@</ROOT>
+            payload = @`"${PROJECT_ROOT}/publish/fx/elements/hero_explosion/element_latest.usd"`@</ROOT>
         ) {}
     }
 }
@@ -166,7 +170,9 @@ def Xform "ROOT"
     {
         def DomeLight "SkyDome"
         {
-            asset inputs:texture:file = @${PROJ_ROOT}/assets/hdri/sunset.exr@
+            # 注意：asset 型「屬性值」不適用 Composition 階段的 Expression Variable，
+            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §4.2。
+            asset inputs:texture:file = @/projects/show_A/assets/hdri/sunset.exr@
             float inputs:intensity = 1.2
         }
         def RectLight "KeyLight"

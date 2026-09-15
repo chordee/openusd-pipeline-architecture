@@ -48,23 +48,27 @@ SkelRoot ──┼── 2. skel (Skeleton) ──► 由【Rig 環節】提供 
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     def Scope "Anim"
     {
         def Scope "Characters"
         {
             # 必須宣告為 SkelRoot，Hydra / 渲染器才會啟動 GPU/CPU Skinning
-            def SkelRoot "Hero"
+            # 並且必須套用 SkelBindingAPI —— skel:* 全系列屬性與 relationship
+            # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
+            def SkelRoot "Hero" (
+                prepend apiSchemas = ["SkelBindingAPI"]
+            )
             {
                 # 1. 引用 Asset 端的幾何 (geo，指向最新發布之模型)
                 def "Geo" (
-                    references = @${PROJ_ROOT}/publish/assets/characters/hero/asset_latest.usd@</ROOT/ModelDefault>
+                    references = @`"${PROJECT_ROOT}/publish/assets/characters/hero/asset_latest.usd"`@</ROOT/ModelDefault>
                 ) {}
 
                 # 2. 引用 Rig 端的靜態骨架 (skel，指向最新發布之骨架)
                 def Skeleton "Skel" (
-                    references = @${PROJ_ROOT}/publish/assets/characters/hero/rig/rig_latest.usd@</ROOT/Skeleton>
+                    references = @`"${PROJECT_ROOT}/publish/assets/characters/hero/rig/rig_latest.usd"`@</ROOT/Skeleton>
                 ) {}
 
                 # 3. 動畫師本鏡頭實際輸出的動態資料 (SkelAnimation)
@@ -84,6 +88,8 @@ over "ROOT"
                 }
 
                 # 建立動態綁定關聯 (Binding)
+                # 掛在 SkelRoot 上可沿命名空間繼承給底下所有被 skin 的 Mesh，
+                # 無需在每顆 Mesh 上重複宣告。
                 rel skel:animationSource = </ROOT/Anim/Characters/Hero/AnimData>
                 rel skel:skeleton = </ROOT/Anim/Characters/Hero/Skel>
             }
@@ -110,7 +116,7 @@ over "ROOT"
     defaultPrim = "ROOT"
 )
 
-over "ROOT"
+def Xform "ROOT"
 {
     def Scope "Anim"
     {
@@ -140,7 +146,7 @@ over "ROOT"
         def Scope "Props"
         {
             def Xform "HeroGun" (
-                references = @${PROJ_ROOT}/publish/assets/props/weapons/blaster/asset_latest.usd@</ROOT>
+                references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/blaster/asset_latest.usd"`@</ROOT>
             )
             {
                 double3 xformOp:translate.timeSamples = {
@@ -177,7 +183,8 @@ over "ROOT"
 
 1. **嚴禁在動畫層寫入 Mesh 點位快取**：除非是無法以骨架或 BlendShape 表達的特殊穿透修正，否則一律禁止烘焙 Point Cache。
 2. **統一 SkelRoot 邊界**：所有骨架角色必須包覆在 `SkelRoot` 節點內，確保即時預覽（Hydra）與離線渲染時能正確解算 Skinning。
-3. **時序資料集中**：攝影機與道具的動態屬性統一宣告為 `xformOp` 時間樣本，確保被 Lighting 或 FX 圖層引用時具備乾淨的時序插值（Interpolation）。
+3. **`SkelBindingAPI` 必須顯式套用**：`skel:skeleton`、`skel:animationSource`、`skel:joints`、`primvars:skel:jointIndices` 等全系列屬性皆隸屬 `SkelBindingAPI` 這個 **Applied API Schema**。凡是承載這些屬性的 Prim（`SkelRoot`、`Skeleton`、被 skin 的 `Mesh`），都必須以 `prepend apiSchemas = ["SkelBindingAPI"]` 套用；**只寫屬性而未套用 Schema 是無效綁定**，Hydra 不會解算 Skinning 且 `usdchecker` 會報錯。發布前 QC 應列為必檢項。詳見：[USD Skel 骨架動畫設定指南](usd-skel-guide.md)。
+4. **時序資料集中**：攝影機與道具的動態屬性統一宣告為 `xformOp` 時間樣本，確保被 Lighting 或 FX 圖層引用時具備乾淨的時序插值（Interpolation）。
 
 ---
 
@@ -190,4 +197,4 @@ over "ROOT"
 2. **Solaris Implicit Layer 禁錮**：若由 Solaris 輸出，所有導出的隱式圖層必須限制在目標目錄或其子目錄內，嚴禁外溢。
 3. **內相對、外絕對（Expression Variable 替換）**：
    - **包內互連**：`anim.usd` 堆疊包內的骨架動畫層與鏡頭層一律使用相對路徑（`@./...@`）。
-   - **包外引用**：動畫層引用外部角色幾何或道具 Asset，輸出時由 Solaris Output Processor 自動改寫為 `@${PROJ_ROOT}/...@`，確保專案遷移或交接客戶時可一鍵切換。
+   - **包外引用**：動畫層引用外部角色幾何或道具 Asset，輸出時由 Solaris Output Processor 自動改寫為 ``@`"${PROJECT_ROOT}/..."`@``，確保專案遷移或交接客戶時可一鍵切換。

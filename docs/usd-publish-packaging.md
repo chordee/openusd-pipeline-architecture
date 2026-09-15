@@ -13,7 +13,7 @@
 > 2. **輸出子目錄收斂（Save Paths Relative to Output）**：Pipeline 優先利用 Flatten 打平 Implicit Layers；對於結構上無法 Flatten 而被 Houdini 自動轉換為實體的圖層，必須透過 ROP 設定強制將路徑收斂在輸出資料夾的子目錄（如 `./layers/`）內，避免散落外溢。
 > 3. **路徑引用雙重標準與 Expression Variable 專案替換**：
 >    - **包內互連 → 相對路徑（`@./...@`）**：確保單一發布包搬移或跨平臺時不壞鏈。
->    - **包外引用 → 專案 Expression Variable（`@${PROJ_ROOT}/...@`）**：所有引用專案目錄的絕對路徑，在輸出時由 **Houdini Solaris Output Processor** 自動改寫為 Stage Expression Variable（如 `${PROJ_ROOT}`），並於 Layer Metadata 中預設宣告。未來專案目錄搬遷或交付客戶時，**只需在頂層重新指定變數或以 Wrapper Layer 包裹，即可一口氣全局替換所有層的路徑**，零檔案修改。
+>    - **包外引用 → 專案 Expression Variable（``@`"${PROJECT_ROOT}/..."`@``）**：所有引用專案目錄的絕對路徑，在輸出時由 **Houdini Solaris Output Processor** 自動改寫為 Stage Expression Variable（如 `${PROJECT_ROOT}`），並於 Layer Metadata 中預設宣告。未來專案目錄搬遷或交付客戶時，**只需在頂層重新指定變數或以 Wrapper Layer 包裹，即可一口氣全局替換所有層的路徑**，零檔案修改。
 > 4. **Pure USD 單元**：發布目標純粹為 USD，內容與結構放寬限制，專供靈活應付額外自訂操作與特殊工具鏈。
 > 5. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口（Linux 符號連結；Windows 採 `subLayers` 包裝圖層）。
 > 6. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本的「不可變性（Immutability）」。
@@ -68,7 +68,7 @@ def PointInstancer "ForestTrees"
 
     # 2. 以 latest 引用獨立發布的 Pure USD 點雲單元
     # 內部定義了 positions, orientations, scales, protoIndices 等屬性
-    prepend references = @${PROJ_ROOT}/publish/shots/sq01/sh010/layout/scatter_forest/scatter_forest_latest.usd@</ROOT/ScatterPoints>
+    prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/layout/scatter_forest/scatter_forest_latest.usd"`@</ROOT/ScatterPoints>
 }
 ```
 
@@ -130,6 +130,22 @@ def PointInstancer "ForestTrees"
 > 3. **頂層自動維護唯一的 `asset_latest.usd`**：
 >    - 只有在整個 Asset 進版時，Pipeline 才會自動維護並將頂層的 `asset_latest.usd` 更新指向新生成的版次（如 `v002/asset.usd`）。
 >    - 這保證了歷史每個版本 `asset.usd` 的內部結構完全不可變（Immutable），且外部消費端永遠只需對接唯一的 `asset_latest.usd`。
+
+> [!CAUTION]
+> **`/ROOT` 的 `def` 責任歸屬：總裝層用 `over`，sub 圖層必須 `def`**
+> `over` **不會建立 Prim**。若一個封裝包內所有圖層（總裝層與全部 sub 圖層）都以 `over "ROOT"` 撰寫，合成後 `/ROOT` 將**從未被定義**：`UsdPrim.IsDefined()` 回傳 false，預設的 Stage 遍歷述詞會直接跳過它，`defaultPrim` 亦無法解析到有效 Prim，整個發布包在下游等同空殼。
+>
+> 因此全 Pipeline 統一規範：
+>
+> | 圖層角色 | 寫法 | 說明 |
+> | :--- | :--- | :--- |
+> | **Sub 圖層**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | `def Xform "ROOT"` | 由最底層的內容圖層負責實際定義 Prim |
+> | **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | `over "ROOT" ( kind = "..." )` | 僅疊加 `kind` 等元數據，不重複定義 |
+> | **`latest` 包裝層**（`asset_latest.usd`、`element_latest.usd`） | `over "ROOT"` 或留空 | 純指標層，不應帶入任何場景意見 |
+> | **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | `def Xform "ROOT"` | 各部門圖層皆為獨立發布單元，須自帶定義 |
+> | **Shot 總裝層**（`shot.usd`）與各部門 `overrides` 容器 | `over "ROOT"` | 純堆疊與覆寫，不定義 |
+>
+> 發布前 QC 必須驗證：每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`。
 
 ### 範例 B：FX Element 發布包目錄結構（以 `explosion_hero` 為例）
 FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
@@ -208,8 +224,8 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 ┌────────────────────────────────────────────────────────┐
 │  【階段三：原子移轉至專案正式流程結構】               │
 │  mv /mnt/scratch/.../chair/v002                        │
-│     --> ${PROJ_ROOT}/publish/assets/props/chair/v002/  │
-│  自動更新維護 ${PROJ_ROOT}/.../asset_latest.usd        │
+│   --> ${PROJECT_ROOT}/publish/assets/props/chair/v002/ │
+│  自動更新維護 ${PROJECT_ROOT}/.../asset_latest.usd     │
 └──────────────────────────┬─────────────────────────────┘
                            │
                            ▼
@@ -276,7 +292,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
                                                  │
     【外部參照：Expression Variable 替換】          │
     Output Processor 自動改寫專案目錄前綴           ▼
-    references = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    references = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 ```
 
 ### 1. 包內參照 → 必須為相對路徑（Relative Paths）
@@ -288,7 +304,32 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
   - 整份 Asset 發布資料夾（包含 `v###/`、`modelDefault/`、`lookDefault/`、`textureDefault/`）可隨意在硬碟間複製、移動、存檔或交付外部外包，內部相對路徑 100% 保持自洽有效。
   - 不依賴固定的磁碟機代號或掛載路徑（Mount point），跨 Windows（`D:/`）與 Linux（`/mnt/`）無縫共用。
 
-### 2. 包外參照 → Stage Expression Variable（`${PROJ_ROOT}`）
+### 2. 包外參照 → Stage Expression Variable（`${PROJECT_ROOT}`）
+
+> [!CAUTION]
+> **語法鐵律：Expression 必須以反引號＋雙引號包裹**
+> Stage Expression Variable **不是**單純的字串代換。直接寫 `@${PROJECT_ROOT}/publish/...@` 時，USD 會將其視為一段**字面路徑**，變數完全不會展開，解析必定失敗且不報錯。
+>
+> 合法的 Expression 必須以反引號（`` ` ``）包裹一則字串運算式：
+>
+> ```usda
+> # ✗ 錯誤：變數不會展開，被當成字面檔名
+> references = @${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd@
+>
+> # ✓ 正確：反引號內為字串運算式，變數於解析時展開
+> references = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@
+> ```
+>
+> 本專案的參考實作 [`projectrootvariable.py`](../tools/outputprocessors/projectrootvariable.py) 產出的即為此合法形式，變數名統一為 **`PROJECT_ROOT`**。
+
+> [!WARNING]
+> **適用範圍限於 Composition Arcs**
+> Expression Variable 的展開時機發生在**合成（Composition）階段**，因此其適用對象為 `subLayers`、`references`、`payload` 等組合弧的 asset path，以及 variant selection。
+>
+> 對於一般的 **asset 型屬性值**（如 `DomeLight` 的 `inputs:texture:file`、`OpenVDBAsset` 的 `filePath`、Shader 的貼圖路徑），是否支援 Expression **隨 OpenUSD 版本而異**，不可預設可用。Pipeline 應遵守：
+> - **優先以 Output Processor 於輸出時直接寫入已解析的絕對路徑**，而非留下 Expression。
+> - 若確有需求在屬性值上使用變數，**必須在工作室實際部署的 OpenUSD 版本上實測驗證**後才納入規範。
+> - 貼圖與快取類的外部路徑，建議改以獨立的 Asset Resolver 或 search path 機制處理，與 Composition 層的 `${PROJECT_ROOT}` 分開治理。
 
 #### 傳統硬編碼絕對路徑的致命缺陷
 在過去，引用專案外部 Asset 庫（如全域場景陳設或跨部門快取）時，若直接硬編碼全域絕對路徑（如 `@/projects/show_A/publish/...@`）：
@@ -303,7 +344,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
    - 在 ROP 輸出寫出檔案的瞬間，Output Processor 掃描所有外連路徑，**凡是符合目前專案根目錄前綴的路徑，一律自動替換為 Stage Expression Variable 語法**：
      ```text
      原始寫入路徑：/projects/show_A/publish/assets/props/chair/asset_latest.usd
-     Output Processor 轉換後：@${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@
+     Output Processor 轉換後：@`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@
      ```
 2. **Layer Metadata 自動賦值預設變數**：
    - Output Processor 同時會在輸出的 USD Layer Metadata 中，將當前環境的變數預設值寫入：
@@ -312,7 +353,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
      (
          defaultPrim = "ROOT"
          expressionVariables = {
-             string PROJ_ROOT = "/projects/show_A"
+             string PROJECT_ROOT = "/projects/show_A"
          }
      )
      ```
@@ -322,14 +363,14 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 當專案目錄需要遷移、或者交付外部客戶承接時（只要內部相對目錄結構維持一致），**完全無需修改或重寫任何歷史發布的 USD 檔案**，只需透過以下任一簡潔方式：
 
 * **方式 A：在 Houdini Solaris 中覆寫 Expression Variable**
-  - 在 Solaris LOP 流程的根節點或 Project Settings 中，直接指定新的 `PROJ_ROOT` 變數（例如 `/client_mount/show_A`）。
+  - 在 Solaris LOP 流程的根節點或 Project Settings 中，直接指定新的 `PROJECT_ROOT` 變數（例如 `/client_mount/show_A`）。
 * **方式 B：建立極簡的 Wrapper USD 圖層包裹**
   - 建立一個僅有數行、配置好新變數的 `wrapper.usda`，透過 `subLayers` 將下游發布場景引入：
     ```usda
     #usda 1.0
     (
         expressionVariables = {
-            string PROJ_ROOT = "/client_mount/show_A"  # 宣告新的專案根路徑
+            string PROJECT_ROOT = "/client_mount/show_A"  # 宣告新的專案根路徑
         }
         subLayers = [
             @./publish/shots/sq01/sh010/shot.usd@      # 引入原有場景
@@ -337,7 +378,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
     )
     ```
   - **根據 OpenUSD Composition 規則，最強層（最外層 Wrapper）所宣告的 `expressionVariables` 會直接覆寫所有弱層（下游所有圖層）的同名變數！**
-  - 這意味著**只需在最外層指定一次新路徑，底下一整批成千上萬個 USD 圖層中引用的 `${PROJ_ROOT}` 將瞬間一口氣全局切換為新路徑**，達成極致的靈活性與可維護性。
+  - 這意味著**只需在最外層指定一次新路徑，底下一整批成千上萬個 USD 圖層中引用的 `${PROJECT_ROOT}` 將瞬間一口氣全局切換為新路徑**，達成極致的靈活性與可維護性。
 
 #### 官方參考實作與工具
 本專案提供完整的 Solaris USD Output Processor 實作腳本與測試：
@@ -484,7 +525,7 @@ def Xform "ROOT" (
 
     # 【包外引用】：由 Output Processor 自動改寫為 Stage Expression Variable
     def Xform "GroundCollider" (
-        references = @${PROJ_ROOT}/publish/assets/env/cliff/asset_latest.usd@</ROOT>
+        references = @`"${PROJECT_ROOT}/publish/assets/env/cliff/asset_latest.usd"`@</ROOT>
     ) {}
 }
 ```

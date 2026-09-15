@@ -91,7 +91,7 @@
 ```usda
 # 藝術家將 chair 載入並重命名為 HeroArmChair，語意高度貼合場景
 def Xform "HeroArmChair" (
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
     double3 xformOp:translate = (120, 0, 45)
@@ -109,7 +109,7 @@ def Xform "HeroArmChair" (
 # 透過 Loader 載入之多個實例
 def Xform "Chair_01" (
     instanceable = true
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
     double3 xformOp:translate = (0, 0, 0)
@@ -118,7 +118,7 @@ def Xform "Chair_01" (
 
 def Xform "Chair_02" (
     instanceable = true
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 )
 {
     double3 xformOp:translate = (150, 0, 0)
@@ -146,7 +146,7 @@ def Xform "Chair_02" (
 def Xform "OfficeChair_01" (
     # 預設自動注入：/__CLASS__/chair
     inherits = </__CLASS__/chair>
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 ) {}
 ```
 
@@ -161,7 +161,7 @@ def Xform "OfficeChair_01" (
         </__CLASS__/wooden_props>,
         </__CLASS__/interior_dressing>
     ]
-    payload = @${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd@</ROOT>
+    payload = @`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`@</ROOT>
 ) {}
 ```
 
@@ -201,7 +201,8 @@ class "_class_wooden_props"
    # Solaris Python Script / LOP Callback
    stage = hou.node(".").stage()
    prim_path = "/ROOT/Environment/Props/chair_01"
-   asset_usd_path = "${PROJ_ROOT}/publish/assets/props/chair/asset_latest.usd"
+   # Expression Variable 必須以反引號包裹字串運算式，否則不會展開
+   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/chair/asset_latest.usd"`'
    
    # 1. 建立 Prim 並指派 kind
    prim = stage.DefinePrim(prim_path, "Xform")

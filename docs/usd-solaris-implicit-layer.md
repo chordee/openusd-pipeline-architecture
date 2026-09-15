@@ -125,8 +125,8 @@ USD ROP (Output Processor)
    - 逐一比對每個圖層的目標磁碟路徑：是否位在當前任務所允許的發布資料夾底下的 `./layers/` 子目錄？
    - **一旦偵測到輸出路徑不符規範（例如產生未規範的匿名圖層實體化檔、或路徑外溢到非預期資料夾），立即拋出例外中止輸出（Abort Export）**。
 2. **專案根目錄替換為 Stage Expression Variable（可攜性保證）**：
-   - 掃描所有外連圖層的絕對路徑，凡命中目前專案根目錄（如 `/projects/show_A/`）者，自動改寫為 `@${PROJ_ROOT}/...@`。
-   - 同時在導出的 Layer Metadata 中宣告預設的 `expressionVariables = { string PROJ_ROOT = "..." }`，使整批發布的 USD 在未來專案搬遷或交接客戶時，能透過最外層 Wrapper 圖層一鍵全局覆寫。
+   - 掃描所有外連圖層的絕對路徑，凡命中目前專案根目錄（如 `/projects/show_A/`）者，自動改寫為 ``@`"${PROJECT_ROOT}/..."`@``。
+   - 同時在導出的 Layer Metadata 中宣告預設的 `expressionVariables = { string PROJECT_ROOT = "..." }`，使整批發布的 USD 在未來專案搬遷或交接客戶時，能透過最外層 Wrapper 圖層一鍵全局覆寫。
 
 * **致命痛點（為什麼仍需前置防禦）**：
   - **輸出已至最後階段**：當 Output Processor 觸發時，通常已經點擊了 Render / Export，甚至場景已經送往 Farm 進行背景算圖。
