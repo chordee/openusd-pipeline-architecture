@@ -31,11 +31,16 @@
     framesPerSecond = 24
     startTimeCode = 1        # 含前後手把的完整範圍
     endTimeCode = 100
+    # 四個部門 Master 各為獨立包裝單元，故一律以專案變數作跨包絕對引用
     subLayers = [
-        @./layers/lighting.usd@,     # [0] 最強：燈光、渲染設定與全場外觀覆寫
-        @./layers/fx.usd@,           # [1] 次強：特效模擬、破碎與角色接管
-        @./layers/anim.usd@,    # [2] 中等：角色骨架動態、攝影機與道具動畫
-        @./layers/environment.usd@   # [3] 最弱：世界舞台、建築與 Set Dressing
+        # [0] 最強：燈光、渲染設定與全場外觀覆寫
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/lighting/Lighting_master/lighting_latest.usda"`@,
+        # [1] 次強：特效模擬、破碎與角色接管
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/fx/Fx_master/fx_latest.usda"`@,
+        # [2] 中等：角色骨架動態、攝影機與道具動畫
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/Anim_master/anim_latest.usda"`@,
+        # [3] 最弱：世界舞台、建築與 Set Dressing
+        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/environment/Environment_master/environment_latest.usda"`@
     ]
 )
 
@@ -45,6 +50,10 @@ def Xform "ROOT" (
 {
 }
 ```
+
+> [!IMPORTANT]
+> **部門 Master 是包外引用，不得寫成相對路徑**
+> 四個部門 Master 與 `Shot` 分屬**不同的包裝單元**，彼此引用即為包外引用，依[路徑雙重標準](usd-publish-packaging.md)必須使用絕對路徑並由 Output Processor 變數化。若寫成 `@./layers/lighting.usd@`，等於宣稱 Master 是 `Shot` 包內的檔案——一旦該部門單獨重新發布，鏈結即告失效。
 
 ---
 
