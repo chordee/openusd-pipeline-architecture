@@ -135,13 +135,13 @@ def Xform "Chair_02" (
    - `Instanceable Xform`：適合幾十到幾百個由藝術家手工擺放、需各別精準旋轉微調或獨立切換 Variant 的場景道具。
 
 > [!CAUTION]
-> **勾選 `instanceable` 即等同放棄一切內部覆寫能力**
+> **勾選 `instanceable` 放棄的是「逐實例覆寫」，不是全部的覆寫能力**
 > Instance 內部為 Instance Proxy，**不可 author 任何 opinion**。一旦標記 `instanceable`：
-> - 下游（Lighting、FX）**無法** `over` 進 Asset 內部改單一 Mesh 的材質或可見度，只能整顆實例開關。
-> - §5 的 Class 往下走廣播**完全失效**（其 `over` 全數落在 Prototype 內部）。
-> - `inherits` 本身參與 Prototype 識別，**不同的 Class 標籤組合會產生不同 Prototype**，標籤加得越雜、共享率越低。
+> - 下游（Lighting、FX）**無法**以 `over` 進入 Asset 內部改單一 Mesh 的材質或可見度——`OverridePrim()` 會直接拋出編輯驗證錯誤，只能整顆實例開關。
+> - **但 [§5.5 的 Class 廣播不受此限](#5-穿透-instanceableinherit-是唯一的覆寫途徑)**：`inherits` 的意見是 Prototype 組合的一部分，而非施加於 Instance Proxy 的外部覆寫，因此穿透生效。這是 Instanceable Asset **唯一**的內部覆寫途徑。
+> - 代價是 `inherits` 參與 Prototype 識別：**攜帶意見的 Class 標籤會使 Prototype 分裂**，標籤組合越多、共享率越低。
 >
-> 因此 Loader 介面應明確提示此取捨：**記憶體效益與內部可覆寫性無法兼得**。凡預期會被下游細部覆寫的實例，一律不得勾選。
+> 因此 Loader 介面應如此提示取捨：需要「**只改這一顆**」的實例不得勾選；需要「**改全部同類**」則應勾選並改用 Class 廣播。
 
 ---
 
@@ -249,6 +249,72 @@ class "__CLASS__"
 * **高內聚分類**：Class 在 USD 中不佔用空間實體，也不干擾階層的 Transform 幾何運算，是純粹的語意標籤。
 * **Relationship 目標不重映射**：`inherits` 與 Reference 不同，屬同一命名空間內的組合弧，**Class 內的 relationship 目標路徑不會被重映射**。因此可直接指向鏡頭層級的共用材質（如 `/ROOT/Lighting/Materials/...`），這正是廣播機制得以運作的關鍵。
 
+### 4. `/__CLASS__` 必須以 `class` 指示符宣告
+
+Class 命名空間的根**一律以 `class` 指示符建立**，不得使用 `def` 或 `over`。Pipeline 應在 Stage 初始化時預設建立，使藝術家不會在任何情境下意外以 `def` 生成它：
+
+```python
+stage.CreateClassPrim("/__CLASS__")     # 指示符為 class，IsAbstract() == True
+```
+
+差別不只是語意。`class` 指示符使該 Prim 成為**抽象（Abstract）**，而 USD 預設的 Stage 走訪**直接跳過抽象 Prim**：
+
+| 指示符 | `IsAbstract()` | 預設 `Stage.Traverse()` |
+| :--- | :---: | :---: |
+| `class` | `True` | **跳過** |
+| `def` | `False` | 走訪 |
+
+> [!CAUTION]
+> **誤用 `def` 會讓 Class 成為真實場景內容**
+> 一旦 `/__CLASS__` 以 `def` 宣告，它就是一顆貨真價實的 Prim：渲染器會走訪它、匯出工具會帶上它、QC 腳本會把它算進 Prim 統計、包圍盒計算會納入它的子階層，Outliner 中也會多出一棵與製作無關的樹。而 Class 底下掛的往往是 `over` 片段與材質綁定，被當成實體內容處理將產生難以歸因的錯誤。
+>
+> `class` 的抽象性在 Flatten 後依然保留，因此發布包中的 Class 不會汙染下游。
+
+### 5. 穿透 Instanceable：`inherit` 是唯一的覆寫途徑
+
+設為 `instanceable = true` 的 Prim，其後代在命名空間中是 **Instance Proxy**——**唯讀，無法被 `over`**：
+
+```python
+stage.OverridePrim("/World/ChairA/Model/Frame")   # 拋出 _ValidateEditing 錯誤
+```
+
+但 `inherit` 的 Class 意見是**原型（Prototype）組合的一部分**，而非施加於實例代理的外部覆寫。因此它**穿透 Instanceable 生效**，且精準落在指定路徑上：
+
+```usda
+class "__CLASS__"
+{
+    class "wooden_props"
+    {
+        over "Model"
+        {
+            over "Frame"
+            {
+                token visibility = "invisible"   # 全場 wooden_props 的木框隱形
+            }
+        }
+    }
+}
+```
+
+實測結果：所有繼承 `wooden_props` 的椅子，其 `Model/Frame` 皆轉為 `invisible`，而同層的 `Model/Seat` 完全不受影響——即使這些椅子全都是 Instanceable。
+
+> [!IMPORTANT]
+> **這是 Instanceable Asset 唯一的內部覆寫途徑**
+> 下游若需要調整 Instanceable Asset 的內部結構，唯一的合法手段就是編輯它所繼承的 Class。放棄 `instanceable` 以換取可覆寫性，代價是喪失整個 Asset 的實例化記憶體效益——絕大多數情境下，改用 Class 廣播才是正解。
+
+> [!CAUTION]
+> **標籤不是免費的：攜帶意見的標籤會使原型分裂**
+> 原型的共用與否取決於實例的組合結構，`inherits` 清單即為其中一部分。實測三把 Instanceable 椅子：
+>
+> | 情境 | 原型數 |
+> | :--- | :---: |
+> | 三把標籤完全相同 | 1 |
+> | 其中一把多掛一個**空的**標籤 | 1 |
+> | 其中一把多掛一個**帶有意見的**標籤 | **2** |
+>
+> 換言之，標籤在尚未攜帶意見時幾乎無成本；一旦某個 Class 被寫入實質意見，掛載該標籤的實例即與其餘實例分屬不同原型。**實例化的記憶體效益會按實際生效的標籤組合數切分**——這是廣播式治理的真實代價，大規模場景中規劃標籤體系時必須納入考量。
+
+
 ---
 
 ## 6. DCC 實作對照指引（以 Houdini Solaris 為例）
@@ -298,6 +364,7 @@ class "__CLASS__"
 | **載入範圍** | 全發布元素皆可載入 | 涵蓋 Asset、SetDressing Assembly、FX Element、Pure USD Unit |
 | **USD 合成弧** | 嚴格維持原生 Composition Arcs | 僅使用 `Payload`、`Reference`、`Sublayer`，絕不搞專有節點 |
 | **擺放路徑** | 自由自訂 Target Prim Path | 擺脫檔名強綁定，完美發揮發布端 `/ROOT` 解耦彈性 |
-| **實例化** | 支援 `instanceable = true`，但與內部覆寫互斥 | 達成 Stage 原生記憶體共享；預期被下游細部覆寫者不得勾選 |
+| **實例化** | 支援 `instanceable = true`，排除逐實例覆寫但不排除 Class 廣播 | 達成 Stage 原生記憶體共享；需逐顆覆寫者不得勾選，需整類覆寫者改走 Class |
 | **繼承標籤** | 預設 `/__CLASS__/{name}`，允許自訂追加 | 達成廣播式屬性覆寫與多重語意標籤管理 |
 | **廣播寫法** | 意見一律往下走至目標 Prim，嚴禁寫在 Class 根上 | 保留 Asset 自身材質層次；須留意綁定優先序因此反轉 |
+| **Class 根宣告** | `/__CLASS__` 一律以 `class` 指示符建立，由 Pipeline 預設產生 | 抽象 Prim 不被預設 `Traverse()` 走訪，不汙染渲染、匯出與統計 |

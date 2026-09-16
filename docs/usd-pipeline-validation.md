@@ -107,6 +107,7 @@
 | **Shot 部門圖層未污染 `/ROOT`** | 部門圖層在 `/ROOT` 上無任何屬性或元數據意見 | 攔阻 | 同上 |
 | **`kind` 階層狀況** | 列出所有掉出 Model Hierarchy 的 model 及其斷點 | **報告** | [`usdkind` 治理](usd-asset-layer.md) |
 | **已聲明能力未失效** | 已指定 `drawMode` 等 Model 能力的 Prim，其 Model Hierarchy 實際有效 | 攔阻 | 同上 |
+| **Class 根為抽象 Prim** | `/__CLASS__` 以 `class` 指示符宣告，非 `def` | 攔阻 | [Class Inherits 機制](usd-asset-loader.md) |
 
 ### 2. 材質與綁定
 
