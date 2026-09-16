@@ -45,6 +45,21 @@ _SKIN_PROPERTIES = (
 )
 
 
+
+def _prepend_api_schema(spec: Sdf.PrimSpec, schema: str) -> None:
+    """Add ``schema`` to ``spec``'s applied API schemas without clobbering others.
+
+    Prepend, never explicit: an explicit list op replaces the weaker layer's
+    ``apiSchemas`` wholesale, silently dropping ``MaterialBindingAPI`` and every
+    other API schema the geometry package applied.
+    """
+    existing = spec.GetInfo("apiSchemas") if spec.HasInfo("apiSchemas") else None
+    prepended = list(existing.prependedItems) if existing else []
+    if schema not in prepended:
+        prepended.insert(0, schema)
+    spec.SetInfo("apiSchemas", Sdf.TokenListOp.Create(prependedItems=prepended))
+
+
 class SkelBinding:
     """One ``SkelRoot``'s resolved skeleton / animation / mesh / blendshape graph."""
 
@@ -68,6 +83,7 @@ class CharacterSplitter:
     def __init__(self, stage: Usd.Stage):
         self._stage = stage
         self._bindings: Optional[List[SkelBinding]] = None
+        self._flat: Optional[Sdf.Layer] = None
 
     # -- discovery ---------------------------------------------------------
 
@@ -129,7 +145,7 @@ class CharacterSplitter:
 
         for binding in self.bindings():
             self._copy_subtree(layer, binding.skeleton_path)
-            self._drop_nested_animations(layer, binding.skeleton_path)
+            self._drop_animation(layer, binding.anim_path)
             self._repoint_animation_source(layer, binding)
 
             for bs_path in binding.blend_shape_paths:
@@ -177,20 +193,38 @@ class CharacterSplitter:
             if source and source.GetTypeName():
                 spec.typeName = source.GetTypeName()
 
+    def _source_layer(self) -> Sdf.Layer:
+        """The composed stage flattened into one layer, cached.
+
+        ``Sdf.CopySpec`` is not composition-aware: it copies only the specs
+        authored in the layer it is handed. A character whose skeleton or
+        geometry arrives through a reference, payload, sublayer or variant has
+        no such specs in the stage's root layer, and the copy raises "cannot
+        copy unknown spec". Flattening first gives every composed prim a real
+        spec at the same path.
+        """
+        if self._flat is None:
+            self._flat = self._stage.Flatten()
+        return self._flat
+
     def _copy_subtree(self, layer: Sdf.Layer, path: Sdf.Path) -> None:
         self._ensure_ancestors(layer, path)
         Sdf.CreatePrimInLayer(layer, path)
-        Sdf.CopySpec(self._stage.GetRootLayer(), path, layer, path)
+        if not Sdf.CopySpec(self._source_layer(), path, layer, path):
+            raise RuntimeError("failed to copy spec at {}".format(path))
 
-    def _drop_nested_animations(self, layer: Sdf.Layer, skeleton_path: Sdf.Path) -> None:
-        """Remove Animation prims the subtree copy dragged in — they belong to anim."""
-        source = self._stage.GetPrimAtPath(skeleton_path)
-        for child in source.GetChildren():
-            if not child.IsA(UsdSkel.Animation):
-                continue
-            spec = layer.GetPrimAtPath(child.GetPath())
-            if spec:
-                spec.nameParent.nameChildren.remove(spec.name)
+    def _drop_animation(self, layer: Sdf.Layer, anim_path: Optional[Sdf.Path]) -> None:
+        """Remove the Animation prim the subtree copy dragged in — it belongs to anim.
+
+        Keyed off the resolved ``anim_path`` rather than the Skeleton's direct
+        children, so an Animation nested any number of levels down (say
+        ``/ROOT/Skel/Rig/Anim``) is still removed.
+        """
+        if not anim_path:
+            return
+        spec = layer.GetPrimAtPath(anim_path)
+        if spec:
+            del spec.nameParent.nameChildren[spec.name]
 
     def _repoint_animation_source(self, layer: Sdf.Layer, binding: SkelBinding) -> None:
         """Retarget rather than clear ``skel:animationSource``.
@@ -202,6 +236,9 @@ class CharacterSplitter:
         if not binding.anim_path:
             return
         spec = layer.GetPrimAtPath(binding.skeleton_path)
+        # SkelBindingAPI may have been applied on an ancestor rather than the
+        # Skeleton itself; without it here the relationship below is inert.
+        _prepend_api_schema(spec, "SkelBindingAPI")
         rel = spec.relationships.get("skel:animationSource")
         if rel is None:
             rel = Sdf.RelationshipSpec(spec, "skel:animationSource", False)
@@ -223,7 +260,7 @@ class CharacterSplitter:
         spec.specifier = Sdf.SpecifierDef
         if source.GetTypeName():
             spec.typeName = source.GetTypeName()
-        spec.SetInfo("apiSchemas", Sdf.TokenListOp.CreateExplicit(["SkelBindingAPI"]))
+        _prepend_api_schema(spec, "SkelBindingAPI")
 
         for name in _SKIN_PROPERTIES:
             attr = source.GetAttribute(name)

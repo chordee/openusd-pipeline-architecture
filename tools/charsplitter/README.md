@@ -15,9 +15,15 @@
 
 這條分界與 OpenUSD 自身的 Schema 切分一致：`BlendShape` 存放形狀 `offsets`、`SkelAnimation` 存放 `blendShapeWeights`；`Skeleton` 存放 `restTransforms`、`SkelAnimation` 存放每幀 transforms。實務效益是靜態資料體積大而變動少，時序資料才是動畫師反覆迭代的對象——分開後重發動畫無須重寫靜態層。
 
+> [!IMPORTANT]
+> **來源 Stage 會先 Flatten**
+> `Sdf.CopySpec` **不具備 Composition 感知能力**——它只複製所交付 Layer 中已寫入的 spec。真實角色的骨架與幾何多半經 Reference 或 Payload 帶入，Root Layer 根本沒有對應 spec，複製會直接拋出 `cannot copy unknown spec`。因此工具內部先 `Stage.Flatten()`（結果快取），再以該 Layer 作為所有複製的來源。
+>
+> Stage Metadata 仍由 Root Layer 取得——依 OpenUSD 定義，它只記錄於 Root 或 Session Layer。
+
 `char_splitter.py` 負責執行這項拆分，並處理[骨架拆分的五個靜默陷阱](../../docs/usd-asset-layer.md)：
 
-1. **綁定關係是命名空間繼承的**：`skel:skeleton` 與 `skel:animationSource` 可能只寫在 `SkelRoot` 上。工具在拆出的 Mesh 上**顯式重建** `SkelBindingAPI` 與 `skel:skeleton`，不倚賴繼承。
+1. **綁定關係是命名空間繼承的**：`skel:skeleton` 與 `skel:animationSource` 可能只寫在 `SkelRoot` 上。工具在拆出的 Mesh **與 Skeleton** 上**顯式重建** `SkelBindingAPI` 與對應關係，不倚賴繼承。`apiSchemas` 一律以 **prepend** 寫入——explicit list op 會整份取代較弱層的清單，靜默移除 `MaterialBindingAPI` 等既有 API Schema。
 2. **無型別祖先會使發現失效**：`UsdSkel.Cache` 會靜默跳過無型別 Prim 之下的蒙皮目標，故建立祖先 spec 時一併帶上其合成型別。
 3. **`skel:joints` 漏複製會綁到錯誤的關節**：明確納入複製清單。
 4. **`skinningMethod` 預設為 `classicLinear`**：非預設值（如 `dualQuaternion`）明確複製。
@@ -69,4 +75,6 @@ skel_layer, anim_layer = splitter.split("skel.usda", "anim.usda")
 hython -m unittest discover -s tools/charsplitter/tests -v
 ```
 
-測試涵蓋上述五個陷阱各一項，並包含一項**重新合成驗證**：將拆出的兩層與原始幾何層疊回，確認 `UsdSkel.Cache` 能完整解析 skeleton、`animationSource` 與蒙皮目標。
+測試共 13 項，涵蓋上述陷阱、經 Reference 帶入骨架的角色、巢狀於 Skeleton 之下的 `SkelAnimation`，以及 `apiSchemas` 的保留。
+
+重新合成驗證刻意以**僅含幾何的 Layer** 作為最弱層（而非原始來源的完整副本）——否則來源會補回拆分輸出遺漏的內容，使驗證失去意義。

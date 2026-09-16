@@ -72,6 +72,59 @@ def build_character(path, skinning_method="dualQuaternion", per_mesh_joints=None
     return stage
 
 
+def build_geometry_only(path):
+    """The geometry package as published: meshes, no skeleton and no binding.
+
+    Used as the weakest layer when recomposing, so the skeleton, animation and
+    binding can only come from the split outputs — a full copy of the source
+    would mask anything the split dropped.
+    """
+    stage = Usd.Stage.CreateNew(path)
+    root = stage.DefinePrim("/ROOT", "SkelRoot")
+    stage.SetDefaultPrim(root)
+    stage.DefinePrim("/ROOT/Geometry", "Xform")
+    mesh = UsdGeom.Mesh.Define(stage, "/ROOT/Geometry/Body")
+    mesh.CreatePointsAttr([Gf.Vec3f(0, 0, 0), Gf.Vec3f(1, 0, 0)])
+    mesh.GetPrim().ApplyAPI("MaterialBindingAPI")
+    stage.Save()
+    return stage
+
+
+def build_referenced_character(outer_path, inner_path):
+    """A character whose rig arrives through a reference, as in production.
+
+    ``Sdf.CopySpec`` sees no specs for referenced prims in the root layer, so
+    this is the case that a non-composition-aware copy fails on.
+    """
+    inner = Usd.Stage.CreateNew(inner_path)
+    inner_root = UsdSkel.Root.Define(inner, "/ROOT")
+    inner.SetDefaultPrim(inner_root.GetPrim())
+    skel = UsdSkel.Skeleton.Define(inner, "/ROOT/Skel")
+    skel.CreateJointsAttr(["Hips"])
+    skel.CreateBindTransformsAttr([Gf.Matrix4d(1)])
+    skel.CreateRestTransformsAttr([Gf.Matrix4d(1)])
+    inner.DefinePrim("/ROOT/Geometry", "Xform")
+    mesh = UsdGeom.Mesh.Define(inner, "/ROOT/Geometry/Body")
+    mesh.CreatePointsAttr([Gf.Vec3f(0, 0, 0)])
+    mesh_binding = UsdSkel.BindingAPI.Apply(mesh.GetPrim())
+    mesh_binding.CreateJointIndicesPrimvar(False, 1).Set(Vt.IntArray([0]))
+    mesh_binding.CreateJointWeightsPrimvar(False, 1).Set(Vt.FloatArray([1.0]))
+    inner.Save()
+
+    outer = Usd.Stage.CreateNew(outer_path)
+    root = outer.OverridePrim("/ROOT")
+    root.GetReferences().AddReference(inner_path, "/ROOT")
+    outer.SetDefaultPrim(root)
+    anim = UsdSkel.Animation.Define(outer, "/ROOT/AnimData")
+    anim.CreateJointsAttr(["Hips"])
+    anim.CreateRotationsAttr().Set([Gf.Quatf(1)], 1.0)
+    root_binding = UsdSkel.BindingAPI.Apply(root)
+    root_binding.CreateSkeletonRel().SetTargets(["/ROOT/Skel"])
+    root_binding.CreateAnimationSourceRel().SetTargets(["/ROOT/AnimData"])
+    outer.Save()
+    return outer
+
+
 class CharSplitterTest(unittest.TestCase):
 
     def setUp(self):
@@ -106,7 +159,7 @@ class CharSplitterTest(unittest.TestCase):
         rel = mesh.relationships.get("skel:skeleton")
         self.assertIsNotNone(rel, "skel:skeleton must be authored on the mesh itself")
         self.assertEqual(list(rel.targetPathList.explicitItems), [Sdf.Path("/ROOT/Skel")])
-        self.assertIn("SkelBindingAPI", mesh.GetInfo("apiSchemas").explicitItems)
+        self.assertIn("SkelBindingAPI", mesh.GetInfo("apiSchemas").prependedItems)
 
     def test_non_default_skinning_method_survives(self):
         _, skel_layer, _ = self._split(skinning_method="dualQuaternion")
@@ -159,12 +212,15 @@ class CharSplitterTest(unittest.TestCase):
     # -- round trip --------------------------------------------------------
 
     def test_recomposition_resolves_full_binding(self):
-        stage, skel_layer, anim_layer = self._split()
+        _, skel_layer, anim_layer = self._split()
+        geo_path = os.path.join(self.tmp, "geo.usda")
+        geometry = build_geometry_only(geo_path)
+
         composed = Usd.Stage.CreateInMemory()
         composed.GetRootLayer().subLayerPaths = [
             anim_layer.identifier,
             skel_layer.identifier,
-            stage.GetRootLayer().identifier,
+            geometry.GetRootLayer().identifier,
         ]
 
         cache = UsdSkel.Cache()
@@ -183,6 +239,63 @@ class CharSplitterTest(unittest.TestCase):
         mesh = targets[0].GetPrim()
         self.assertEqual(mesh.GetAttribute("primvars:skel:skinningMethod").Get(),
                          "dualQuaternion")
+
+    def test_preserves_api_schemas_from_weaker_layer(self):
+        """An explicit apiSchemas list op would drop MaterialBindingAPI."""
+        _, skel_layer, anim_layer = self._split()
+        geometry = build_geometry_only(os.path.join(self.tmp, "geo.usda"))
+
+        composed = Usd.Stage.CreateInMemory()
+        composed.GetRootLayer().subLayerPaths = [
+            anim_layer.identifier,
+            skel_layer.identifier,
+            geometry.GetRootLayer().identifier,
+        ]
+        mesh = composed.GetPrimAtPath("/ROOT/Geometry/Body")
+        applied = mesh.GetMetadata("apiSchemas").GetAppliedItems()
+        self.assertIn("SkelBindingAPI", applied)
+        self.assertIn("MaterialBindingAPI", applied)
+
+    # -- composition-aware copying -----------------------------------------
+
+    def test_splits_character_whose_rig_arrives_by_reference(self):
+        """Sdf.CopySpec sees no specs for referenced prims in the root layer."""
+        stage = build_referenced_character(
+            os.path.join(self.tmp, "outer.usda"),
+            os.path.join(self.tmp, "inner.usda"))
+        splitter = CharacterSplitter(stage)
+        self.assertEqual(len(splitter.bindings()), 1)
+
+        skel_layer, anim_layer = splitter.split(self.skel_path, self.anim_path)
+
+        skel_spec = skel_layer.GetPrimAtPath("/ROOT/Skel")
+        self.assertIsNotNone(skel_spec, "referenced Skeleton must survive the copy")
+        self.assertEqual(list(skel_spec.attributes["joints"].default), ["Hips"])
+
+        mesh_spec = skel_layer.GetPrimAtPath("/ROOT/Geometry/Body")
+        self.assertIsNotNone(mesh_spec)
+        self.assertIn("primvars:skel:jointWeights", mesh_spec.attributes)
+        self.assertIsNotNone(anim_layer.GetPrimAtPath("/ROOT/AnimData"))
+
+    def test_drops_animation_nested_below_the_skeleton(self):
+        """The Animation may sit several levels under the Skeleton."""
+        stage = build_character(self.src)
+        rig = stage.DefinePrim("/ROOT/Skel/Rig", "Xform")
+        nested = UsdSkel.Animation.Define(stage, "/ROOT/Skel/Rig/Anim")
+        nested.CreateJointsAttr(["Hips", "Hips/Spine"])
+        nested.CreateRotationsAttr().Set([Gf.Quatf(1)] * 2, 1.0)
+        UsdSkel.BindingAPI(stage.GetPrimAtPath("/ROOT")).CreateAnimationSourceRel(
+        ).SetTargets([nested.GetPath()])
+        self.assertTrue(rig.IsValid())
+
+        splitter = CharacterSplitter(stage)
+        self.assertEqual(splitter.bindings()[0].anim_path,
+                         Sdf.Path("/ROOT/Skel/Rig/Anim"))
+
+        skel_layer, anim_layer = splitter.split(self.skel_path, self.anim_path)
+        self.assertIsNone(skel_layer.GetPrimAtPath("/ROOT/Skel/Rig/Anim"),
+                          "nested Animation must not survive into the skel layer")
+        self.assertIsNotNone(anim_layer.GetPrimAtPath("/ROOT/Skel/Rig/Anim"))
 
 
 if __name__ == "__main__":
