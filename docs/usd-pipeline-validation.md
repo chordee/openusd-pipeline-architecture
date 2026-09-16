@@ -128,7 +128,7 @@
 | **幾何零蒙皮資料** | 幾何發布單元內無 `primvars:skel:*` 或 `skel:skeleton` | 攔阻 | [角色 Asset 結構](usd-asset-layer.md) |
 | **`elementSize` 已設定** | `primvars:skel:jointIndices` / `jointWeights` 皆已明確宣告 `elementSize` | 攔阻 | 同上 |
 | **`SkelRoot` 邊界正確** | 所有被 skin 的 Mesh 皆位於 `SkelRoot` 之下 | 攔阻 | [Skel 設定指南](usd-skel-guide.md) |
-| **拆包後綁定關係未遺失** | `skel/` 包內的 Skeleton 與 Mesh 自身即帶有完整綁定，不倚賴已不存在的祖先繼承 | 攔阻 | [骨架拆分陷阱](usd-asset-layer.md) |
+| **拆包後綁定關係未遺失** | **於合成後的 Stage** 驗證 `UsdSkel.Cache` 解析得到全部蒙皮目標；對單一 sub 包查詢無意義 | 攔阻 | [骨架拆分陷阱](usd-asset-layer.md) |
 | **蒙皮輔助屬性已隨行** | 來源若有 `skel:joints` 或非預設的 `skinningMethod`，拆分產物亦須具備 | 攔阻 | 同上 |
 | **`animationSource` 目標路徑一致** | `skel/` 所指的 `SkelAnimation` 路徑與 `anim/` 實際提供者相符 | 報告 | 同上 |
 
