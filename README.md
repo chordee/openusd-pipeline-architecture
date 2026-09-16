@@ -121,4 +121,7 @@
 - **[Houdini Solaris Layer Inspector 檢測工具庫](tools/layerinspector/README.md)**：
   - **`layer_inspector.py`**：輸出前置檢查 Stage 圖層狀態，辨識隱式（Implicit）與顯式（Explicit）圖層、反查建立圖層的肇因 LOP 節點，並檢測無效 Sublayer 壞鏈。
   - 支援 Python Shell 終端排版報告（`print_summary()`）與 JSON 格式輸出。
+- **[角色動畫靜態／時序拆分工具](tools/charsplitter/README.md)**：
+  - **`char_splitter.py`**：將合成後的角色 Stage 拆為 `skel`（`Skeleton`、`BlendShape` 本體、蒙皮綁定）與 `anim`（`SkelAnimation` 時序）兩個 sub 單元，並處理綁定的命名空間繼承、`skel:joints` 重映射、非預設 `skinningMethod` 等會靜默出錯的環節。
+  - 僅依賴 `pxr`，不綁定任何 DCC；附含重新合成驗證的單元測試。
 
