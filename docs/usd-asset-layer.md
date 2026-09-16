@@ -782,6 +782,12 @@ def Xform "Controls" (
 }
 ```
 
+> [!CAUTION]
+> **匯出器不會替你標記控制器**
+> DCC 的 USD 匯出通常**原樣輸出**控制曲線（`BasisCurves` / `NurbsCurves`），既不設 `purpose` 也不設 `visibility`——在下游眼中它們就是可算圖的幾何。`purpose = "guide"` 必須由發布工具主動寫入。
+>
+> 另一項更隱蔽的：控制骨架常被匯出為**自成一組、未綁定任何 Mesh 的 `Skeleton` + `SkelAnimation`**。它們不承擔蒙皮職責，既不屬於 `skel/` 也不屬於 `anim/`，但會隨幾何層一併留存。拆包工具因此必須**依 Prim 型別**搜尋這類內容，而非僅依綁定清單——只看綁定清單會完全漏掉它們。
+
 > [!TIP]
 > **USD 原生的精簡替代方案：`constraintTargets`**
 > `UsdGeomModelAPI` 提供 `constraintTargets:<name>`（型別 `matrix4d`），專為「對外公開若干可供約束的座標」而設，無須搬運整套控制器階層：
@@ -869,7 +875,65 @@ def Xform "ROOT"
 > **`elementSize` 未設定是最常見的致命錯誤**
 > `jointIndices` / `jointWeights` 必須透過 `UsdGeomPrimvar.SetElementSize(n)` 明確宣告每點影響的 joint 數量，否則 imaging 端**無法切分每點影響數**，Skinning 結果錯亂。此項列為發布前 QC 必檢。詳見 [USD Skel 骨架動畫設定指南](usd-skel-guide.md)。
 
-### 5. 跨包引用 `latest` 的取捨
+### 5. 拆分與複製骨架資料的靜默陷阱
+
+將角色拆為 `skel/` 與 `anim/` 兩個 sub 單元、或以程式複製骨架資料時，以下五項全部**不會報錯**，只會讓變形安靜地錯掉。
+
+#### 一、綁定關係是命名空間繼承的
+
+`skel:skeleton` 與 `skel:animationSource` 皆為**命名空間繼承**。實測：僅在 `SkelRoot` 上套用 `SkelBindingAPI` 並指定兩者，Skeleton 與 Mesh 本身完全沒有該 Schema，解析依然成立。
+
+```text
+SkelRoot  有 SkelBindingAPI : True
+Skeleton  有 SkelBindingAPI : False   ← 自身沒有
+Mesh      有 SkelBindingAPI : False   ← 自身也沒有
+
+Skeleton 解析到的 animationSource : /ROOT/AnimData
+Mesh     解析到的 skeleton        : /ROOT/Skel
+```
+
+> [!CAUTION]
+> **`Sdf.CopySpec` 只複製 Prim 自身已寫入的意見**
+> 拆包時若逐 Prim 複製 Skeleton 或 Mesh，那些**繼承自祖先**的綁定關係不會隨行——來源明明正確，拆出來的包卻失去骨架連結。
+>
+> 對策：拆分後必須在目標 Prim 上**顯式 `Apply()` 並重建 relationship**，不能假設複製即完整。
+
+#### 二、`over` 層獨立開啟時走訪不到任何東西
+
+`over` 的 Prim `IsDefined() == False`，而 USD 預設的走訪判準要求 `IsDefined()`。實測三種寫法：
+
+| 層的寫法 | 獨立開啟時 `Stage.Traverse()` | 與幾何包合成後的 `typeName` |
+| :--- | :--- | :--- |
+| 純 `over` | **回傳空** | `Mesh` |
+| 無型別 `def` | 全數走訪得到 | `Mesh` |
+
+本架構的材質包與 `skel/` 包皆以 `over` 寫回幾何分支——**合成後完全正確**，但單獨開啟該包時，預設走訪回傳空集合，QC 工具會誤判為「空包」。
+
+> [!TIP]
+> **需要獨立驗證的拆分產物，改用無型別 `def`**
+> 不宣告 `typeName` 的 `def` 既可被預設走訪，合成時型別又仍由幾何包解析為 `Mesh`——兩者兼得。若不便改寫，則走訪時改用 `Usd.PrimAllPrimsPredicate`。
+
+#### 三、`skel:joints` 漏複製會綁到錯誤的關節
+
+`skel:joints`（`token[]`，uniform）是**該 Mesh 專屬**的關節順序／子集重映射。缺少它時，`primvars:skel:jointIndices` 的數值會被**靜默重新解釋**為索引完整骨架的 joint 清單——頂點綁到錯誤的關節，不報錯。
+
+#### 四、`primvars:skel:skinningMethod` 預設為 `classicLinear`
+
+允許值為 `classicLinear` 與 `dualQuaternion`，**未寫入時回落前者**。若來源使用 `dualQuaternion` 而複製時漏了此屬性，扭轉關節（肩、腕、脊椎）處的外觀會明顯不同，但整體看起來仍「像是對的」。
+
+#### 五、`skel:animationSource` 應重指而非清除
+
+拆出 `anim/` 層後，`skel/` 層中 Skeleton 的 `skel:animationSource` **不應清空**，而應重新指向 `anim/` 層中 `SkelAnimation` 的 Prim 路徑。
+
+該 relationship 的目標是**共同命名空間中的 Prim 路徑**，而非對某個檔案的引用。因此：
+
+- `anim/` 與 `skel/` 一經合成（Sublayer、Reference 或 Payload 皆可），關係自動接上
+- 未合成時僅為懸空目標，無害
+- 下游逐鏡頭替換 `anim/` 時，**只需保持 `SkelAnimation` 的 Prim 路徑一致**，無須重新寫入任何關係
+
+這正是靜態與時序得以乾淨分離、又不必犧牲可組合性的原因。
+
+### 6. 跨包引用 `latest` 的取捨
 
 `Geometry` 引用的是幾何材質角色的 **`asset_latest.usda`**（動態指標），而非鎖定的具體版次。這是刻意的選擇：
 
