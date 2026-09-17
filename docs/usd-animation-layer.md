@@ -7,10 +7,18 @@
 > [!IMPORTANT]
 > **30 秒核心架構觀念**
 > 1. **兩大元素分類**：
->    - **骨架角色動畫（Skeletal Character Animation）**：拆分為 `geo`、`skel` 與 `animation` 三部分。
->    - **幾何 Transform 動畫（Rigid Transform / Prop Animation）**：引用 Asset 後僅輸出時序空間矩陣。
-> 2. **極致輕量的本質**：
->    - 幾何網格（Mesh）早已在 **Asset 階段**發佈完畢，動畫層絕不重複導出頂點快取。
+>    - **骨架角色動畫（Skeletal Character Animation）**：發布為 `charAnim` 單元。
+>    - **幾何 Transform 動畫（Rigid Transform / Prop Animation）**：發布為 `propAnim` 單元。
+> 2. **所有動畫單元一律靜態／時序二分**：這是全篇貫穿的通則，兩類元素只是同一條軸上的兩個實例。
+>
+>    | 單元 | 靜態 sub | 時序 sub |
+>    | :--- | :--- | :--- |
+>    | `charAnim` | `skel`（關節拓樸、bind／rest、`BlendShape` 本體） | `anim`（joint transforms、`blendShapeWeights`） |
+>    | `propAnim` | `geo`（拓樸、UV、靜態點位） | `xform`（`xformOp` 時間樣本、變形點位） |
+>
+>    靜態資料體積大而變動少，時序資料才是動畫師反覆迭代的對象——分開後重發動畫無須重寫靜態層。
+> 3. **極致輕量的本質**：
+>    - 幾何網格（Mesh）早已在 **Asset 階段**發佈完畢，剛體動畫絕不重複導出頂點快取。
 >    - 骨架拓樸早已在 **Rig 階段**發佈完畢。
 >    - Animator 僅需輸出數據量極小的 **Joint 時序旋轉/平移陣列** 或 **Transform TimeSamples**。
 
@@ -218,24 +226,74 @@ over "ROOT"
 }
 ```
 
+### `propAnim` 單元的兩個 sub
+
+與 `charAnim` 同構，`propAnim` 亦為靜態／時序二分：
+
+```text
+anim/propAnim/<unit>/
+├── propAnim_latest.usda
+├── v001/
+│   └── propAnim.usd          <-- 總裝：以 /ROOT 為根，不知悉掛載位置
+├── geo/                      <-- 【靜態】拓樸、UV、靜態點位；無 latest
+│   └── v001/geo.usd
+└── xform/                    <-- 【時序】xformOp 時間樣本；無 latest
+    └── v001/xform.usd
+```
+
+**絕大多數道具不需要 `geo`**。剛體道具的幾何早已在 Asset 階段發布，單元只需 Reference 該 Asset 並交付 `xform`——這正是前一段範例的情形，也是 `propAnim` 輕量的來源。
+
+`geo` 存在，是為了**幾何無法來自靜態 Asset** 的情形：
+
+| 情境 | 為何需要 `geo` |
+| :--- | :--- |
+| 變形道具（旗幟、布幔、擠壓變形的球） | 形變無法以 `xformOp` 表達，靜態 Asset 給不出每幀的形狀 |
+| 動畫階段才產生的臨時幾何 | 尚未、也不會進入 Asset 流程 |
+| 拓樸與已發布 Asset 不同的替身 | 無法以覆寫嫁接回原 Asset |
+
+> [!IMPORTANT]
+> **變形道具的拆法：靜態拓樸進 `geo`，逐幀點位進 `xform`**
+> `Mesh` 的拓樸（`faceVertexCounts`、`faceVertexIndices`）、UV 與 bind 姿態的 `points` 屬於**靜態**，歸 `geo`；隨時間變化的 `points` 時間樣本屬於**時序**，與 `xformOp` 同歸 `xform`。
+>
+> 此拆法要求**拓樸在整段時間內固定不變**（fixed topology）。拓樸若逐幀改變，兩側的對應關係即告瓦解，該內容不屬於動畫單元，應改由 [FX Element](usd-fx-layer.md) 以 Value Clips 承載。
+
+
 ---
 
-## 3. 傳統快取 vs. USD Animation 儲存量對比
+## 3. 點位快取的正確定位：手段選型，而非好壞之分
 
-為什麼在傳統流程中動畫檔常常高達數十 GB，而 USD 卻能壓在數 MB？
+傳統流程的動畫檔常高達數十 GB，USD 卻能壓在數 MB——差別**不在於點位快取本身是落後手段**，而在於是否被誤用在能以更廉價方式表達的內容上。
 
-| 比較維度 | 傳統全幾何快取 (Point Cache / Deforming ABC) | 工業級 USD Animation 架構 |
+以角色為例，對照的是同一份表演的兩種表達：
+
+| 比較維度 | 全幾何點位快取 | 骨架時序（`charAnim`） |
 | :--- | :--- | :--- |
 | **儲存方式** | 每一格都將角色 50 萬頂點的 $(x,y,z)$ 座標完整烘焙寫入磁碟。 | 幾何留在 Asset；每格僅儲存 80 個骨架 Joint 的旋轉向量。 |
 | **磁碟佔用 (100 格)** | 約 **5 GB ~ 15 GB**。 | 約 **2 MB ~ 8 MB**（節省 99% 以上）。 |
 | **修改與重新發佈** | 稍微修改動作就必須重新烘焙巨型快取，網路傳輸極慢。 | Animator 秒級輸出幾 MB 的動態檔案，發佈與審閱無負擔。 |
 | **下游使用靈活性** | 幾何已死鎖，下游難以拆解骨架或替換 Mesh 拓樸。 | 下游可隨時替換高低模（Model Variant），骨架動態完全通用。 |
 
+這張表要說的是：**凡能以骨架或 `xformOp` 表達者，烘點位是純粹的浪費**——上表每一列都是代價，換不到任何東西。
+
+但反過來也成立：**真正的形變無法以骨架或 `xformOp` 表達**。旗幟在風中翻捲、布幔垂墜、球體撞擊時的擠壓，這些內容沒有等價的廉價表達，逐幀點位就是它唯一的載體。此時烘點位不是退步，而是唯一正確的手段。
+
+### 選型判準
+
+| 內容 | 手段 | 落點 |
+| :--- | :--- | :--- |
+| 位置／旋轉／縮放變化 | `xformOp` 時間樣本 | `propAnim` 的 `xform` |
+| 關節驅動的角色變形 | `SkelAnimation` | `charAnim` 的 `anim` |
+| 表情等具名形狀混合 | `blendShapeWeights` | 同上 |
+| **固定拓樸的真形變** | **逐幀 `points`** | **`propAnim` 的 `xform`** |
+| 逐幀拓樸改變（碎裂、流體） | Value Clips | [FX Element](usd-fx-layer.md) |
+
+判準只有一句：**先問這個變化能不能以更廉價的方式表達**；能，就不得烘點位；不能，就正當使用，並依靜態／時序拆入對應的 sub。
+
 ---
 
 ## 4. Pipeline 規範總結
 
-1. **嚴禁在動畫層寫入 Mesh 點位快取**：除非是無法以骨架或 BlendShape 表達的特殊穿透修正，否則一律禁止烘焙 Point Cache。
+1. **點位快取限定用於真形變**：凡能以 `xformOp`、`SkelAnimation` 或 `blendShapeWeights` 表達的變化，**一律不得烘焙 Point Cache**。真正的形變（固定拓樸的布料、旗幟、擠壓）則正當使用，並拆入 `propAnim` 的 `geo`／`xform` 兩個 sub；拓樸逐幀改變者不屬動畫單元，改由 FX Element 承載。判準詳見 §3。
 2. **統一 SkelRoot 邊界**：所有骨架角色必須包覆在 `SkelRoot` 節點內，確保即時預覽（Hydra）與離線渲染時能正確解算 Skinning。
 3. **`SkelBindingAPI` 必須顯式套用**：`skel:skeleton`、`skel:animationSource`、`skel:joints`、`primvars:skel:jointIndices` 等全系列屬性皆隸屬 `SkelBindingAPI` 這個 **Applied API Schema**。凡是承載這些屬性的 Prim（`SkelRoot`、`Skeleton`、被 skin 的 `Mesh`），都必須以 `prepend apiSchemas = ["SkelBindingAPI"]` 套用；**只寫屬性而未套用 Schema 是無效綁定**，Hydra 不會解算 Skinning 且 `usdchecker` 會報錯。發布前 QC 應列為必檢項。詳見：[USD Skel 骨架動畫設定指南](usd-skel-guide.md)。
 4. **時序資料集中**：攝影機與道具的動態屬性統一宣告為 `xformOp` 時間樣本，確保被 Lighting 或 FX 圖層引用時具備乾淨的時序插值（Interpolation）。
