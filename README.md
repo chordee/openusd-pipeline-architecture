@@ -121,6 +121,9 @@
 - **[Houdini Solaris Layer Inspector 檢測工具庫](tools/layerinspector/README.md)**：
   - **`layer_inspector.py`**：輸出前置檢查 Stage 圖層狀態，辨識隱式（Implicit）與顯式（Explicit）圖層、反查建立圖層的肇因 LOP 節點，並檢測無效 Sublayer 壞鏈。
   - 支援 Python Shell 終端排版報告（`print_summary()`）與 JSON 格式輸出。
+- **[道具動畫靜態／時序拆分工具](tools/pointcachesplitter/README.md)**：
+  - **`point_cache_splitter.py`**：將形變幾何拆為 `geo`（拓樸、UV、bind 點位）與 `xform`（點位與 `xformOp` 時間樣本）兩個 sub 單元，並逐幀重算 `extent`——USD 從不自動重算，留下靜態 `extent` 會使 frustum culling 與 `drawMode = "bounds"` 靜默取用錯誤的包圍盒。
+  - 主動驗證固定拓樸（`faceVertexCounts` 在 Schema 中為 varying，USD 允許逐幀拓樸而不報錯），並確保 `xformOpOrder` 隨 `xformOp` 時間樣本同行——少了它 USD 完全不評估 Transform，動畫靜默解析為單位矩陣。
 - **[角色動畫靜態／時序拆分工具](tools/charsplitter/README.md)**：
   - **`char_splitter.py`**：將合成後的角色 Stage 拆為 `skel`（`Skeleton`、`BlendShape` 本體、蒙皮綁定）與 `anim`（`SkelAnimation` 時序）兩個 sub 單元，並處理綁定的命名空間繼承、`skel:joints` 重映射、非預設 `skinningMethod` 等會靜默出錯的環節。
   - 僅依賴 `pxr`，不綁定任何 DCC；附含重新合成驗證的單元測試。
