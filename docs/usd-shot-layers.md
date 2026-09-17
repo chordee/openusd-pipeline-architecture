@@ -112,6 +112,7 @@ over "ROOT"
 
 負責全場角色表演與鏡頭運動。解耦為 `geo`（幾何）、`skel`（骨架拓樸）與 `animation`（關節時序動態），磁碟佔用極小（僅數 MB）：
 ```usda
+# anim_base.usd —— 部門 Master 的 base，彙整本鏡頭已發布的動畫單元
 #usda 1.0
 (
     defaultPrim = "ROOT"
@@ -119,26 +120,18 @@ over "ROOT"
 
 over "ROOT"
 {
-    # 部門分支由 Master 的 base 建立；各單元於其下貢獻一顆以自身單元名命名的 Prim
     def Scope "Anim" ( kind = "group" )
     {
-        # 單次引用綁定角色，一併帶入幾何、材質與骨架；其 /ROOT 即為 SkelRoot
+        # 各 charAnim 單元以 Reference 嫁接，Prim 名即單元名。
+        # 單元內部已封裝綁定角色與 SkelAnimation，此處不再重複宣告。
         def "BoyWalking" (
-            prepend apiSchemas = ["SkelBindingAPI"]
-            prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
-        )
-        {
-            # 動畫層唯一產出：純動態時序資料
-            def SkelAnimation "AnimData"
-            {
-                uniform token[] joints = ["Hips", "Spine", "Head"]
-                quatf[] rotations.timeSamples = { 1: [...], 100: [...] }
-            }
-            rel skel:animationSource = </ROOT/Anim/BoyWalking/AnimData>
-        }
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/BoyWalking/charAnim_latest.usda"`@</ROOT>
+        ) {}
     }
 }
 ```
+
+合成後 `/ROOT/Anim/BoyWalking` 即為完整的 `SkelRoot`，底下是 `Geometry`／`Skel`／`AnimData` 三顆。單元自身的結構與 Master ／ `base` ／ `overrides` 三層堆疊分別詳見 [Animation Layer 篇](usd-animation-layer.md) 與本篇 §5。
 
 ### 3. FX Layer (`fx.usd`) —— 次強（動態模擬）
 > 📖 詳細架構請見：[USD FX Layer 鏡頭特效層架構設計](usd-fx-layer.md)
@@ -301,13 +294,22 @@ over "ROOT" {}
 #usda 1.0
 (
     defaultPrim = "ROOT"
-    subLayers = [
-        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/BoyWalking/charAnim_latest.usda"`@,
-        @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/GirlRunning/charAnim_latest.usda"`@
-    ]
 )
 
-over "ROOT" {}
+over "ROOT"
+{
+    # 部門分支由本部門定義；Prim 名即單元名，無須轉換
+    def Scope "Anim" ( kind = "group" )
+    {
+        def "BoyWalking" (
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/BoyWalking/charAnim_latest.usda"`@</ROOT>
+        ) {}
+
+        def "GirlRunning" (
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/GirlRunning/charAnim_latest.usda"`@</ROOT>
+        ) {}
+    }
+}
 ```
 
 合成後，每個單元各自佔據部門分支底下以**自身單元名**命名的一顆 Prim：
@@ -316,6 +318,12 @@ over "ROOT" {}
 /ROOT/Anim/BoyWalking
 /ROOT/Anim/GirlRunning
 ```
+
+> [!IMPORTANT]
+> **`base` 以 Reference 嫁接單元，不以 Sublayer**
+> Sublayer **不做路徑重映射**：單元若以 Sublayer 疊入，就必須自己把內容寫在 `/ROOT/Anim/<UnitName>` 這個最終路徑上——等於把落點硬編碼進單元，單元從此必須知悉消費端的命名空間。
+>
+> 改用 Reference 後，單元得以與 FX Element、Prop、Set **完全同構**：自身以 `/ROOT` 為根、不知道自己會被掛到哪裡，由消費端決定落點並自動重映射。這正是 [`/ROOT` 解耦哲學](usd-publish-packaging.md)的直接應用。
 
 > [!IMPORTANT]
 > **單元名即 Prim 名**
@@ -362,8 +370,8 @@ shot.usd
       │    ├── subLayer: char_eye_highlight_fix.usd   <-- 細分任務覆寫
       │    └── subLayer: bg_prop_prune.usd            <-- 細分任務覆寫
       └── subLayer: lighting_base.usd                 <-- 彙整本鏡頭已發布的燈光單元
-           ├── subLayer: KeyRig/lighting_latest.usda       --> /ROOT/Lighting/KeyRig
-           └── subLayer: RimRig/lighting_latest.usda       --> /ROOT/Lighting/RimRig
+           ├── reference: KeyRig/lighting_latest.usda      --> /ROOT/Lighting/KeyRig
+           └── reference: RimRig/lighting_latest.usda      --> /ROOT/Lighting/RimRig
 ```
 
 ---

@@ -47,7 +47,68 @@ SkelRoot ──┼── 2. Skel ──────► 由【Rig 環節】提供
 >
 > 完整的角色 Asset 結構詳見 [Asset Layer 篇 §7 角色 Asset 結構](usd-asset-layer.md#7-角色-asset-結構character-asset)。
 
-### 骨架角色組裝 USDA 範例
+### 骨架角色動畫的兩層 USDA
+
+這裡有**兩個不同的東西**，先前常被混為一談：**charAnim 單元自身**，以及**部門 Master 的 `base` 如何嫁接它**。
+
+#### 一、charAnim 單元自身（`charAnim/<unit>/v###/charAnim.usd`）
+
+與其他所有發布單元同構：**以 `/ROOT` 為自身的根，完全不知道自己會被掛到哪裡**。
+
+```usda
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+)
+
+# 以 Reference 嫁接綁定角色，一併帶入 Geometry（幾何＋材質）與 Skel（骨架）。
+# /ROOT 的型別 SkelRoot 隨 Reference 帶入，此處無須重複宣告。
+def "ROOT" (
+    prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
+)
+{
+    # 動畫師本鏡頭唯一實際輸出的動態資料
+    def SkelAnimation "AnimData"
+    {
+        uniform token[] joints = ["Hips", "Hips/Spine", "Hips/Spine/Chest", ...]
+
+        quatf[] rotations.timeSamples = {
+            1: [(1, 0, 0, 0), (0.7, 0, 0.7, 0), ...],
+            2: [(0.99, 0.01, 0, 0), (0.69, 0.02, 0.7, 0), ...]
+        }
+        float3[] translations.timeSamples = {
+            1: [(0, 1.0, 0), (0, 0.15, 0), ...],
+            2: [(0, 1.01, 0.005), (0, 0.15, 0), ...]
+        }
+
+        # BlendShape 權重亦由動畫層輸出（形狀本體在綁定角色的 Skel 內）
+        uniform token[] blendShapes = ["smile"]
+        float[] blendShapeWeights.timeSamples = {
+            1: [0.0],
+            2: [0.35]
+        }
+    }
+
+    # 綁定關係下探至 Skel，不寫在 /ROOT 上。
+    # skel:skeleton 已由綁定角色寫在各 Mesh 上，此處只需掛上動畫來源。
+    over "Skel" (
+        prepend apiSchemas = ["SkelBindingAPI"]
+    )
+    {
+        rel skel:animationSource = </ROOT/AnimData>
+    }
+}
+```
+
+> [!IMPORTANT]
+> **`animationSource` 為何下探至 `Skel` 而非寫在 `/ROOT`**
+> `skel:*` 屬於 `SkelBindingAPI`，寫在 `/ROOT` 上會違反 [`/ROOT` 鐵律](usd-publish-packaging.md)——該處白名單僅含 `collection`。下探至 `Skel` 既合規，效果亦相同（綁定關係本就是命名空間繼承的，寫在 Skeleton 自身是最直接的位置）。
+>
+> 單元的 `/ROOT` 因此**除了 Reference 之外零寫入**：無屬性、無 `kind`、無 `variantSets`、無 `apiSchemas`。
+
+#### 二、部門 Master 的 `base` 如何嫁接（`anim_base.usd`）
+
+單元的落點由**消費端**決定，與 FX Element、Prop、Set 完全同構——一律 Reference 並重映射 `</ROOT>`：
 
 ```usda
 #usda 1.0
@@ -57,51 +118,31 @@ SkelRoot ──┼── 2. Skel ──────► 由【Rig 環節】提供
 
 over "ROOT"
 {
-    # /ROOT/Anim 由部門 Master 的 base 建立，單元本身僅以 over 進入
-    over "Anim"
+    # 部門分支由本部門定義；Prim 名即單元名，無須轉換
+    def Scope "Anim" ( kind = "group" )
     {
-        # Prim 名即本單元的單元名（BoyWalking），無須任何轉換。
-        # 單次引用綁定角色，一併帶入 Geometry（幾何＋材質）與 Skel（骨架）。
-        # 其 /ROOT 即為 SkelRoot，型別隨 Reference 帶入，此處無須重複宣告。
-        # SkelBindingAPI 必須套用 —— skel:* 全系列屬性與 relationship
-        # 皆隸屬此 Applied API Schema，未套用則綁定不成立。
         def "BoyWalking" (
-            prepend apiSchemas = ["SkelBindingAPI"]
-            prepend references = @`"${PROJECT_ROOT}/publish/rig/Hero_rig/char_latest.usda"`@</ROOT>
-        )
-        {
-            # 動畫師本鏡頭唯一實際輸出的動態資料 (SkelAnimation)
-            def SkelAnimation "AnimData"
-            {
-                uniform token[] joints = ["Hips", "Hips/Spine", "Hips/Spine/Chest", ...]
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/BoyWalking/charAnim_latest.usda"`@</ROOT>
+        ) {}
 
-                # 僅輸出隨時間變化的四元數陣列 (極度輕量)
-                quatf[] rotations.timeSamples = {
-                    1: [(1, 0, 0, 0), (0.7, 0, 0.7, 0), ...],
-                    2: [(0.99, 0.01, 0, 0), (0.69, 0.02, 0.7, 0), ...]
-                }
-                float3[] translations.timeSamples = {
-                    1: [(0, 1.0, 0), (0, 0.15, 0), ...],
-                    2: [(0, 1.01, 0.005), (0, 0.15, 0), ...]
-                }
-
-                # BlendShape 權重亦由動畫層輸出（形狀本體在綁定角色的 Skel 內）
-                uniform token[] blendShapes = ["smile"]
-                float[] blendShapeWeights.timeSamples = {
-                    1: [0.0],
-                    2: [0.35]
-                }
-            }
-
-            # 掛上動畫來源即完成。
-            # skel:skeleton 已由綁定角色的 skel 包寫在各 Mesh 上，此處無須重複宣告。
-            rel skel:animationSource = </ROOT/Anim/BoyWalking/AnimData>
-        }
+        def "GirlRunning" (
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/charAnim/GirlRunning/charAnim_latest.usda"`@</ROOT>
+        ) {}
     }
 }
 ```
 
----
+合成後，單元內部的所有路徑隨 Reference 自動重映射：
+
+```text
+/ROOT/Anim/BoyWalking            (SkelRoot，型別來自綁定角色)
+├── Geometry/                    <-- 幾何＋材質，來自幾何材質 Asset
+├── Skel                         <-- 骨架，來自綁定角色；此處掛上 animationSource
+└── AnimData                     <-- 本單元唯一實際輸出
+```
+
+單元內寫的 `</ROOT/AnimData>` 在此解析為 `/ROOT/Anim/BoyWalking/AnimData`——**單元始終無須知悉自己的掛載位置**。
+
 
 ## 2. 元素類型二：幾何 Transform 動畫（Rigid / Prop Animation）
 
@@ -111,9 +152,12 @@ over "ROOT"
 - 鏡頭動態（`ShotCam` 平移、旋轉、焦距變化）
 
 ### 運作模式：引用 Asset＋覆寫時序 Transform
-動畫師在鏡頭中**引用（Reference）已發佈的 Asset**，只在其身上輸出隨影格變化的空間 Transform 數據：
+動畫師在鏡頭中**引用（Reference）已發佈的 Asset**，只在其身上輸出隨影格變化的空間 Transform 數據。
+
+以下呈現的是**部門 Master 的 `base` 合成後的樣貌**（與 §1 的第二段同一層級）。若該內容獨立成發布單元，其自身層一律比照 [§1 的第一段](#一charanim-單元自身charanimunitvcharanimusd)：以 `/ROOT` 為根、不知悉掛載位置，由 `base` 以 Reference 決定落點。
 
 ```usda
+# anim_base.usd 合成後的樣貌
 #usda 1.0
 (
     defaultPrim = "ROOT"
