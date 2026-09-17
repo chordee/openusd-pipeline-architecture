@@ -17,7 +17,7 @@
 
 ---
 
-## 兩個會靜默出錯的環節
+## 三個會靜默出錯的環節
 
 ### 一、`extent` 不會跟隨 `points`
 
@@ -37,9 +37,26 @@ BBoxCache 算出的    : [(0,0,0), (1,1,0)]      ← 沿用過期值
 
 拓樸確實需要逐幀改變的內容（碎裂、流體）不屬於動畫單元，應改由 [FX Element](../../docs/usd-fx-layer.md) 以 Value Clips 承載。
 
+### 三、`xformOpOrder` 是 uniform，但少了它整組 Transform 不生效
+
+`xformOpOrder` 不帶時間樣本，因此不會出現在「時序屬性」清單中——但 USD **沒有它就不評估任何 xformOp**。`propAnim` 的 `xform` 若直接疊在已發布的 Asset 之上（剛體道具的常見情形），Asset 並不知道動畫師加了哪些 op，合成後的 local transform 會靜默地解析為單位矩陣：
+
+```text
+缺 xformOpOrder : ( (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1) )   ← 位移完全消失
+補上之後        : ( (1,0,0,0), (0,1,0,0), (0,0,1,0), (5,0,0,1) )
+```
+
+工具因此在有任何 `xformOp:*` 進入 `xform` 時，一併複製 `xformOpOrder`。
+
+> [!NOTE]
+> **靜態層不留任何時間樣本**
+> 拆分的判準是「**是否帶時間樣本**」，而非屬性名單——動畫化的 `visibility` 或 primvar 同樣會破壞靜態層的契約。唯一例外是拓樸：既已驗證其值恆定，即折疊為 default 留在 `geo`，不搬入 `xform`。
+>
+> 屬性以 `Sdf.CopySpec` 搬移而非重建，以保留來源的 `interpolation`、`elementSize` 等 metadata——缺少 `interpolation` 的 faceVarying `normals` 會被靜默當成 vertex 內插。
+
 > [!NOTE]
 > **伴隨屬性必須與 `points` 同行**
-> `velocities`、`accelerations`、`normals` 若留在靜態層而 `points` 已移走，動態模糊會取用與實際位移不符的速度場。工具將這四者視為一組一併搬移。
+> `velocities`、`accelerations`、`normals` 若留在靜態層而 `points` 已移走，動態模糊會取用與實際位移不符的速度場。
 
 ---
 
@@ -77,4 +94,4 @@ Layer Metadata 不會透過 `subLayers` 向上傳遞，因此 `upAxis`、`meters
 hython -m unittest discover -s tools/pointcachesplitter/tests -v
 ```
 
-測試共 11 項，涵蓋上述兩個環節、經 Reference 帶入的幾何，以及一項**重新合成驗證**：將拆出的兩層疊回後，確認第 2 幀的 `BBoxCache` 結果確實跟隨形變——若 `extent` 未逐幀重算，此項即會失敗。
+測試共 15 項，涵蓋上述三個環節、經 Reference 帶入的幾何，以及一項**重新合成驗證**：將拆出的兩層疊回後，確認第 2 幀的 `BBoxCache` 結果確實跟隨形變——若 `extent` 未逐幀重算，此項即會失敗。

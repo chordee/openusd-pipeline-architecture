@@ -149,6 +149,68 @@ class PointCacheSplitterTest(unittest.TestCase):
             composed.GetPrimAtPath("/ROOT/Flag")).ComputeAlignedRange()
         self.assertEqual(bound.GetMax(), Gf.Vec3d(10, 10, 0))
 
+    # -- completeness of the split -----------------------------------------
+
+    def test_geo_layer_keeps_no_time_samples_at_all(self):
+        """Animated visibility is not point data, but it still breaks the contract."""
+        stage = build_deforming_prop(self.src)
+        mesh = UsdGeom.Imageable(stage.GetPrimAtPath("/ROOT/Flag"))
+        mesh.CreateVisibilityAttr().Set("inherited", 1.0)
+        mesh.GetVisibilityAttr().Set("invisible", 2.0)
+
+        geo_layer, xform_layer = PointCacheSplitter(stage).split(
+            self.geo_path, self.xform_path)
+
+        spec = geo_layer.GetPrimAtPath("/ROOT/Flag")
+        leftover = [n for n, p in spec.properties.items() if p.HasInfo("timeSamples")]
+        self.assertEqual(leftover, [], "geo layer must hold no time samples")
+        self.assertIsNotNone(
+            xform_layer.GetAttributeAtPath("/ROOT/Flag.visibility"),
+            "the samples must land in the xform layer rather than vanish")
+
+    def test_constant_topology_samples_collapse_to_default(self):
+        stage = build_deforming_prop(self.src)
+        counts = stage.GetPrimAtPath("/ROOT/Flag").GetAttribute("faceVertexCounts")
+        counts.Set([3], 1.0)
+        counts.Set([3], 2.0)
+
+        geo_layer, _ = PointCacheSplitter(stage).split(self.geo_path, self.xform_path)
+        spec = geo_layer.GetPrimAtPath("/ROOT/Flag").properties["faceVertexCounts"]
+        self.assertFalse(spec.HasInfo("timeSamples"))
+        self.assertEqual(list(spec.default), [3])
+
+    def test_xform_layer_alone_drives_a_published_asset(self):
+        """Without xformOpOrder the ops never evaluate and the move is lost."""
+        _, _, xform_layer = self._split()
+
+        asset = Usd.Stage.CreateNew(os.path.join(self.tmp, "asset.usda"))
+        root = asset.DefinePrim("/ROOT", "Xform")
+        asset.SetDefaultPrim(root)
+        mesh = UsdGeom.Mesh.Define(asset, "/ROOT/Flag")
+        mesh.CreateFaceVertexCountsAttr([3])
+        mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
+        mesh.CreatePointsAttr(Vt.Vec3fArray(FRAME_1))
+        asset.Save()
+
+        composed = Usd.Stage.CreateInMemory()
+        composed.GetRootLayer().subLayerPaths = [
+            xform_layer.identifier, asset.GetRootLayer().identifier]
+        xform = UsdGeom.Xformable(composed.GetPrimAtPath("/ROOT/Flag"))
+        matrix = xform.GetLocalTransformation(Usd.TimeCode(2.0))
+        self.assertEqual(matrix.ExtractTranslation(), Gf.Vec3d(5, 0, 0))
+
+    def test_attribute_metadata_survives(self):
+        """faceVarying normals silently become vertex without interpolation."""
+        stage = build_deforming_prop(self.src)
+        mesh = UsdGeom.Mesh(stage.GetPrimAtPath("/ROOT/Flag"))
+        mesh.CreateNormalsAttr().Set(Vt.Vec3fArray([Gf.Vec3f(0, 1, 0)] * 3), 1.0)
+        mesh.SetNormalsInterpolation("faceVarying")
+
+        _, xform_layer = PointCacheSplitter(stage).split(self.geo_path, self.xform_path)
+        spec = xform_layer.GetAttributeAtPath("/ROOT/Flag.normals")
+        self.assertEqual(spec.GetInfo("interpolation"), "faceVarying")
+        self.assertIsNone(spec.default, "xform layer carries samples, not a default")
+
     def test_splits_geometry_arriving_by_reference(self):
         """Sdf.CopySpec sees no specs for referenced prims in the root layer."""
         inner = os.path.join(self.tmp, "inner.usda")

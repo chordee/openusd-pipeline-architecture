@@ -97,10 +97,14 @@ class PointCacheSplitter:
             if prim.IsA(UsdGeom.Mesh):
                 self._assert_fixed_topology(prim, layer)
 
+            # Every time-sampled attribute belongs in the xform layer, not just
+            # the point-based ones: animated visibility or primvars left behind
+            # would break the static layer's contract just as surely.
+            # Topology is the exception — validated constant above, so it is
+            # collapsed to a default in the geo layer rather than moved.
             names = [
                 attr.GetName() for attr in prim.GetAttributes()
-                if (attr.GetName() in _DEFORM_ATTRIBUTES
-                    or attr.GetName().startswith("xformOp:"))
+                if attr.GetName() not in _TOPOLOGY_ATTRIBUTES
                 and _time_samples(layer, attr)
             ]
             if names:
@@ -150,6 +154,7 @@ class PointCacheSplitter:
                 if samples:
                     attr_spec.default = samples[min(samples)]
                 attr_spec.ClearInfo("timeSamples")
+            self._collapse_topology(layer, prim_path)
             self._restate_extent(layer, prim_path)
 
         layer.Save()
@@ -165,11 +170,16 @@ class PointCacheSplitter:
             spec = self._define(layer, prim_path)
 
             for name in names:
-                attr = source.GetAttribute(name)
-                out = Sdf.AttributeSpec(spec, name, attr.GetTypeName())
-                for t in _time_samples(self._source_layer(), attr):
-                    layer.SetTimeSample(out.path, t, attr.Get(t))
+                # CopySpec rather than a bare AttributeSpec: it carries the
+                # source's metadata (interpolation, elementSize…) along with the
+                # samples. Without interpolation a faceVarying normals array is
+                # silently reinterpreted as vertex.
+                attr_path = prim_path.AppendProperty(name)
+                Sdf.CopySpec(self._source_layer(), attr_path, layer, attr_path)
+                out = layer.GetAttributeAtPath(attr_path)
+                out.ClearDefaultValue()
 
+            self._copy_xform_op_order(layer, spec, source, names)
             self._write_animated_extent(layer, spec, source, names)
 
         layer.Save()
@@ -211,6 +221,40 @@ class PointCacheSplitter:
             if source and source.GetTypeName():
                 spec.typeName = source.GetTypeName()
         return layer.GetPrimAtPath(path)
+
+    def _collapse_topology(self, layer: Sdf.Layer, prim_path: Sdf.Path) -> None:
+        """Fold constant-valued topology time samples down to a default.
+
+        Topology is validated constant, so its samples carry no information —
+        but leaving them in place would still break the static layer's contract.
+        """
+        spec = layer.GetPrimAtPath(prim_path)
+        for name in _TOPOLOGY_ATTRIBUTES:
+            attr_spec = spec.properties.get(name)
+            if attr_spec is None or not attr_spec.HasInfo("timeSamples"):
+                continue
+            samples = attr_spec.GetInfo("timeSamples")
+            if samples:
+                attr_spec.default = samples[min(samples)]
+            attr_spec.ClearInfo("timeSamples")
+
+    def _copy_xform_op_order(self, layer: Sdf.Layer, spec: Sdf.PrimSpec,
+                             source: Usd.Prim, names: Sequence[str]) -> None:
+        """Carry ``xformOpOrder`` across whenever an ``xformOp`` is animated.
+
+        It is uniform, so it never appears among the time-sampled attributes —
+        but without it USD evaluates no transform ops at all. A propAnim unit
+        composed straight over a published Asset has no other source for it, and
+        the animation silently resolves to identity.
+        """
+        if not any(n.startswith("xformOp:") for n in names):
+            return
+        attr = source.GetAttribute("xformOpOrder")
+        if not attr or attr.Get() is None:
+            return
+        out = Sdf.AttributeSpec(spec, "xformOpOrder", attr.GetTypeName(),
+                                Sdf.VariabilityUniform)
+        out.default = attr.Get()
 
     def _restate_extent(self, layer: Sdf.Layer, prim_path: Sdf.Path) -> None:
         """Give the static layer an extent matching its bind-pose points."""
