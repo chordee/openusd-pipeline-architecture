@@ -50,7 +50,9 @@ BBoxCache 算出的    : [(0,0,0), (1,1,0)]      ← 沿用過期值
 
 > [!NOTE]
 > **靜態層不留任何時間樣本**
-> 拆分的判準是「**是否帶時間樣本**」，而非屬性名單——動畫化的 `visibility` 或 primvar 同樣會破壞靜態層的契約。唯一例外是拓樸：既已驗證其值恆定，即折疊為 default 留在 `geo`，不搬入 `xform`。
+> 拆分的判準是「**是否帶時間樣本**」，而非屬性名單——動畫化的 `visibility` 或 primvar 同樣會破壞靜態層的契約。`geo` 因此以**全層掃描**凍結樣本，而非只處理 discovery 回報的 Prim：只帶恆定拓樸樣本的 Mesh 根本不會出現在 discovery 結果中，其樣本卻仍會抵達 `geo`。
+>
+> 兩項屬性從不由來源搬運：**拓樸**既已驗證恆定，折疊為 default 留在 `geo`；**`extent`** 一律由 `points` 重算——來源的 `extent` 可能本就是過期的，且複製它會與重算的規格同名衝突。
 >
 > 屬性以 `Sdf.CopySpec` 搬移而非重建，以保留來源的 `interpolation`、`elementSize` 等 metadata——缺少 `interpolation` 的 faceVarying `normals` 會被靜默當成 vertex 內插。
 
@@ -94,4 +96,4 @@ Layer Metadata 不會透過 `subLayers` 向上傳遞，因此 `upAxis`、`meters
 hython -m unittest discover -s tools/pointcachesplitter/tests -v
 ```
 
-測試共 15 項，涵蓋上述三個環節、經 Reference 帶入的幾何，以及一項**重新合成驗證**：將拆出的兩層疊回後，確認第 2 幀的 `BBoxCache` 結果確實跟隨形變——若 `extent` 未逐幀重算，此項即會失敗。
+測試共 17 項，涵蓋上述三個環節、經 Reference 帶入的幾何，以及一項**重新合成驗證**：將拆出的兩層疊回後，確認第 2 幀的 `BBoxCache` 結果確實跟隨形變——若 `extent` 未逐幀重算，此項即會失敗。

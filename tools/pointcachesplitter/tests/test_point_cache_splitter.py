@@ -211,6 +211,37 @@ class PointCacheSplitterTest(unittest.TestCase):
         self.assertEqual(spec.GetInfo("interpolation"), "faceVarying")
         self.assertIsNone(spec.default, "xform layer carries samples, not a default")
 
+    def test_mesh_with_only_topology_samples_is_frozen(self):
+        """Such a mesh never appears in discovery, but its samples must still go."""
+        stage = Usd.Stage.CreateNew(self.src)
+        root = stage.DefinePrim("/ROOT", "Xform")
+        stage.SetDefaultPrim(root)
+        mesh = UsdGeom.Mesh.Define(stage, "/ROOT/M")
+        mesh.CreateFaceVertexCountsAttr().Set([3], 1.0)
+        mesh.CreateFaceVertexCountsAttr().Set([3], 2.0)
+        mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
+        mesh.CreatePointsAttr(Vt.Vec3fArray(FRAME_1))
+        stage.Save()
+
+        geo_layer, _ = PointCacheSplitter(stage).split(self.geo_path, self.xform_path)
+        spec = geo_layer.GetPrimAtPath("/ROOT/M")
+        leftover = [n for n, p in spec.properties.items() if p.HasInfo("timeSamples")]
+        self.assertEqual(leftover, [])
+        self.assertEqual(list(spec.properties["faceVertexCounts"].default), [3])
+
+    def test_animated_source_extent_is_recomputed_not_copied(self):
+        """Exporters ship an animated extent; copying it would duplicate the spec."""
+        stage = build_deforming_prop(self.src, animate_transform=False)
+        extent = stage.GetPrimAtPath("/ROOT/Flag").GetAttribute("extent")
+        extent.Clear()
+        # Deliberately wrong values, to prove they are not what comes out.
+        extent.Set(Vt.Vec3fArray([Gf.Vec3f(0, 0, 0), Gf.Vec3f(99, 99, 99)]), 1.0)
+        extent.Set(Vt.Vec3fArray([Gf.Vec3f(0, 0, 0), Gf.Vec3f(99, 99, 99)]), 2.0)
+
+        _, xform_layer = PointCacheSplitter(stage).split(self.geo_path, self.xform_path)
+        samples = xform_layer.GetAttributeAtPath("/ROOT/Flag.extent").GetInfo("timeSamples")
+        self.assertEqual(list(samples[2.0]), [Gf.Vec3f(0, 0, 0), Gf.Vec3f(10, 10, 0)])
+
     def test_splits_geometry_arriving_by_reference(self):
         """Sdf.CopySpec sees no specs for referenced prims in the root layer."""
         inner = os.path.join(self.tmp, "inner.usda")

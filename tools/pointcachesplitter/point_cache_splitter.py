@@ -41,6 +41,9 @@ _STAGE_METADATA = (
 #: behind while ``points`` move gives a mismatched motion-blur velocity field.
 _DEFORM_ATTRIBUTES = ("points", "velocities", "accelerations", "normals")
 
+#: Never carried over from the source: topology is validated constant and folded
+#: into the geo layer, and ``extent`` is always recomputed from ``points`` — copying
+#: the source's would both duplicate the spec and preserve a possibly stale box.
 #: Topology must not vary over time for a point cache to be meaningful.
 _TOPOLOGY_ATTRIBUTES = (
     "faceVertexCounts",
@@ -50,6 +53,8 @@ _TOPOLOGY_ATTRIBUTES = (
     "creaseIndices",
     "creaseLengths",
 )
+
+_EXCLUDED_ATTRIBUTES = frozenset(_TOPOLOGY_ATTRIBUTES) | {"extent"}
 
 
 class VaryingTopologyError(ValueError):
@@ -104,7 +109,7 @@ class PointCacheSplitter:
             # collapsed to a default in the geo layer rather than moved.
             names = [
                 attr.GetName() for attr in prim.GetAttributes()
-                if attr.GetName() not in _TOPOLOGY_ATTRIBUTES
+                if attr.GetName() not in _EXCLUDED_ATTRIBUTES
                 and _time_samples(layer, attr)
             ]
             if names:
@@ -142,19 +147,12 @@ class PointCacheSplitter:
         # provenance of the split, not of the published geometry.
         layer.pseudoRoot.ClearInfo("documentation")
 
-        for prim_path, names in self.animated_attributes().items():
-            spec = layer.GetPrimAtPath(prim_path)
-            for name in names:
-                attr_spec = spec.properties.get(name)
-                if attr_spec is None:
-                    continue
-                # Keep the earliest sample as the bind pose so the static layer
-                # still describes a complete, openable piece of geometry.
-                samples = attr_spec.GetInfo("timeSamples")
-                if samples:
-                    attr_spec.default = samples[min(samples)]
-                attr_spec.ClearInfo("timeSamples")
-            self._collapse_topology(layer, prim_path)
+        # Sweep the whole layer rather than only the prims discovery returned:
+        # a mesh carrying nothing but constant topology samples never appears in
+        # animated_attributes(), yet its samples would still reach the geo layer.
+        self.animated_attributes()          # runs the fixed-topology check
+        self._freeze_time_samples(layer)
+        for prim_path in self._mesh_paths():
             self._restate_extent(layer, prim_path)
 
         layer.Save()
@@ -222,21 +220,29 @@ class PointCacheSplitter:
                 spec.typeName = source.GetTypeName()
         return layer.GetPrimAtPath(path)
 
-    def _collapse_topology(self, layer: Sdf.Layer, prim_path: Sdf.Path) -> None:
-        """Fold constant-valued topology time samples down to a default.
+    def _mesh_paths(self) -> List[Sdf.Path]:
+        return [p.GetPath() for p in self._stage.Traverse() if p.IsA(UsdGeom.Mesh)]
 
-        Topology is validated constant, so its samples carry no information —
-        but leaving them in place would still break the static layer's contract.
+    def _freeze_time_samples(self, layer: Sdf.Layer) -> None:
+        """Fold every attribute's earliest sample into a default, layer-wide.
+
+        The static layer's contract is that it holds no time samples at all, so
+        this is driven by what the layer actually contains rather than by what
+        discovery reported. Keeping the earliest sample as the value leaves the
+        geo layer a complete, openable piece of geometry.
         """
-        spec = layer.GetPrimAtPath(prim_path)
-        for name in _TOPOLOGY_ATTRIBUTES:
-            attr_spec = spec.properties.get(name)
-            if attr_spec is None or not attr_spec.HasInfo("timeSamples"):
-                continue
-            samples = attr_spec.GetInfo("timeSamples")
+        def visit(path):
+            if not path.IsPropertyPath():
+                return
+            spec = layer.GetAttributeAtPath(path)
+            if spec is None or not spec.HasInfo("timeSamples"):
+                return
+            samples = spec.GetInfo("timeSamples")
             if samples:
-                attr_spec.default = samples[min(samples)]
-            attr_spec.ClearInfo("timeSamples")
+                spec.default = samples[min(samples)]
+            spec.ClearInfo("timeSamples")
+
+        layer.Traverse(Sdf.Path("/"), visit)
 
     def _copy_xform_op_order(self, layer: Sdf.Layer, spec: Sdf.PrimSpec,
                              source: Usd.Prim, names: Sequence[str]) -> None:
