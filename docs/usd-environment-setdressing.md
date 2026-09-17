@@ -36,7 +36,7 @@ Environment 圖層的核心成員並非直接建立的幾何多邊形，而是�
 
 ## 2. Set Dressing 的「虛擬組裝」特性
 
-Set Dressing 圖層本質上是一份「**空間座標與引用清單**」。它告訴 USD：「在座標 $(x, y, z)$ 放一把已發佈的椅子，在旋轉 $(\theta_x, \theta_y, \theta_z)$ 放一張已發佈的桌子」。
+Set Dressing 圖層本質上是一份「**空間座標與引用清單**」。它告訴 USD：「在座標 `(x, y, z)` 放一把已發佈的椅子，以旋轉 `(rx, ry, rz)` 放一張已發佈的桌子」。
 
 ### 範例：室內家具陳設 (`setdressing_livingroom.usda`)
 
