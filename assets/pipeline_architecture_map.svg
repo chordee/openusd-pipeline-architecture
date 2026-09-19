@@ -138,13 +138,13 @@
     <rect x="195" y="10" width="42" height="18" rx="4" fill="#92400e" />
     <text class="card-badge" x="201" y="23" fill="#fef3c7">ANIM</text>
 
-    <text class="text-mono" x="14" y="48" fill="#fcd34d">animation.usd</text>
-    <text class="text-dim" x="105" y="48">/ROOT/Anim</text>
+    <text class="text-mono" x="14" y="48" fill="#fcd34d">anim.usd</text>
+    <text class="text-dim" x="80" y="48">/ROOT/Anim</text>
 
     <rect x="14" y="58" width="222" height="64" rx="4" fill="#020617" />
-    <text class="text-body" x="22" y="75">• <tspan class="text-mono" fill="#f8fafc">SkelRoot</tspan>: geo + skel + animation 三分</text>
+    <text class="text-body" x="22" y="75">• <tspan class="text-mono" fill="#f8fafc">SkelRoot</tspan>: 骨架動畫三分解耦 (charAnim)</text>
     <text class="text-dim" x="32" y="90">  (僅輸出 Joint 時序旋轉，節省 99% 容量)</text>
-    <text class="text-body" x="22" y="108">• <tspan class="text-mono" fill="#f8fafc">Transform</tspan>: 道具與 ShotCam 時序</text>
+    <text class="text-body" x="22" y="108">• <tspan class="text-mono" fill="#f8fafc">Transform</tspan>: 剛體道具時序 (propAnim)</text>
   </g>
 
   <!-- 2C. FX Layer -->
@@ -173,31 +173,37 @@
     <!-- Sublayer Stack Box -->
     <g transform="translate(16, 42)">
       <rect x="0" y="0" width="428" height="236" rx="6" fill="#020617" stroke="#7e22ce" stroke-width="1" />
-      <text class="text-mono" x="14" y="24" fill="#c084fc" font-weight="bold">shot.usda (Sublayer Stacking 權限由上而下遞減)</text>
+      <text class="text-mono" x="14" y="22" fill="#c084fc" font-weight="bold">shot.usda (Sublayer 權限由上而下遞減；Camera 為底層 Reference)</text>
       
       <!-- Layer 1: Lighting -->
-      <rect x="14" y="34" width="400" height="42" rx="4" fill="#3b0764" stroke="#d8b4fe" />
-      <text class="text-mono" x="24" y="52" fill="#faf5ff" font-weight="bold">Index 0: lighting.usd</text>
-      <text class="text-dim" x="175" y="52">【最強意見 / 最終仲裁】</text>
-      <text class="text-body" x="24" y="68">/ROOT/Lighting 光源、RenderSettings、全場 Lookdev 最終 Override</text>
+      <rect x="14" y="30" width="400" height="36" rx="4" fill="#3b0764" stroke="#d8b4fe" />
+      <text class="text-mono" x="24" y="45" fill="#faf5ff" font-weight="bold">Index 0: lighting.usd</text>
+      <text class="text-dim" x="175" y="45">【最強意見 / 最終仲裁】</text>
+      <text class="text-body" x="24" y="59">/ROOT/Lighting 光源、RenderSettings、全場 Lookdev 最終 Override</text>
 
       <!-- Layer 2: FX -->
-      <rect x="14" y="82" width="400" height="42" rx="4" fill="#4c0519" stroke="#fda4af" stroke-opacity="0.6" />
-      <text class="text-mono" x="24" y="100" fill="#fff1f2">Index 1: fx.usd</text>
-      <text class="text-dim" x="145" y="100">【次強意見】可接管覆寫角色動畫可見度</text>
-      <text class="text-body" x="24" y="116">掛載 /ROOT/FX/explosion_hero 等獨立元素快取</text>
+      <rect x="14" y="70" width="400" height="36" rx="4" fill="#4c0519" stroke="#fda4af" stroke-opacity="0.6" />
+      <text class="text-mono" x="24" y="85" fill="#fff1f2">Index 1: fx.usd</text>
+      <text class="text-dim" x="145" y="85">【次強意見】可接管覆寫角色動畫可見度</text>
+      <text class="text-body" x="24" y="99">掛載 /ROOT/FX/explosion_hero 等獨立元素快取</text>
 
       <!-- Layer 3: Anim -->
-      <rect x="14" y="130" width="400" height="42" rx="4" fill="#451a03" stroke="#fde68a" stroke-opacity="0.6" />
-      <text class="text-mono" x="24" y="148" fill="#fffbeb">Index 2: animation.usd</text>
-      <text class="text-dim" x="175" y="148">【中等意見】可覆寫環境道具 Transform</text>
-      <text class="text-body" x="24" y="164">/ROOT/Anim/Characters 角色動態與 ShotCam 鏡頭動態</text>
+      <rect x="14" y="110" width="400" height="36" rx="4" fill="#451a03" stroke="#fde68a" stroke-opacity="0.6" />
+      <text class="text-mono" x="24" y="125" fill="#fffbeb">Index 2: anim.usd</text>
+      <text class="text-dim" x="155" y="125">【中等意見】可覆寫環境道具 Transform</text>
+      <text class="text-body" x="24" y="139">/ROOT/Anim 角色 (charAnim) 與剛體道具 (propAnim) 時序動態</text>
 
       <!-- Layer 4: Env -->
-      <rect x="14" y="178" width="400" height="46" rx="4" fill="#022c22" stroke="#6ee7b7" stroke-opacity="0.6" />
-      <text class="text-mono" x="24" y="196" fill="#f0fdf4">Index 3: environment.usd</text>
-      <text class="text-dim" x="190" y="196">【最弱意見 / 舞台基底】</text>
-      <text class="text-body" x="24" y="214">/ROOT/Environment 靜態背景、地形、建築與 Set Dressing 道具陳設</text>
+      <rect x="14" y="150" width="400" height="36" rx="4" fill="#022c22" stroke="#6ee7b7" stroke-opacity="0.6" />
+      <text class="text-mono" x="24" y="165" fill="#f0fdf4">Index 3: environment.usd</text>
+      <text class="text-dim" x="190" y="165">【最弱 Sublayer / 舞台基底】</text>
+      <text class="text-body" x="24" y="179">/ROOT/Environment 靜態背景、地形、建築與 Set Dressing 道具陳設</text>
+
+      <!-- Camera Unit: Stage Reference -->
+      <rect x="14" y="190" width="400" height="38" rx="4" fill="#082f49" stroke="#38bdf8" stroke-dasharray="3 2" />
+      <text class="text-mono" x="24" y="205" fill="#e0f2fe" font-weight="bold">Stage Reference: cam_latest.usda</text>
+      <text class="text-dim" x="250" y="205">【LIVRPS 恆弱基準】</text>
+      <text class="text-body" x="24" y="220">/ROOT/Cameras/FinalCamera 獨立單元 (運動/光學解耦)，全體可 Override</text>
     </g>
 
     <!-- Department Overrides Architecture -->
@@ -264,7 +270,7 @@
       <text class="text-mono" x="14" y="22" fill="#38bdf8" font-weight="bold">D. Latest 與 Resolver 鎖定</text>
       <text class="text-dim" x="14" y="38">Versioning &amp; Version Pinning</text>
       <text class="text-body" x="14" y="58">• 不用 VariantSet 控版 (免回改)</text>
-      <text class="text-body" x="14" y="76">• 全元素進版維持 <tspan class="text-mono" fill="#f8fafc">latest.usd</tspan></text>
+      <text class="text-body" x="14" y="76">• 全元素進版維持 <tspan class="text-mono" fill="#f8fafc">latest.usda</tspan></text>
       <text class="text-dim" x="14" y="92">  (Linux: Symlink / Win: Wrapper)</text>
       <text class="text-body" x="14" y="110">• <tspan fill="#c084fc">Asset Resolver</tspan>: 算圖時自動</text>
       <text class="text-dim" x="14" y="126">  逆向鎖定歷史核准版本 (Pinning)</text>
