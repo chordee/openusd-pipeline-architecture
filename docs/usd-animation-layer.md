@@ -157,12 +157,12 @@ over "ROOT"
 第二類是剛體或無骨架物件的空間動態，常見於：
 - 道具動態（手持武器、咖啡杯、手機）
 - 載具動態（汽車、飛機軌跡）
-- 鏡頭動態（`ShotCam` 平移、旋轉、焦距變化）
+- 鏡頭動態（平移、旋轉、焦距變化）——惟攝影機**自成鏡頭級單元**，不屬動畫部門，見本節末
 
 ### 運作模式：引用 Asset＋覆寫時序 Transform
 動畫師在鏡頭中**引用（Reference）已發佈的 Asset**，只在其身上輸出隨影格變化的空間 Transform 數據。
 
-以下呈現的是**部門 Master 的 `base` 合成後的樣貌**（與 §1 的第二段同一層級）。若該內容獨立成發布單元，其自身層一律比照 [§1 的第一段](#一charanim-單元自身charanimunitvcharanimusd)：以 `/ROOT` 為根、不知悉掛載位置，由 `base` 以 Reference 決定落點。
+與 §1 同樣分兩層呈現：先是**部門 Master 的 `base`**，再是**單元自身**。
 
 ```usda
 # anim_base.usd 合成後的樣貌
@@ -175,56 +175,38 @@ over "ROOT"
 {
     def Scope "Anim" ( kind = "group" )
     {
-        # 1. 鏡頭攝影機動態
-        def Scope "Cameras" ( kind = "group" )
-        {
-            def Camera "ShotCam"
-            {
-                # 焦距與光圈的單位恆為「scene unit 的十分之一」；本專案為公尺制，
-                # 故十分之一即 10cm：35mm = 0.035m = 0.35    50mm = 0.05m = 0.5
-                float2 clippingRange = (0.01, 10000)
-                float horizontalAperture = 0.20955        # Academy 光圈 20.955mm
-                float focalLength.timeSamples = {
-                    1: 0.35,
-                    50: 0.5
-                }
-                float focusDistance.timeSamples = {
-                    1: 5.0,                               # 對焦距離為 world unit（公尺）
-                    50: 3.2
-                }
-                double3 xformOp:translate.timeSamples = {
-                    1: (0, 1.5, 3),
-                    50: (0.2, 1.55, 2.5)
-                }
-                float3 xformOp:rotateXYZ.timeSamples = {
-                    1: (-10, 5, 0),
-                    50: (-8, 12, 0)
-                }
-                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
-            }
-        }
-
-        # 2. 道具剛體動畫 (引用已發佈 Asset，只輸出矩陣時序)
-        def Scope "Props" ( kind = "group" )
-        {
-            def Xform "HeroGun" (
-                references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/Blaster/asset_latest.usda"`@</ROOT>
-            )
-            {
-                double3 xformOp:translate.timeSamples = {
-                    1: (0.152, 1.105, 0.45),
-                    2: (0.158, 1.12, 0.462)
-                }
-                float3 xformOp:rotateXYZ.timeSamples = {
-                    1: (0, 45, 10),
-                    2: (2, 48, 12)
-                }
-                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
-            }
-        }
+        # 道具剛體動畫：引用已發佈 Asset，只輸出矩陣時序
+        def "HeroGunMove" (
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/propAnim/HeroGunMove/propAnim_latest.usda"`@</ROOT>
+        ) {}
     }
 }
 ```
+
+單元自身（`propAnim/HeroGunMove/v001/propAnim.usd`）以 `/ROOT` 為根，引用道具 Asset 後僅輸出 `xformOp` 時序：
+
+```usda
+def "ROOT" (
+    prepend references = @`"${PROJECT_ROOT}/publish/assets/props/weapons/Blaster/asset_latest.usda"`@</ROOT>
+)
+{
+    double3 xformOp:translate.timeSamples = {
+        1: (0.152, 1.105, 0.45),
+        2: (0.158, 1.12, 0.462)
+    }
+    float3 xformOp:rotateXYZ.timeSamples = {
+        1: (0, 45, 10),
+        2: (2, 48, 12)
+    }
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+}
+```
+
+> [!IMPORTANT]
+> **攝影機不屬於動畫部門**
+> 早期版本將攝影機置於 `/ROOT/Anim/Cameras` 之下。但**會發布攝影機的部門不只 Animation**——Layout 的 previz 機、Lighting 的 witness 機皆然，因此攝影機不歸屬任何部門的命名空間，也不進入任何部門的 Master。
+>
+> 攝影機自成鏡頭級單元，合成於 `/ROOT/Cameras`——`/ROOT/Anim` 的同層兄弟。結構與最終算圖相機的識別約定詳見 [Shot Layers 篇 §5 攝影機單元](usd-shot-layers.md)。
 
 ### `propAnim` 單元的兩個 sub
 
