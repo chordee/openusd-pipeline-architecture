@@ -108,7 +108,8 @@
 | **`kind` 階層狀況** | 列出所有掉出 Model Hierarchy 的 model 及其斷點 | **報告** | [`usdkind` 治理](usd-asset-layer.md) |
 | **已聲明能力未失效** | 已指定 `drawMode` 等 Model 能力的 Prim，其 Model Hierarchy 實際有效 | 攔阻 | 同上 |
 | **Class 根為抽象 Prim** | `/__CLASS__` 以 `class` 指示符宣告，非 `def` | 攔阻 | [Class Inherits 機制](usd-asset-loader.md) |
-| **最終算圖相機唯一且具名** | 鏡頭內存在且僅存在一個 `FinalCamera` 單元，合成後 `/ROOT/Cameras/FinalCamera/Motion/Camera` 可解析 | 攔阻 | [攝影機單元](usd-shot-layers.md) |
+| **最終算圖相機位置已填** | `shot.usd` 的 `/ROOT/Cameras/FinalCamera` 已指向某個攝影機單元，且 `Motion/Camera` 可解析 | 攔阻 | [攝影機單元](usd-shot-layers.md) |
+| **攝影機單元結構同構** | 每個攝影機單元的 `/ROOT` 底下恆為 `Motion/Camera`，不因用途而異 | 攔阻 | 同上 |
 | **`RenderSettings` 指向有效相機** | `rel camera` 的目標存在且型別為 `Camera` | 攔阻 | 同上 |
 
 ### 2. 材質與綁定

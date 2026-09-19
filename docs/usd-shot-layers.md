@@ -53,8 +53,10 @@ def Xform "ROOT" (
     # 四個部門之下，任何部門皆可覆寫——詳見 §5.3。
     def Scope "Cameras"
     {
+        # FinalCamera 是「位置」的保留字，不是單元名——落在此處者即為
+        # 最終算圖相機，單元本身不知道自己被選中了（見 §5.2）。
         def "FinalCamera" (
-            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/camera/FinalCamera/camera_latest.usda"`@</ROOT>
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/camera/LayoutMain/camera_latest.usda"`@</ROOT>
         ) {}
     }
 }
@@ -227,7 +229,7 @@ over "ROOT"
 
 > [!NOTE]
 > **`RenderSettings` 以 relationship 指向攝影機**
-> `rel camera = </ROOT/Cameras/FinalCamera/Motion/Camera>`。該路徑之所以能寫死在模板裡，是因為最終算圖相機的單元名為保留字——見 [§5.2](#2-最終算圖相機具名且唯一)。
+> `rel camera = </ROOT/Cameras/FinalCamera/Motion/Camera>`。該路徑之所以能寫死在模板裡，是因為 `FinalCamera` 為**位置**的保留字——落在該位置的即為最終算圖相機——見 [§5.2](#2-最終算圖相機由鏡頭總裝指定而非單元自稱)。
 
 ### 2. 一個鏡頭並存多套 `RenderSettings`
 
@@ -332,7 +334,7 @@ def "ROOT"
 }
 ```
 
-分作兩層的理由是**運動與光學各有其擁有者**：運動多由 Layout 或 Animation 決定，光學（景深、焦段）則常由攝影指導或 Lighting 主張。分層後兩者可各自被覆寫而不互相牽動，立體聲 Rig 亦得以一組運動掛載雙機。
+分作兩層的理由是**運動與光學各有其擁有者**：運動多由 Layout 或 Animation 決定，光學（景深、焦段）則常由攝影指導或 Lighting 主張。分層後兩者可各自被覆寫而不互相牽動——例如 Lighting 調整景深時不會動到機位。
 
 > [!IMPORTANT]
 > **`xformOp` 一律寫在 `Motion` 上，不寫在 `Camera` 上**
@@ -350,22 +352,62 @@ def "ROOT"
 >
 > 分層之後，`Camera` Prim 上就只剩**真正的光學參數**，排查時不必再判斷某個 `xformOp` 究竟意在移動還是意在成像。
 
-### 2. 最終算圖相機：具名且唯一
+### 2. 最終算圖相機：由鏡頭總裝指定，而非單元自稱
 
-一顆鏡頭過程中可以有任意多部攝影機（previz、witness、輔助機），但**最終用於算圖的只能有一部**，且其單元名為保留字：
+**每個攝影機單元的內部結構完全相同**，不因用途而異：
 
 ```text
-/ROOT/Cameras/FinalCamera/Motion/Camera        <-- 全專案恆定
-/ROOT/Cameras/PrevizWide/Motion/Camera         <-- 其餘攝影機自由命名
+<任一相機單元>/v###/camera.usd
+└── /ROOT
+    └── Motion
+        └── Camera
+```
+
+單元**不知道自己是不是最終算圖相機**。這件事由 `shot.usd` 在 Reference 時決定——落在 `FinalCamera` 這個位置的，就是最終算圖相機：
+
+```usda
+# shot.usd
+def Scope "Cameras"
+{
+    # 保留位置：最終算圖相機
+    def "FinalCamera" (
+        prepend references = @`"${PROJECT_ROOT}/.../camera/LayoutMain/camera_latest.usda"`@</ROOT>
+    ) {}
+
+    # 其餘為複選，位置自由命名
+    def "PrevizWide" (
+        prepend references = @`"${PROJECT_ROOT}/.../camera/HandheldA/camera_latest.usda"`@</ROOT>
+    ) {}
+    def "WitnessTop" (
+        prepend references = @`"${PROJECT_ROOT}/.../camera/LightingWitness/camera_latest.usda"`@</ROOT>
+    ) {}
+}
+```
+
+合成後：
+
+```text
+/ROOT/Cameras/FinalCamera/Motion/Camera        <-- 全專案恆定，算圖對象
+/ROOT/Cameras/PrevizWide/Motion/Camera         <-- 複選
 /ROOT/Cameras/WitnessTop/Motion/Camera
 ```
+
+> [!IMPORTANT]
+> **`FinalCamera` 是位置的保留字，不是單元名**
+> 這與[單元不知悉自身掛載位置](usd-publish-packaging.md)是同一條原則。若改由單元自稱（把某個發布目錄命名為 `FinalCamera`），會產生三個問題：
+>
+> 1. **發布者被迫在發布當下決定用途**，但「哪一台是最終機」往往到 Layout 定案甚至更晚才確定。
+> 2. **更換最終機需重新發布或改名**，而實際上該變的只是鏡頭總裝的一個 Reference 目標。
+> 3. **跨部門撞名**：會發布攝影機的部門不只一個，而[單元名於鏡頭作用域內唯一](usd-publish-packaging.md)——Layout 與 Lighting 都想交付「最終機候選」時即告死結。
+>
+> 位置保留字沒有這些問題：各部門自由命名自己的單元（`LayoutMain`、`HandheldA`、`LightingWitness`），由鏡頭總裝挑選其一放進 `FinalCamera`。
 
 > [!IMPORTANT]
 > **路徑固定是流程約束，不是 USD 的要求**
 > `UsdRenderSettings` 的 `camera` 是 **relationship**，技術上可指向任意路徑——即使每顆鏡頭的相機路徑都不同，USD 也運作無礙。
 >
-> 但那會讓 `RenderSettings` 無法以模板產生：每顆鏡頭都得有人手動接上正確的相機，農場提交工具也無從推導。保留 `FinalCamera` 之名，即以結構消除歧異：
-
+> 但那會讓 `RenderSettings` 無法以模板產生：每顆鏡頭都得有人手動接上正確的相機，農場提交工具也無從推導。固定 `FinalCamera` 之位，即以結構消除歧異：
+>
 > ```usda
 > def RenderSettings "final"
 > {
@@ -373,7 +415,7 @@ def "ROOT"
 > }
 > ```
 
-「只能有一部」由結構自然保證——[單元名於作用域內唯一](usd-publish-packaging.md)，同一顆鏡頭不可能存在兩個 `FinalCamera`。
+「只能有一部」由命名空間自然保證——同一個 `Cameras` Scope 底下不可能存在兩個 `FinalCamera`。
 
 ### 3. 以 Reference 帶入，因而弱於所有部門
 
@@ -386,7 +428,7 @@ def Xform "ROOT" ( kind = "assembly" )
     def Scope "Cameras"
     {
         def "FinalCamera" (
-            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/camera/FinalCamera/camera_latest.usda"`@</ROOT>
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/camera/LayoutMain/camera_latest.usda"`@</ROOT>
         ) {}
     }
 }
