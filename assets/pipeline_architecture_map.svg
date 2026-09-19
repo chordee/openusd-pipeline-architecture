@@ -201,7 +201,7 @@
 
       <!-- Camera Unit: Stage Reference -->
       <rect x="14" y="190" width="400" height="38" rx="4" fill="#082f49" stroke="#38bdf8" stroke-dasharray="3 2" />
-      <text class="text-mono" x="24" y="205" fill="#e0f2fe" font-weight="bold">Stage Reference: cam_latest.usda</text>
+      <text class="text-mono" x="24" y="205" fill="#e0f2fe" font-weight="bold">Stage Reference: camera_latest.usda</text>
       <text class="text-dim" x="250" y="205">【LIVRPS 恆弱基準】</text>
       <text class="text-body" x="24" y="220">/ROOT/Cameras/FinalCamera 獨立單元 (運動/光學解耦)，全體可 Override</text>
     </g>
