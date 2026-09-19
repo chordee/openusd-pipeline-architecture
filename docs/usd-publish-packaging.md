@@ -29,7 +29,7 @@
 ### 定位與設計目的
 Pipeline 中常有無法歸類於傳統 Asset（Model/Look）或特定鏡頭部門的特殊需求：
 - Sequence 級的跨鏡頭照明/環境覆寫包
-- 複雜的共用攝影機 Rig / 立體雙鏡頭系統
+- 複雜的共用攝影機 Rig / 3D 立體雙機系統
 - 特殊 Lookdev 校色與診斷 Stage
 - 工具開發人員產生的程序化 USD 幾何或自訂 Schema 容器
 

@@ -336,6 +336,14 @@ def "ROOT"
 
 分作兩層的理由是**運動與光學各有其擁有者**：運動多由 Layout 或 Animation 決定，光學（景深、焦段）則常由攝影指導或 Lighting 主張。分層後兩者可各自被覆寫而不互相牽動——例如 Lighting 調整景深時不會動到機位。
 
+> [!NOTE]
+> **3D 立體相機是具名例外**
+> 立體拍攝需一組運動掛載左右雙機，`Motion` 底下因而是兩顆 `Camera` 而非一顆，固定葉節點結構在此不成立。
+>
+> 這不構成問題，因為**它在專案設定階段就已知**：是否為立體專案不會到鏡頭組裝時才發現。Pipeline 得以預先反應——QC 的葉節點檢查改為接受雙機、提交工具依專案組態決定送哪一眼。
+>
+> 而 `FinalCamera` **這個位置的名稱不受影響**：無論底下掛的是單機或雙機，最終算圖相機恆在 `/ROOT/Cameras/FinalCamera`。下游要定位它的方式沒有改變。
+
 > [!IMPORTANT]
 > **`xformOp` 一律寫在 `Motion` 上，不寫在 `Camera` 上**
 > 就合成結果而言兩者其實等價——`Motion` 是 `Camera` 的父層，變換本就往下傳遞，實測 FOV 與最終矩陣皆無差異。這是**可讀性與歸屬**的規範，不是技術限制。
@@ -443,6 +451,27 @@ def Xform "ROOT" ( kind = "assembly" )
 > 若改以 Sublayer 帶入，攝影機便會與部門圖層在同一個 Layer Stack 內競爭，強弱取決於排序，且無法同時弱於全部四個部門。
 
 這正是攝影機該有的位置：它是**全鏡頭的共同基準**，而非某個部門的產出。Layout 定了機位、動畫依之表演、FX 依之模擬、Lighting 最後仍保有微調景深與焦段的餘地。
+
+### 4. 附帶效益：攝影機可跨鏡頭取用
+
+攝影機單元既是自成一體的 `/ROOT` 包、又不隸屬任何部門，取用它便與取用一個 Asset 無異——**包含取用別顆鏡頭的**：
+
+```usda
+# 本鏡頭的 shot.usd
+def Scope "Cameras"
+{
+    def "FinalCamera" (
+        prepend references = @`"${PROJECT_ROOT}/.../sh010/camera/LayoutMain/camera_latest.usda"`@</ROOT>
+    ) {}
+
+    # 直接引用鄰鏡的主相機，用於接戲比對
+    def "PrevShotCam" (
+        prepend references = @`"${PROJECT_ROOT}/.../sh009/camera/LayoutMain/camera_latest.usda"`@</ROOT>
+    ) {}
+}
+```
+
+典型用途：接戲檢查、整場戲共用一台主相機（此時該單元宜改置於[序列級作用域](usd-publish-packaging.md)）、或 Lighting 需以另一機位驗證光線。**無須複製檔案、也無須改動來源鏡頭**——這是「攝影機不屬任何部門」與「單元 `/ROOT` 化」兩項決定疊加後自然浮現的能力。
 
 ---
 
