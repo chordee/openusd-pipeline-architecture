@@ -335,11 +335,11 @@ publish/                                <-- 專案作用域
     │       ├── environment/
     │       │   ├── Environment_master/     → environment.usd
     │       │   └── <unit>/
+    │       ├── camera/<unit>/              → camera.usd   不屬任何部門
     │       ├── anim/
     │       │   ├── Anim_master/            → anim.usd
     │       │   ├── charAnim/<unit>/        → charAnim.usd  (skel + anim)
-    │       │   ├── propAnim/<unit>/        → propAnim.usd  (geo + xform)
-    │       │   └── camera/<unit>/          → camera.usd
+    │       │   └── propAnim/<unit>/        → propAnim.usd  (geo + xform)
     │       ├── fx/
     │       │   ├── Fx_master/              → fx.usd
     │       │   └── <unit>/                 → element.usd
@@ -494,6 +494,7 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 | Set | `set.usd` | `assets/sets/<unit>/` |
 | 角色動畫 | `charAnim.usd` | `shots/<seq>/<shot>/anim/charAnim/<unit>/` |
 | 道具動畫 | `propAnim.usd` | `shots/<seq>/<shot>/anim/propAnim/<unit>/` |
+| 攝影機 | `camera.usd` | `shots/<seq>/<shot>/camera/<unit>/` |
 | 部門 Master | `<dept>.usd` | `shots/<seq>/<shot>/<dept>/<Dept>_master/` |
 | Pure USD | 單元名 | 任一作用域的 `libraries/<unit>/` |
 

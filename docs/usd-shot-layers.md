@@ -8,7 +8,7 @@
 
 > [!IMPORTANT]
 > **30 秒核心原則**
-> 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。**唯一例外為渲染設定 `/Render`**，其為 `/ROOT` 的同層兄弟——渲染設定不是場景內容，不應隨場景被引用（見 §4）。
+> 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。**攝影機不屬任何部門**，另立 `/ROOT/Cameras` 為同層兄弟（見 §5）。**唯一例外為渲染設定 `/Render`**，其為 `/ROOT` 的同層兄弟——渲染設定不是場景內容，不應隨場景被引用（見 §4）。
 > 2. **LIVRPS Sublayer 強弱順序**：頂層 `subLayers` 順序決定意見權重（Index 越小權限越強）：
 >    `Lighting (最強) > FX (次強) > Animation (中等) > Environment (最弱)`
 > 3. **各部門內部雙層堆疊**：四大主要圖層內部普遍採用 `Master → Overrides → Base` 結構；`overrides.usd` 本身作為聚合容器，再 Sublayer 各任務微型覆寫檔案。
@@ -48,6 +48,15 @@ def Xform "ROOT" (
     kind = "assembly"
 )
 {
+    # 攝影機不屬任何部門，故不經部門 Master，由此直接以 Reference 帶入。
+    # 經 Reference 弧的意見弱於整個 Layer Stack 的 Local 意見，因此它恆在
+    # 四個部門之下，任何部門皆可覆寫——詳見 §5.3。
+    def Scope "Cameras"
+    {
+        def "FinalCamera" (
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/camera/FinalCamera/camera_latest.usda"`@</ROOT>
+        ) {}
+    }
 }
 ```
 
@@ -216,6 +225,10 @@ over "ROOT"
         └── <var_name>                    (RenderVar)        例：beauty / depth / cryptomatte
 ```
 
+> [!NOTE]
+> **`RenderSettings` 以 relationship 指向攝影機**
+> `rel camera = </ROOT/Cameras/FinalCamera/Motion/Camera>`。該路徑之所以能寫死在模板裡，是因為最終算圖相機的單元名為保留字——見 [§5.2](#2-最終算圖相機具名且唯一)。
+
 ### 2. 一個鏡頭並存多套 `RenderSettings`
 
 同一顆鏡頭通常需要數種產出組態，各自獨立成一個 `RenderSettings` Prim：
@@ -267,7 +280,115 @@ over "Render"
 
 ---
 
-## 5. 部門內部圖層結構：Master 與 Overrides 堆疊
+## 5. 攝影機單元：跨部門，且恆為最弱
+
+攝影機**不屬於任何部門**。會發布攝影機的不只 Animation——Layout 的 previz 機、Lighting 的 witness 機、FX 為模擬對位而設的輔助機皆然。因此它：
+
+- 不進入任何部門的 Master 或 `base`
+- 合成於 **`/ROOT/Cameras`**——`/ROOT/Anim`、`/ROOT/FX` 的**同層兄弟**，而非任何部門的子孫
+- 由 `shot.usd` **以 Reference 直接帶入**
+
+### 1. 單元結構：運動與光學分離
+
+```usda
+# camera/<unit>/v###/camera.usd —— 以 /ROOT 為根，不知悉掛載位置
+#usda 1.0
+(
+    defaultPrim = "ROOT"
+)
+
+def "ROOT"
+{
+    # 運動：攝影機在世界中的位移與旋轉
+    def Xform "Motion"
+    {
+        double3 xformOp:translate.timeSamples = {
+            1: (0, 1.5, 3),
+            50: (0.2, 1.55, 2.5)
+        }
+        float3 xformOp:rotateXYZ.timeSamples = {
+            1: (-10, 5, 0),
+            50: (-8, 12, 0)
+        }
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+
+        # 光學：鏡頭本身的成像參數
+        def Camera "Camera"
+        {
+            # 焦距與光圈的單位恆為「scene unit 的十分之一」；本專案為公尺制，
+            # 故十分之一即 10cm：35mm = 0.035m = 0.35    50mm = 0.05m = 0.5
+            float2 clippingRange = (0.01, 10000)
+            float horizontalAperture = 0.20955        # Academy 光圈 20.955mm
+            float focalLength.timeSamples = {
+                1: 0.35,
+                50: 0.5
+            }
+            float focusDistance.timeSamples = {
+                1: 5.0,                               # 對焦距離為 world unit（公尺）
+                50: 3.2
+            }
+        }
+    }
+}
+```
+
+分作兩層的理由是**運動與光學各有其擁有者**：運動多由 Layout 或 Animation 決定，光學（景深、焦段）則常由攝影指導或 Lighting 主張。分層後兩者可各自被覆寫而不互相牽動，立體聲 Rig 亦得以一組運動掛載雙機。
+
+### 2. 最終算圖相機：具名且唯一
+
+一顆鏡頭過程中可以有任意多部攝影機（previz、witness、輔助機），但**最終用於算圖的只能有一部**，且其單元名為保留字：
+
+```text
+/ROOT/Cameras/FinalCamera/Motion/Camera        <-- 全專案恆定
+/ROOT/Cameras/PrevizWide/Motion/Camera         <-- 其餘攝影機自由命名
+/ROOT/Cameras/WitnessTop/Motion/Camera
+```
+
+> [!IMPORTANT]
+> **路徑固定是流程約束，不是 USD 的要求**
+> `UsdRenderSettings` 的 `camera` 是 **relationship**，技術上可指向任意路徑——即使每顆鏡頭的相機路徑都不同，USD 也運作無礙。
+>
+> 但那會讓 `RenderSettings` 無法以模板產生：每顆鏡頭都得有人手動接上正確的相機，農場提交工具也無從推導。保留 `FinalCamera` 之名，即以結構消除歧異：
+
+> ```usda
+> def RenderSettings "final"
+> {
+>     rel camera = </ROOT/Cameras/FinalCamera/Motion/Camera>
+> }
+> ```
+
+「只能有一部」由結構自然保證——[單元名於作用域內唯一](usd-publish-packaging.md)，同一顆鏡頭不可能存在兩個 `FinalCamera`。
+
+### 3. 以 Reference 帶入，因而弱於所有部門
+
+`shot.usd` 以 **Reference** 而非 Sublayer 帶入攝影機：
+
+```usda
+# shot.usd
+def Xform "ROOT" ( kind = "assembly" )
+{
+    def Scope "Cameras"
+    {
+        def "FinalCamera" (
+            prepend references = @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/camera/FinalCamera/camera_latest.usda"`@</ROOT>
+        ) {}
+    }
+}
+```
+
+> [!IMPORTANT]
+> **這個選擇決定了攝影機的強弱位置——而且與直覺相反**
+> 直覺會認為「`shot.usd` 是 Root Layer，寫在裡面的東西最強」。但經 **Reference 弧**帶入的意見，依 LIVRPS 弱於**整個 Root Layer Stack 的 Local 意見**——而四個部門 Master 正是 `shot.usd` 的 Sublayer，同屬該 Layer Stack。
+>
+> 因此攝影機恆在所有部門**之下**，任何部門都能覆寫它。實測：單元宣告 `focalLength = 0.35`，Lighting 圖層覆寫為 `0.85`，合成結果為 `0.85`。
+>
+> 若改以 Sublayer 帶入，攝影機便會與部門圖層在同一個 Layer Stack 內競爭，強弱取決於排序，且無法同時弱於全部四個部門。
+
+這正是攝影機該有的位置：它是**全鏡頭的共同基準**，而非某個部門的產出。Layout 定了機位、動畫依之表演、FX 依之模擬、Lighting 最後仍保有微調景深與焦段的餘地。
+
+---
+
+## 6. 部門內部圖層結構：Master 與 Overrides 堆疊
 
 在實際 Pipeline 中，四大圖層本身並非單一扁平檔案，而是各自採用 **Master → Overrides → Base** 的 Sublayer 結構：
 
@@ -376,7 +497,7 @@ shot.usd
 
 ---
 
-## 6. 跨部門稀疏覆寫（Cross-Department Sparse Overrides）
+## 7. 跨部門稀疏覆寫（Cross-Department Sparse Overrides）
 
 ### 為什麼不需要符合自身 Scene Tree？
 
@@ -388,7 +509,7 @@ shot.usd
 
 ---
 
-## 7. 跨部門覆寫實務情境代碼範例
+## 8. 跨部門覆寫實務情境代碼範例
 
 ### 情境 A：Lighting 覆寫 Environment（背景道具微調）
 * **檔案**：`lighting_overrides/bg_prop_prune.usd`
@@ -542,7 +663,7 @@ over "ROOT"
 
 ---
 
-## 8. 跨部門覆寫的合法方向矩陣
+## 9. 跨部門覆寫的合法方向矩陣
 
 依據 Sublayer 堆疊權重規則（`Lighting > FX > Anim > Env`），覆寫方向具有**單向性**：
 
@@ -555,7 +676,7 @@ over "ROOT"
 
 ---
 
-## 9. 架構優勢與防坑指南
+## 10. 架構優勢與防坑指南
 
 ### Pipeline 架構優勢
 1. **多人並行協作零衝突（Zero File Lock）**：
@@ -596,7 +717,7 @@ over "ROOT"
 
 ---
 
-## 10. 鏡頭交付與進版對齊
+## 11. 鏡頭交付與進版對齊
 
 > 📖 發布邊界、目錄封裝與進版機制詳見：[USD 發布封裝、路徑邊界與進版解析架構](usd-publish-packaging.md)
 
