@@ -229,7 +229,9 @@ over "ROOT"
 
 > [!NOTE]
 > **`RenderSettings` 以 relationship 指向攝影機**
-> `rel camera = </ROOT/Cameras/FinalCamera/Motion/Camera>`。該路徑之所以能寫死在模板裡，是因為 `FinalCamera` 為**位置**的保留字——落在該位置的即為最終算圖相機——見 [§5.2](#2-最終算圖相機由鏡頭總裝指定而非單元自稱)。
+> `rel camera = </ROOT/Cameras/FinalCamera/Motion/Camera>`。該路徑之所以能寫死在模板裡，是因為 `FinalCamera` 為**位置**的保留字——落在該位置的即為全鏡頭主相機——見 [§5.2](#2-最終算圖相機由鏡頭總裝指定而非單元自稱)。
+>
+> `camera` 是 **per-settings** 的，因此各套 `RenderSettings` 大可指向不同攝影機——techpass 從另一機位算圖即為常見情形。這與「主相機只有一部」不衝突，兩者談的不是同一件事，見 [§5.2](#2-最終算圖相機由鏡頭總裝指定而非單元自稱)。
 
 ### 2. 一個鏡頭並存多套 `RenderSettings`
 
@@ -424,6 +426,20 @@ def Scope "Cameras"
 > ```
 
 「只能有一部」由命名空間自然保證——同一個 `Cameras` Scope 底下不可能存在兩個 `FinalCamera`。
+
+> [!IMPORTANT]
+> **判準是對整顆鏡頭而言，不是有沒有被拿去算圖**
+> 一顆鏡頭可並存多套 `RenderSettings`，而 `rel camera` 是 per-settings 的——Lighting 為 techpass 另備一台機、從別的角度算出輔助 Pass，完全正當。這與「主相機只有一部」並不衝突，因為兩者界定的不是同一件事：
+>
+> | | `FinalCamera` | 部門自備的機 |
+> | :--- | :--- | :--- |
+> | 作用範圍 | 全鏡頭共同基準 | 僅對該部門有意義 |
+> | 誰依它工作 | Layout 定機位、動畫表演、FX 模擬皆依它 | 其他部門不依它 |
+> | 是否唯一 | 是 | 可有多台 |
+>
+> techpass 機只對 Lighting 有意義，其他部門不依它工作，因此**不符合主相機的定義**——即使它確實參與了算圖。
+>
+> 這類機依循完全相同的規則：由該部門發布為一個攝影機單元，於 `shot.usd` 佔據自己的位置（如 `TechpassCam`），其 `RenderSettings` 指向該位置。無須任何新機制——這正是「[攝影機是任何部門都可產出的單元](#5-攝影機單元跨部門且恆為最弱)」在實務上的體現。
 
 ### 3. 以 Reference 帶入，因而弱於所有部門
 
