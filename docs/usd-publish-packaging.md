@@ -413,7 +413,7 @@ subLayers = [
 
 > [!NOTE]
 > **`drawMode` 是少數該寫在 Class 根 Prim 上的廣播**
-> [Asset Loader 篇](usd-asset-loader.md)要求廣播意見「一律往下走」，那是針對 `material:binding`——綁定解析由目標 Prim **向上**尋找最近的帶綁定祖先，寫在 Class 根會把整顆 Asset 的材質層次抹平。`model:drawMode` 則相反：它本就是**模型根層級**的屬性，寫在 Class 根（即實例根 Prim）才是正確位置。`model:applyDrawMode` 則用於標籤落在非模型根 Prim 的情形（其預設值為 `false`）。
+> [Asset Loader 篇](usd-asset-loader.md)要求廣播意見「一律往下走」，那是針對 `material:binding`——綁定解析由目標 Prim **向上**尋找最近的帶綁定 ancestor，寫在 Class 根會把整顆 Asset 的材質層次抹平。`model:drawMode` 則相反：它本就是**模型根層級**的屬性，寫在 Class 根（即實例根 Prim）才是正確位置。`model:applyDrawMode` 則用於標籤落在非模型根 Prim 的情形（其預設值為 `false`）。
 
 綁定角色（`rig/`）獨立於 `assets/` 之外，是因為它與幾何材質 Asset **分屬不同審批週期**：Model／Lookdev 驗收一次交付 `assets/char/<unit>/`，Rigging 驗收一次交付 `rig/<unit>/`。鏡頭端引用的恆為後者。
 

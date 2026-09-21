@@ -7,7 +7,7 @@ Pixar USD 用於骨架動畫（skeletal animation）與 blend shape 變形的官
 ```text
 SkelRoot (Boundable Xformable)
   ├─ Skeleton (定義骨架靜態結構)
-  │    └─ SkelAnimation (透過 rel skel:animationSource 綁定，常掛在 Skeleton 或其祖先)
+  │    └─ SkelAnimation (透過 rel skel:animationSource 綁定，常掛在 Skeleton 或其 ancestor)
   └─ Mesh / 任何 Gprim (套用 SkelBindingAPI 後成為被 skinning 的幾何)
         primvars:skel:jointIndices / jointWeights
         skel:geomBindTransform
@@ -42,9 +42,9 @@ SkelRoot (Boundable Xformable)
 - 這些路徑**不對應任何實際 USD prim**，只是 Skeleton 內部的 joint 命名空間
 - relative 風格（不以 `/` 開頭），但不真的相對於任何 prim
 - **必須 ancestral ordering**：parent 在 child 之前
-- 完整路徑必須唯一，但末端名稱可重複（同名兄弟 OK）
+- 完整路徑必須唯一，但末端名稱可在不同分支重複（`"A/Hand"` 與 `"B/Hand"` OK）
 - 允許任意數量的 root joint，例如 `["RootA", "RootA/Child", "RootB"]`
-- 中間路徑可省略：若 `"A/B/C"` 存在但 `"A/B"` 不在陣列裡，`"A/B/C"` 的 parent 自動找最近的祖先 `"A"`
+- 中間路徑可省略：若 `"A/B/C"` 存在但 `"A/B"` 不在陣列裡，`"A/B/C"` 的 parent 自動找最近的 ancestor `"A"`
 
 驗證拓樸合法性：
 
@@ -107,7 +107,7 @@ Applied API schema，套在 Skeleton、SkelRoot 或要被 skin 的 Gprim（通�
 | 名稱 | 用途 |
 | --- | --- |
 | `skel:skeleton` | 指向要使用的 Skeleton prim。可繼承（套在 SkelRoot 上會傳遞給子階層 mesh） |
-| `skel:animationSource` | 指向 SkelAnimation prim。慣例上套在 Skeleton 或其祖先上 |
+| `skel:animationSource` | 指向 SkelAnimation prim。慣例上套在 Skeleton 或其 ancestor 上 |
 | `skel:blendShapeTargets` | 有序的 rel list，每個 target 指向一個 BlendShape prim |
 
 #### Uniform attributes（拓樸 / 綁定資訊）
@@ -135,7 +135,7 @@ Applied API schema，套在 Skeleton、SkelRoot 或要被 skin 的 Gprim（通�
 USD Skel 的綁定關係是**消費端發起**：
 
 - SkelAnimation **不知道**自己對應到哪個 Skeleton（無任何反向 rel）
-- 是 Skeleton（或其祖先）透過 `SkelBindingAPI.skel:animationSource` 指向 SkelAnimation
+- 是 Skeleton（或其 ancestor）透過 `SkelBindingAPI.skel:animationSource` 指向 SkelAnimation
 - 同理 Mesh 透過 `SkelBindingAPI.skel:skeleton` 指向 Skeleton
 
 這個設計讓 SkelAnimation 可以被**任意數量的 Skeleton 共用**（loop animation 多角色共用、instanceable character 多實例等）。
@@ -158,7 +158,7 @@ def "Model" (prepend apiSchemas = ["SkelBindingAPI"]) {
 | 位置 | 行為 |
 | --- | --- |
 | 直接掛在 Skeleton 上 | 該 Skeleton 採用此動畫 |
-| 掛在 SkelRoot 或其他祖先 prim | 透過 namespace **繼承**給後代所有 Skeleton |
+| 掛在 SkelRoot 或其他 ancestor prim | 透過 namespace **繼承**給所有 descendant Skeleton |
 | 掛在 instanceable reference 的外層 `over` | 多個實例共用 anim，每個實例可餵不同 anim |
 
 **重要條件**：schema 註明 `skel:animationSource` 雖然會被繼承，但**只有在該位置同時能解析到 `skel:skeleton` 時才生效**。
@@ -174,8 +174,8 @@ def "Model" (prepend apiSchemas = ["SkelBindingAPI"]) {
 
 要讓 skinning 跑起來，通常需要三層 binding 同時生效：
 
-1. **`skel:skeleton`**（在被 skin 的 mesh 或其祖先 SkelRoot 上）→ 指向 Skeleton
-2. **`skel:animationSource`**（在 Skeleton 或其祖先上）→ 指向 SkelAnimation
+1. **`skel:skeleton`**（在被 skin 的 mesh 或其 ancestor SkelRoot 上）→ 指向 Skeleton
+2. **`skel:animationSource`**（在 Skeleton 或其 ancestor 上）→ 指向 SkelAnimation
 3. **`primvars:skel:jointIndices` / `jointWeights` / `skel:joints`**（在 mesh 上）→ 描述 mesh 點受哪些 Skeleton joint 影響
 
 ## 資料流動（skinning 求值流程）

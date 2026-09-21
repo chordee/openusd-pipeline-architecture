@@ -8,7 +8,7 @@
 
 > [!IMPORTANT]
 > **30 秒核心原則**
-> 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。**攝影機不屬任何部門**，另立 `/ROOT/Cameras` 為同層兄弟（見 §5）。**唯一例外為渲染設定 `/Render`**，其為 `/ROOT` 的同層兄弟——渲染設定不是場景內容，不應隨場景被引用（見 §4）。
+> 1. **統一根節點 `/ROOT`**：所有鏡頭圖層與元素頂層一律以 `/ROOT` 為唯一根節點，各部門在下方以專屬分支隔離（`/ROOT/Environment`、`/ROOT/Anim`、`/ROOT/FX`、`/ROOT/Lighting`），徹底避免名稱碰撞。**攝影機不屬任何部門**，另立與之同層的 `/ROOT/Cameras`（見 §5）。**唯一例外為渲染設定 `/Render`**，其與 `/ROOT` 同層——渲染設定不是場景內容，不應隨場景被引用（見 §4）。
 > 2. **LIVRPS Sublayer 強弱順序**：頂層 `subLayers` 順序決定意見權重（Index 越小權限越強）：
 >    `Lighting (最強) > FX (次強) > Animation (中等) > Environment (最弱)`
 > 3. **各部門內部雙層堆疊**：四大主要圖層內部普遍採用 `Master → Overrides → Base` 結構；`overrides.usd` 本身作為聚合容器，再 Sublayer 各任務微型覆寫檔案。
@@ -202,7 +202,7 @@ over "ROOT"
 
 ## 4. Render 層：`/Render` 命名空間
 
-渲染設定（`RenderSettings` / `RenderProduct` / `RenderVar`）是鏡頭的**終端配置**，其命名空間位於 **`/Render`——`/ROOT` 的同層兄弟，而非其子孫**。
+渲染設定（`RenderSettings` / `RenderProduct` / `RenderVar`）是鏡頭的**終端配置**，其命名空間位於 **`/Render`——與 `/ROOT` 同層，而非在其之下**。
 
 > [!IMPORTANT]
 > **這是「統一根節點 `/ROOT`」鐵律的唯一例外，且為刻意設計**
@@ -289,7 +289,7 @@ over "Render"
 攝影機**不屬於任何部門**。會發布攝影機的不只 Animation——Layout 的 previz 機、Lighting 的 witness 機、FX 為模擬對位而設的輔助機皆然。因此它：
 
 - 不進入任何部門的 Master 或 `base`
-- 合成於 **`/ROOT/Cameras`**——`/ROOT/Anim`、`/ROOT/FX` 的**同層兄弟**，而非任何部門的子孫
+- 合成於 **`/ROOT/Cameras`**——與 `/ROOT/Anim`、`/ROOT/FX` **同層**，而非位於任何部門之下
 - 由 `shot.usd` **以 Reference 直接帶入**
 
 ### 1. 單元結構：運動與光學分離

@@ -36,7 +36,7 @@
 
 ### 1. 統一根節點 `/ROOT`、語意命名解耦，且結構性意見為 Pipeline 工程專有
 - **所有發布單元（Asset、Set Dressing、FX Element、Shot）頂層一律以 `/ROOT` 為唯一根節點**；總裝層與各 sub 物件包一致採用 `/ROOT`，不另立命名，使工具鏈得以無條件鎖定。
-- **唯一例外：鏡頭的渲染設定置於 `/Render`**（`/ROOT` 的同層兄弟）。渲染設定不是場景內容，不應隨場景被引用；且渲染器透過 `renderSettingsPrimPath` 或型別遍歷定位它，與路徑無關。此結構亦與 Houdini Solaris 原生行為一致。
+- **唯一例外：鏡頭的渲染設定置於 `/Render`**（與 `/ROOT` 同層）。渲染設定不是場景內容，不應隨場景被引用；且渲染器透過 `renderSettingsPrimPath` 或型別遍歷定位它，與路徑無關。此結構亦與 Houdini Solaris 原生行為一致。
 - **解耦哲學**：Asset 內部不硬編碼特定名稱（如 `/Chair`），而是在被引用端（Consumer）消費時，由外部 Stage 自由指派語意路徑（如 `/ROOT/Environment/Props/OfficeChair_01`）。
 - **Sub 物件以 Reference 嫁接**：`modelDefault/`、`lookDefault/` 等 sub 物件包各為自成一體的封裝單元，由 Pipeline 在總裝層以 `references` 嫁接至 `/ROOT`；清單順序即意見強弱。
 - **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與嫁接決策一律僅由總裝層宣告，sub 物件包**嚴禁出現**。部門在 `/ROOT` 的白名單**僅含 `collection`**（單元對自身內容的自述）。
@@ -82,7 +82,7 @@
 
 ### 8. 材質綁定契約：幾何零材質、零綁定
 - **幾何發布單元一律不得攜帶材質**：`modelDefault/`、FX `layers/` 等幾何包內，**嚴禁出現任何 `Material` / `Shader` Prim，亦嚴禁宣告任何 `material:binding`**（含 `GeomSubset` 上的分面綁定）；外觀 100% 交由 look / material 圖層全權決定。
-- **為什麼是鐵律**：依 OpenUSD 規則，後代 Prim 的 direct binding 恆強於祖先的繼承意見，且**與圖層強弱完全無關**。幾何只要夾帶了 direct binding，上游無論站在多強的圖層，其覆寫都會**靜默失效**——此即多數 Pipeline「材質覆寫寫了卻沒反應」的根因。
+- **為什麼是鐵律**：依 OpenUSD 規則，descendant Prim 的 direct binding 恆強於 ancestor 的繼承意見，且**與圖層強弱完全無關**。幾何只要夾帶了 direct binding，上游無論站在多強的圖層，其覆寫都會**靜默失效**——此即多數 Pipeline「材質覆寫寫了卻沒反應」的根因。
 - **維持零綁定後的自然秩序**：覆寫能力回歸 LIVRPS，形成「鏡頭覆寫（Local）> 類別廣播（Inherits）> Asset 預設（References）」的正確優先序，無需任何額外機制。
 - **綁定由材質包以 `over` 寫入幾何分支**：`GeomSubset` 分面綁定只能寫在各 subset 上，多材質情形非 `over` 不可，故單材質亦走同一條路。`/ROOT` 上不承載任何屬性。
 - **下游覆寫由覆寫者依意圖選擇形狀**：整顆換材質用 collection binding（`strongerThanDescendants`）寫在實例根、不需內部知識；局部或分面則往下 `over`。唯一的不變量是**覆寫深度不得淺於既有綁定**，否則靜默落敗。

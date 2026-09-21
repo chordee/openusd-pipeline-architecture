@@ -76,7 +76,7 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 > | :--- | :--- | :--- |
 > | **VariantSet 名** | `model`、`look` | 兩個正交維度 |
 > | **Variant 選項名** | `Default`、`Low`、`High` / `Default`、`Red`、`Blue` | 選項不重複維度名 |
-> | **資料夾名** | `modelDefault/`、`modelLow/`、`lookDefault/`、`lookRed/` | 同層兄弟目錄，**必須帶維度前綴才能區別** |
+> | **資料夾名** | `modelDefault/`、`modelLow/`、`lookDefault/`、`lookRed/` | 同層目錄，**必須帶維度前綴才能區別** |
 > | **Prim 分支名** | `/ROOT/Model`、`/ROOT/Look` | **固定不變**，各 variant 包一律定義同名分支 |
 >
 > 分支名固定是材質包得以 `over "Model"` 寫入綁定、且**切換 `model` variant 仍然生效**的前提。若各精度包各用其名，look 的 `over` 一換 variant 即靜默落空。
@@ -222,7 +222,7 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 
 此規則是 USD 的底層行為，無法以任何設定繞過。其影響有兩種表現形式，但**本質是同一件事**——某顆 model 在什麼情況下會掉出 Model Hierarchy：
 
-1. **祖先鏈中斷**：從根到某顆 `component` 之間，任一中間容器未標記 `group`，該 `component` 及其底下即掉出階層。
+1. **ancestor 鏈中斷**：從根到某顆 `component` 之間，任一中間容器未標記 `group`，該 `component` 及其底下即掉出階層。
 2. **置於 `component` 之下**：`component` 本身不是 `group`，因此任何放在 `component` 底下的 model 同樣掉出階層。
 
 > [!IMPORTANT]
@@ -246,7 +246,7 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 | 項目 | 規範 |
 | :--- | :--- |
 | **容器命名與層數** | **完全自由**。`Props`、`Furniture/Chairs`、`BG/Layer_A/...` 任意分層皆可 |
-| **祖先鏈上的容器** | 希望其下的 model 保有 Model 能力時標記 `kind = "group"`（`Scope` 可直接帶 `kind`，無須改為 `Xform`）；不需要則可留空 |
+| **ancestor 鏈上的容器** | 希望其下的 model 保有 Model 能力時標記 `kind = "group"`（`Scope` 可直接帶 `kind`，無須改為 `Xform`）；不需要則可留空 |
 | **`component` 的擺放位置** | **完全自由**，其底下亦可再有 model——該 model 會掉出 Model Hierarchy，此結果在 Kitbash 等情境下正是所欲 |
 | **合規與否** | Pipeline 於發布時**報告**掉出階層的 model 清單，供發布者確認是否為預期；僅在發布者明確聲明需要該能力時才攔阻 |
 
@@ -257,17 +257,17 @@ USD ModelAPI 的所有高級能力（包括階層選取、邊界盒計算、以�
 | 希望下游的行為 | `kind` | 內部 model 的處置 |
 | :--- | :--- | :--- |
 | **整體視為一個單位**選取與降級（一般道具、Kitbash 車輛、單顆 FX 元素） | `component` | 內部 model 掉出 Model Hierarchy——**正是所欲**，避免被各別選取 |
-| **內部各組件可各別選取／各別指定 `drawMode`**（Set Dressing、Environment Set、大型建築群） | `assembly` | 把祖先鏈補齊為 `group`，使各組件保有 Model 能力 |
+| **內部各組件可各別選取／各別指定 `drawMode`**（Set Dressing、Environment Set、大型建築群） | `assembly` | 把 ancestor 鏈補齊為 `group`，使各組件保有 Model 能力 |
 
 > [!IMPORTANT]
 > **職責劃分**：發布者「**決定**」，Pipeline「**寫入**」並「**報告**」
 > - **決定**：由發布者依選取粒度意圖選定 `kind`。發布工具應提供合理預設並允許覆寫——執行 `PointInstancer` 的特效師最清楚自己的原型該如何歸類，該決定權交給他。
 > - **寫入**：`kind` 一律由 **Pipeline 於總裝層寫入**，sub 物件包內嚴禁宣告。此為 [`/ROOT` 鐵律](usd-publish-packaging.md)之一部分，不因決定權下放而改變。
-> - **報告**：發布前 QC 沿祖先鏈走一遍，**列出所有掉出 Model Hierarchy 的 model 及其斷點**，供發布者確認。**這是提示而非攔阻**——唯有發布者明確聲明該 Prim 需要 Model 能力（例如已為其指定 `drawMode`）卻實際失效時，才視為錯誤並中斷發布。
+> - **報告**：發布前 QC 沿 ancestor 鏈走一遍，**列出所有掉出 Model Hierarchy 的 model 及其斷點**，供發布者確認。**這是提示而非攔阻**——唯有發布者明確聲明該 Prim 需要 Model 能力（例如已為其指定 `drawMode`）卻實際失效時，才視為錯誤並中斷發布。
 
 ### 鏡頭級 `kind` 階層參考
 
-鏡頭組裝同樣適用上述規則。以下為**參考範例而非強制形狀**，只要祖先鏈連續即合規：
+鏡頭組裝同樣適用上述規則。以下為**參考範例而非強制形狀**，只要 ancestor 鏈連續即合規：
 
 ```usda
 # shot.usd（Pipeline 總裝層）
@@ -364,13 +364,13 @@ def Xform "ROOT"
 
 ### 1. 為什麼這條鐵律是整套覆寫機制的地基
 
-OpenUSD 的材質綁定解析規則是：**先找該 Prim 自身的 direct binding，找不到才往祖先層層上溯**。這意味著——
+OpenUSD 的材質綁定解析規則是：**先找該 Prim 自身的 direct binding，找不到才往 ancestor 層層上溯**。這意味著——
 
-> **後代的 direct binding 恆強於祖先的 inherited binding，且此規則與圖層強弱（Layer Strength）完全無關。**
+> **descendant 的 direct binding 恆強於 ancestor 的 inherited binding，且此規則與圖層強弱（Layer Strength）完全無關。**
 
-因此只要幾何層在 Mesh 上寫了 direct binding，上游無論站在多強的圖層、用多高的權限，在祖先 Prim 上寫的 binding 都會**靜默失效**——不報錯、不警告，只是畫面沒變。這正是多數 Pipeline 材質覆寫「寫了卻沒反應」的根因。
+因此只要幾何層在 Mesh 上寫了 direct binding，上游無論站在多強的圖層、用多高的權限，在 ancestor Prim 上寫的 binding 都會**靜默失效**——不報錯、不警告，只是畫面沒變。這正是多數 Pipeline 材質覆寫「寫了卻沒反應」的根因。
 
-反過來說，**只要幾何層徹底維持零綁定，祖先的意見便沒有任何競爭對手**，覆寫能力即回歸單純的 LIVRPS 組合弧強弱秩序：
+反過來說，**只要幾何層徹底維持零綁定，ancestor 的意見便沒有任何競爭對手**，覆寫能力即回歸單純的 LIVRPS 組合弧強弱秩序：
 
 | 綁定來源 | 抵達 Prim 的組合弧 | 強度 | 典型用途 |
 | :--- | :--- | :---: | :--- |
@@ -383,11 +383,11 @@ OpenUSD 的材質綁定解析規則是：**先找該 Prim 自身的 direct bindi
 
 > [!CAUTION]
 > **但組合弧強弱只在「同一顆 Prim」上才有意義**
-> 綁定解析的實際規則是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」。一旦意見分處不同深度，**較近的祖先無條件勝出**，與組合弧強弱完全無關：
+> 綁定解析的實際規則是「**由該 Prim 向上尋找最近一個帶綁定的 ancestor**」。一旦意見分處不同深度，**較近的 ancestor 無條件勝出**，與組合弧強弱完全無關：
 >
 > | 綁定所在 Prim | 來源 | 對 `…/Table_01/Model/Body` 而言 |
 > | :--- | :--- | :--- |
-> | `…/Table_01/Model/Body` | Asset 的 look 包（References） | **最近祖先，勝出** |
+> | `…/Table_01/Model/Body` | Asset 的 look 包（References） | **最近 ancestor，勝出** |
 > | `…/Table_01` | Lighting 覆寫（Local） | 較遠，**落敗** |
 >
 > 由於本契約要求材質包以 `over` 進入幾何分支寫出綁定（見 §5.2），Asset 自身的綁定深度必然深於實例根。**下游若在實例根寫覆寫，將靜默落敗。**
@@ -424,7 +424,7 @@ over "Table_01" (
 > | Asset 綁在 | 下游覆寫在 | 結果 |
 > | :--- | :--- | :--- |
 > | `Model/Body` | `Model/Body`（同一顆） | Local 強於 References，**覆寫勝** ✓ |
-> | `Model/Body` | `Model`（較淺） | 較遠的祖先，**靜默落敗** ✗ |
+> | `Model/Body` | `Model`（較淺） | 較遠的 ancestor，**靜默落敗** ✗ |
 > | `Model/Body` | 實例根 ＋ collection binding | 機制專為此設計，**覆寫勝** ✓ |
 >
 > 中間那列是真正的坑：寫了、不報錯、畫面沒變。因此 QC 應**偵測並報告**覆寫意見淺於既有綁定之情形，詳見 [Pipeline 驗證篇](usd-pipeline-validation.md)。
@@ -499,7 +499,7 @@ Houdini、Maya 等 DCC 的 USD 匯出器**預設就會在 Mesh 上寫入 direct 
 
 ### 6. Collection-Based Binding 的兩種用途
 
-`UsdShadeMaterialBindingAPI` 的 collection-based binding 搭配 `bindMaterialAs = "strongerThanDescendants"`，是**唯一**能從祖先壓過後代 direct binding 的機制。它在本架構中有兩種正當用途：
+`UsdShadeMaterialBindingAPI` 的 collection-based binding 搭配 `bindMaterialAs = "strongerThanDescendants"`，是**唯一**能從 ancestor 壓過 descendant direct binding 的機制。它在本架構中有兩種正當用途：
 
 | 用途 | 情境 |
 | :--- | :--- |
@@ -533,7 +533,7 @@ over "Table_01" (
 `instanceable = true` 的 Prim，其內部（Prototype）**不可被 author 任何 opinion**。但本契約將全部綁定收斂在**實例根 Prim**上，而實例根位於 Prototype 之外，因此 Lighting 與 Loader 的整體外觀覆寫**不受 instancing 限制**。
 
 > [!WARNING]
-> **需在部署版本實測確認**：祖先綁定能否正確傳遞至 Instance Proxy 底下的 Mesh，屬於 `UsdShadeMaterialBindingAPI` 的解析行為細節。導入前務必在工作室實際使用的 OpenUSD 版本上驗證，不可預設可用。
+> **需在部署版本實測確認**：ancestor 綁定能否正確傳遞至 Instance Proxy 底下的 Mesh，屬於 `UsdShadeMaterialBindingAPI` 的解析行為細節。導入前務必在工作室實際使用的 OpenUSD 版本上驗證，不可預設可用。
 >
 > 另須注意：若需**分面或針對 Asset 內部個別 Mesh** 做覆寫（而非整體換材質），instancing 會使其完全不可行——該實例必須放棄 `instanceable`。
 
@@ -641,7 +641,7 @@ def Xform "ROOT" (
    - 嫁接位置與 `kind` 全數由 Pipeline 在總裝層決定，`/ROOT` 的所有權因此徹底切分乾淨。詳見 [發布封裝篇 §2 `/ROOT` 鐵律](usd-publish-packaging.md)。
 3. **職責邊界的結構化保障**：
    - `lookDefault` 位於 `references` 清單前方，確保外觀部門對 `/ROOT` 所寫的任何意見，恆強於幾何包的同名意見。
-   - 但須特別澄清：**Asset 的材質正確性並非倚賴此清單順序**。依 OpenUSD 規則，後代 Prim 的 direct binding 恆強於祖先的繼承意見，**與組合弧強弱完全無關**；`lookDefault` 排在前面也壓不過 Mesh 自帶的綁定。
+   - 但須特別澄清：**Asset 的材質正確性並非倚賴此清單順序**。依 OpenUSD 規則，descendant Prim 的 direct binding 恆強於 ancestor 的繼承意見，**與組合弧強弱完全無關**；`lookDefault` 排在前面也壓不過 Mesh 自帶的綁定。
    - 真正的保障來自「幾何零材質、零綁定」鐵律——幾何包根本不產生任何競爭意見。詳見本篇 [§5 材質綁定契約](#5-材質綁定契約material-binding-contract)。
 
 ---
@@ -894,7 +894,7 @@ Mesh     解析到的 skeleton        : /ROOT/Skel
 
 > [!CAUTION]
 > **`Sdf.CopySpec` 只複製 Prim 自身已寫入的意見**
-> 拆包時若逐 Prim 複製 Skeleton 或 Mesh，那些**繼承自祖先**的綁定關係不會隨行——來源明明正確，拆出來的包卻失去骨架連結。
+> 拆包時若逐 Prim 複製 Skeleton 或 Mesh，那些**繼承自 ancestor**的綁定關係不會隨行——來源明明正確，拆出來的包卻失去骨架連結。
 >
 > 對策：拆分後必須在目標 Prim 上**顯式 `Apply()` 並重建 relationship**，不能假設複製即完整。
 
@@ -903,7 +903,7 @@ Mesh     解析到的 skeleton        : /ROOT/Skel
 兩件事疊在一起，使得單獨開啟一個 sub 包幾乎驗不出東西：
 
 1. `over` 的 Prim `IsDefined() == False`，而 USD 預設的走訪判準要求 `IsDefined()`——純 `over` 層獨立開啟時 `Stage.Traverse()` 回傳**空集合**。
-2. 改寫成**無型別 `def`** 雖能恢復走訪，卻**不能**恢復 Skel 語意：`UsdSkel.Cache` 會靜默跳過無型別 Prim 上的蒙皮目標，**無論無型別的是祖先還是 Mesh 自身**。
+2. 改寫成**無型別 `def`** 雖能恢復走訪，卻**不能**恢復 Skel 語意：`UsdSkel.Cache` 會靜默跳過無型別 Prim 上的蒙皮目標，**無論無型別的是 ancestor 還是 Mesh 自身**。
 
 | 層的寫法 | `Stage.Traverse()` | `UsdSkel.Cache` 找得到蒙皮目標 |
 | :--- | :--- | :---: |

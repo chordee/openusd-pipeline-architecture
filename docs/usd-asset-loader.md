@@ -211,11 +211,11 @@ class "__CLASS__"
 
 > [!WARNING]
 > **一、綁定優先序會被反轉——這是最需要警覺的一項**
-> OpenUSD 的材質綁定解析是「**由該 Prim 向上尋找最近一個帶綁定的祖先**」，**組合弧強弱只在同一顆 Prim 上有意義**。因此當意見分處不同層級時：
+> OpenUSD 的材質綁定解析是「**由該 Prim 向上尋找最近一個帶綁定的 ancestor**」，**組合弧強弱只在同一顆 Prim 上有意義**。因此當意見分處不同層級時：
 >
 > | 綁定所在 Prim | 來源 | 對 `/…/OfficeChair_01/Model/Frame` 而言 |
 > | :--- | :--- | :--- |
-> | `…/OfficeChair_01/Model/Frame` | Class 往下走 | **最近祖先，勝出** |
+> | `…/OfficeChair_01/Model/Frame` | Class 往下走 | **最近 ancestor，勝出** |
 > | `…/OfficeChair_01` | Lighting 個別覆寫（Local） | 較遠，落敗 |
 > | `…/OfficeChair_01` | Asset 自身 `lookDefault`（References） | 較遠，落敗 |
 >
@@ -272,7 +272,7 @@ stage.CreateClassPrim("/__CLASS__")     # 指示符為 class，IsAbstract() == T
 
 ### 5. 穿透 Instanceable：`inherit` 是唯一的覆寫途徑
 
-設為 `instanceable = true` 的 Prim，其後代在命名空間中是 **Instance Proxy**——**唯讀，無法被 `over`**：
+設為 `instanceable = true` 的 Prim，其 descendant 在命名空間中是 **Instance Proxy**——**唯讀，無法被 `over`**：
 
 ```python
 stage.OverridePrim("/World/ChairA/Model/Frame")   # 拋出 _ValidateEditing 錯誤

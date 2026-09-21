@@ -206,7 +206,7 @@ def "ROOT" (
 > **攝影機不屬於動畫部門**
 > 早期版本將攝影機置於 `/ROOT/Anim/Cameras` 之下。但**會發布攝影機的部門不只 Animation**——Layout 的 previz 機、Lighting 的 witness 機皆然，因此攝影機不歸屬任何部門的命名空間，也不進入任何部門的 Master。
 >
-> 攝影機自成鏡頭級單元，合成於 `/ROOT/Cameras`——`/ROOT/Anim` 的同層兄弟。結構與最終算圖相機的識別約定詳見 [Shot Layers 篇 §5 攝影機單元](usd-shot-layers.md)。
+> 攝影機自成鏡頭級單元，合成於 `/ROOT/Cameras`——與 `/ROOT/Anim` 同層。結構與最終算圖相機的識別約定詳見 [Shot Layers 篇 §5 攝影機單元](usd-shot-layers.md)。
 
 ### `propAnim` 單元的兩個 sub
 
