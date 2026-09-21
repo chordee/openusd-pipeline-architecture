@@ -327,6 +327,7 @@ class "__CLASS__"
 2. **參數面板設計**：
    - **Asset Picker（Query 按鈕）**：點擊開啟獨立 Qt 瀏覽器，回傳選定檔案路徑。
    - **Destination Path**：字串輸入框，預設自動代入 `/ROOT/Environment/Props/{asset_name}_01`。
+   - **Version**：下拉選單，預設 `latest`，可指定歷史版次。**此參數必須常駐於節點上**——載入後仍需能切換，例如已載入 `latest` 但本次測試要指回舊版比對。Loader 因此應保存「單元路徑」與「版本選擇」兩個獨立參數並據以組出路徑，而非僅保存 Query 回傳的完整路徑。
    - **Composition Arc**：下拉選單（`Payload`、`Reference`、`Sublayer`）。
    - **Instanceable**：勾選按鈕（Toggle）。
    - **Inherit Classes**：字串陣列，預設包含 `/__CLASS__/{asset_name}`，可由使用者自由 `+` 追加。
