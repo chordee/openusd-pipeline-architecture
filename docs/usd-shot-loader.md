@@ -66,7 +66,7 @@
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│  Shot Loader                     sq01 / sh010                │
+│  Shot Loader                     sq01_sh010                  │
 ├──────────────────────────────────────────────────────────────┤
 │  [x]  Lighting_master        latest ▾        Sublayer   [強] │
 │  [x]  Fx_master              latest ▾        Sublayer        │
@@ -105,20 +105,26 @@
 
 ### 1. 鏡頭以參數指涉，而非寫死路徑
 
-Shot Loader 的第一個參數是 **`shotcode`（字串）**，其餘路徑一律由它組出：
+Shot Loader 的第一個參數是 **`shotcode`（字串）**，形式為序列與鏡頭以底線接合的**扁平識別碼**，其餘路徑一律由它拆解後組出：
 
 ```text
-shotcode = "sq01/sh010"
+shotcode = "sq01_sh010"
+             │     └──── 鏡頭
+             └────────── 序列
 
-  shot.usd    → ${PROJECT_ROOT}/publish/shots/{shotcode}/Shot/shot_latest.usda
-  部門 Master → ${PROJECT_ROOT}/publish/shots/{shotcode}/<dept>/<Dept>_master/…
+  shot.usd    → ${PROJECT_ROOT}/publish/shots/sq01/sh010/Shot/shot_latest.usda
+  部門 Master → ${PROJECT_ROOT}/publish/shots/sq01/sh010/<dept>/<Dept>_master/…
 ```
 
 好處不只是少打字：一旦鏡頭是參數，**同一個 LOP 網路就能對任何鏡頭 cook**，多鏡頭執行因而是自然結果，而非額外機制。
 
-> [!NOTE]
-> **`shotcode` 是否含序列，屬專案約定**
-> 發布路徑為 `publish/shots/<seq>/<shot>/`，單憑鏡頭名無法定位。本文採最簡形式——`shotcode` 即作用域路徑片段 `sq01/sh010`，不需查表。若專案採鏡頭名全域唯一（由 `sh010` 即可推得序列），則 Loader 需額外一次查詢。兩者皆可，但必須全專案一致。
+> [!IMPORTANT]
+> **是扁平識別碼，不是路徑片段**
+> `shotcode` 不寫成 `sq01/sh010`，兩個理由：
+> 1. 同一個值還會出現在算圖輸出檔名、`Wedge` 參數、送算任務名與製片追蹤系統中，這些位置容納不了 `/`。尤其是算圖輸出路徑，值裡帶 `/` 會**靜默多生一層目錄**。
+> 2. 扁平碼是全專案唯一的鍵，與[單元名唯一性](usd-publish-packaging.md)同一套思路——識別碼歸識別碼，目錄結構由工具推導，兩者不必同形。
+>
+> 由此推出一項約束：**拆解只取第一個底線**。序列代號因而不得含底線，鏡頭代號則不受限——`sq01_sh010_retake` 可正確拆為 `sq01` 與 `sh010_retake`。這與本專案「後綴一律底線」的命名約定相容。
 
 ### 2. 以 Context Option 驅動
 
