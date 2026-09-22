@@ -111,6 +111,7 @@
 | **最終算圖相機位置已填** | `shot.usd` 的 `/ROOT/Cameras/FinalCamera` 已指向某個攝影機單元，且 `Motion/Camera` 可解析 | 攔阻 | [攝影機單元](usd-shot-layers.md) |
 | **攝影機單元結構同構** | 每個攝影機單元的 `/ROOT` 底下恆為 `Motion/Camera`，不因用途而異 | 攔阻 | 同上 |
 | **`RenderSettings` 指向有效相機** | `rel camera` 的目標存在且型別為 `Camera` | 攔阻 | 同上 |
+| **鏡頭情境順序與 `shot.usd` 相符** | Loader 重建的部門堆疊，其強弱順序與 `shot.usd` 的 `subLayers` 逐項一致 | 攔阻 | [清單來源](usd-shot-loader.md) |
 
 ### 2. 材質與綁定
 
@@ -161,6 +162,7 @@
 | **分類目錄未兼任包裝單元** | 含 `*_latest.usda` 的目錄，其子目錄不得再含 `*_latest.usda` | 攔阻 | [發布根目錄分類](usd-publish-packaging.md) |
 | **單元名於作用域內唯一** | 同一作用域層級（專案／序列／鏡頭）內無同名包裝單元，不分分類、不分型別 | 攔阻 | 同上 |
 | **入口檔名與所在根相符** | `rig/` 下為 `char.usd`、`assets/sets/` 下為 `set.usd`，餘類推 | 報告 | 同上 |
+| **發布產物未含鏡頭情境層** | 輸出的圖層堆疊中不得出現任何部門 Master（`*_master/*_latest.usda`）或 `shot.usd` | 攔阻 | [Layer Break 隔離](usd-shot-loader.md) |
 
 ### 6. 版本鎖定與渲染
 
@@ -170,6 +172,8 @@
 | **鎖定情境下清單存在** | `Render` / `Delivery` 情境下鎖定清單必須存在，不得回落 `latest` | 送算前 | 攔阻 | 同上 |
 | **指定的 RenderSettings 存在** | 提交參數或 `renderSettingsPrimPath` 所指 Prim 確實存在且可解析 | 送算前 | 攔阻 | [Render 層](usd-shot-layers.md) |
 | **製作資料未寫死** | Lighting 發布版本內未寫死解析度與影格範圍 | 發布前 | 攔阻 | 同上 |
+| **鏡頭情境全數為 `latest`** | Shot Loader 的每一列皆未指定歷史版次；回溯狀態下不得發布 | 發布前 | 攔阻 | [版本回溯](usd-shot-loader.md) |
+| **Overrides 重發落在原槽位** | 新版圖層於已發布 Overrides 的 `subLayers` 中位置與其舊版相同 | 發布前 | 攔阻 | [編輯槽位](usd-shot-loader.md) |
 | **交付包已解析 `latest`** | 交付包內不得殘留未鎖定的 `*_latest.usda` 引用 | 交付前 | 攔阻 | [不可變性層級](usd-publish-packaging.md) |
 
 > [!CAUTION]
