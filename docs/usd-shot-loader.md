@@ -22,6 +22,9 @@
 >    - 僅做 mute 並不足夠：mute 只解決「與自己互疊」，不解決「位置不對」，而後者同樣會靜默產出錯誤畫面。
 > 5. **`shot.usd` 是唯一的順序真實來源**：
 >    - 部門強弱順序不得由 Loader 自行定義；工具只負責忠實重現，並在磁碟上的 `shot.usd` 與載入組態不符時提示。
+> 6. **鏡頭以 `shotcode` 參數指涉**：
+>    - 所有路徑由 `shotcode` 組出，同一個網路因而能對任意鏡頭 cook——多鏡頭執行是自然結果，不是額外機制。
+>    - 多鏡頭僅適用於**消費**（測試算圖、序列總覽、批次 QC），**不適用於發布**。
 
 ---
 
@@ -98,7 +101,66 @@
 
 ---
 
-## 3. 啟用開關與版本選擇
+## 3. `shotcode` 參數與多鏡頭執行
+
+### 1. 鏡頭以參數指涉，而非寫死路徑
+
+Shot Loader 的第一個參數是 **`shotcode`（字串）**，其餘路徑一律由它組出：
+
+```text
+shotcode = "sq01/sh010"
+
+  shot.usd    → ${PROJECT_ROOT}/publish/shots/{shotcode}/Shot/shot_latest.usda
+  部門 Master → ${PROJECT_ROOT}/publish/shots/{shotcode}/<dept>/<Dept>_master/…
+```
+
+好處不只是少打字：一旦鏡頭是參數，**同一個 LOP 網路就能對任何鏡頭 cook**，多鏡頭執行因而是自然結果，而非額外機制。
+
+> [!NOTE]
+> **`shotcode` 是否含序列，屬專案約定**
+> 發布路徑為 `publish/shots/<seq>/<shot>/`，單憑鏡頭名無法定位。本文採最簡形式——`shotcode` 即作用域路徑片段 `sq01/sh010`，不需查表。若專案採鏡頭名全域唯一（由 `sh010` 即可推得序列），則 Loader 需額外一次查詢。兩者皆可，但必須全專案一致。
+
+### 2. 以 Context Option 驅動
+
+`shotcode` 參數預設填入 Context Option 運算式，而非字面值：
+
+```text
+shotcode = `@shotcode`
+```
+
+Context Option 變更即觸發下游重新 cook。實測（`scope` LOP 的 `primpath` 設為 `` /ROOT/Shots/`@shotcode` ``）：
+
+| Context Option | Cook 後的 Stage |
+| :--- | :--- |
+| `shotcode = sh010` | `/ROOT/Shots/sh010` |
+| `shotcode = sh020` | `/ROOT/Shots/sh020` |
+
+> [!CAUTION]
+> **Context Option 有兩套，只有全域那套能驅動多鏡頭**
+> `hou.setContextOption()` 設定的是**全域** Context Option，`@name` 運算式讀的正是它，ROP 算圖時設定的也是這一種。
+> LOP 網路內的 `Edit Context Options` 節點屬於另一套機制，其作用範圍需搭配 Context Options Block，**不會**自動被 `@name` 讀到——實測單獨放置該節點時，下游參數的 `@name` 解析為空字串，且**不報錯**，Prim 會以空名被靜默跳過。
+
+### 3. 多鏡頭執行的三個入口
+
+| 入口 | 機制 | 適用情境 |
+| :--- | :--- | :--- |
+| **`USD Render` ROP** | 節點自帶 Context Options 區塊（`optionname` / `optionstrvalue`） | 每顆鏡頭一個 ROP，各自釘住 `shotcode` |
+| **`Wedge` ROP** | 以 `wedgeparams` 迭代並驅動下游 ROP | 一次送出整段序列 |
+| **`For Each` LOP** | `itermethod = For Each String in Parameter` | 在圖內將多顆鏡頭合成至同一個 Stage（如序列總覽） |
+
+### 4. 邊界：多鏡頭用於消費，不用於發布
+
+`shotcode` 參數化使 Loader 與鏡頭無關，但**下游的創作未必無關**：
+
+| 情境 | 是否適用多鏡頭 |
+| :--- | :--- |
+| Lighting 測試算圖、序列總覽、跨鏡頭比對 | **適用**——純消費，不產生發布物 |
+| 自動化 QC、批次檢查 | **適用** |
+| Overrides 任務的創作與發布 | **不適用**——覆寫意見係針對特定鏡頭手工撰寫，一份網路發布多顆鏡頭會使槽位與任務識別失去意義（見 §6） |
+
+---
+
+## 4. 啟用開關與版本選擇
 
 ### 1. 關閉部門不等於它在最終總成中不存在
 
@@ -122,7 +184,7 @@ Loader 上的版本下拉選單**不改變這件事**。把 Anim 指回 `v003` �
 
 ---
 
-## 4. `Layer Break`：載入情境不得進入發布產物
+## 5. `Layer Break`：載入情境不得進入發布產物
 
 ### 1. 位置
 
@@ -157,7 +219,7 @@ Layer Break **不移除任何圖層**，它只在圖層堆疊上留下標記。S
 
 ---
 
-## 5. Overrides 微型任務：編輯槽位，而非 Mute
+## 6. Overrides 微型任務：編輯槽位，而非 Mute
 
 ### 1. 問題
 
@@ -222,24 +284,25 @@ Layer Break **不移除任何圖層**，它只在圖層堆疊上留下標記。S
 
 ---
 
-## 6. DCC 實作對照指引（以 Houdini Solaris 為例）
+## 7. DCC 實作對照指引（以 Houdini Solaris 為例）
 
 1. **節點底層核心**：
    - 部門 Master：`Sublayer LOP`，`positiontype = weakest`（見 §2 的 CAUTION）。
    - 最終算圖相機：`Reference LOP`，目標路徑固定為 `/ROOT/Cameras/FinalCamera`。
    - 隔離：`Layer Break LOP`，緊接於 Loader 之後。
 2. **參數面板設計**：
-   - **Shot Picker**：選擇鏡頭，Loader 隨即讀取該鏡頭的 `shot.usd` 並展開清單。
+   - **Shot Code**：字串參數，預設為 Context Option 運算式 `` `@shotcode` ``（見 §3）。
+   - **Shot Picker**：選擇鏡頭並回填 `Shot Code`，Loader 隨即讀取該鏡頭的 `shot.usd` 並展開清單。
    - **清單列**：每列含 `啟用` 勾選、`版本` 下拉（預設 `latest`）、唯讀的組合弧類型標示。
    - **重新讀取**：與磁碟上的 `shot.usd` 比對，不符時提示。
    - **非 `latest` 標示**：任一列不在 `latest` 時常駐顯示。
-3. **Overrides 任務的槽位參數**（見 §5.4）：
+3. **Overrides 任務的槽位參數**（見 §6.4）：
    - **Task Id**：據以推導 `findsublayers` 樣式與槽位。
    - **Solo**：檢視用，暫時提至最強位置。
 
 ---
 
-## 7. Pipeline 規範對照總表
+## 8. Pipeline 規範對照總表
 
 | 模組維度 | 規範標準 | 技術細節與效益 |
 | :--- | :--- | :--- |
@@ -248,6 +311,8 @@ Layer Break **不移除任何圖層**，它只在圖層堆疊上留下標記。S
 | **清單單位** | `shot.usd` 會合成的每一項（四個 Master ＋ 相機） | 僅複製 `subLayers` 會遺漏以 Reference 帶入的最終算圖相機 |
 | **順序真實來源** | 一律以 `shot.usd` 的 `subLayers` 為準，Loader 不自訂 | `sublayer` LOP 預設 `strongest` 會反轉清單，必須設為 `weakest` |
 | **擺放路徑** | 不開放自訂 | 鏡頭位置為架構明文規定，Overrides 依賴其穩定性定位 |
+| **鏡頭指涉** | `shotcode` 字串參數，預設為全域 Context Option 運算式 | 同一網路可對任意鏡頭 cook；多鏡頭執行為自然結果 |
+| **多鏡頭範圍** | 僅用於消費（測試算圖、序列總覽、批次 QC） | 發布須逐鏡頭進行——覆寫意見係針對特定鏡頭手工撰寫 |
 | **版本選擇** | 每列獨立，預設 `latest`，非 `latest` 時常駐標示 | 回溯屬除錯手段；農場對 `latest` 算圖，不一致不會報錯 |
 | **部門開關** | 可單獨關閉，但發布前應全開複檢 | 結構性覆寫不受影響；與合成結果相關的意見會分歧 |
 | **Overrides 編輯位置** | 落在該任務的既有槽位，而非堆疊最上方 | 僅 mute 只解決自疊，不解決位置；兩者為獨立錯誤 |
