@@ -146,15 +146,7 @@ Context Option 變更即觸發下游重新 cook。實測（`scope` LOP 的 `prim
 > `hou.setContextOption()` 設定的是**全域** Context Option，`@name` 運算式讀的正是它，ROP 算圖時設定的也是這一種。
 > LOP 網路內的 `Edit Context Options` 節點屬於另一套機制，其作用範圍需搭配 Context Options Block，**不會**自動被 `@name` 讀到——實測單獨放置該節點時，下游參數的 `@name` 解析為空字串，且**不報錯**，Prim 會以空名被靜默跳過。
 
-### 3. 多鏡頭執行的三個入口
-
-| 入口 | 機制 | 適用情境 |
-| :--- | :--- | :--- |
-| **`USD Render` ROP** | 節點自帶 Context Options 區塊（`optionname` / `optionstrvalue`） | 每顆鏡頭一個 ROP，各自釘住 `shotcode` |
-| **`Wedge` ROP** | 以 `wedgeparams` 迭代並驅動下游 ROP | 一次送出整段序列 |
-| **`For Each` LOP** | `itermethod = For Each String in Parameter` | 在圖內將多顆鏡頭合成至同一個 Stage（如序列總覽） |
-
-### 4. 邊界：多鏡頭用於消費，不用於發布
+### 3. 邊界：多鏡頭用於消費，不用於發布
 
 `shotcode` 參數化使 Loader 與鏡頭無關，但**下游的創作未必無關**：
 
