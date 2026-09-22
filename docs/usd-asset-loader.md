@@ -50,6 +50,7 @@
 │  4. 繼承標籤（Class Inherits）：                             │
 │     ├── 預設繼承：/__CLASS__/Chair                           │
 │     └── 追加標籤：/__CLASS__/indoor_props                   │
+│  5. 版本：預設 latest，可隨時改指歷史版次                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -325,7 +326,7 @@ class "__CLASS__"
    - 推薦底層封裝 **`Reference LOP`** 或 **`Sublayer LOP`**。
    - `Reference LOP` 設定模式：`Reference Type = Payload`（預設），`Prim Path = <自訂路徑>`。
 2. **參數面板設計**：
-   - **Asset Picker（Query 按鈕）**：點擊開啟獨立 Qt 瀏覽器，回傳選定檔案路徑。
+   - **Asset Picker（Query 按鈕）**：點擊開啟獨立 Qt 瀏覽器，回傳**單元目錄**與**版本選擇**兩項，而非已組好的完整檔案路徑。
    - **Destination Path**：字串輸入框，預設自動代入 `/ROOT/Environment/Props/{asset_name}_01`。
    - **Version**：下拉選單，預設 `latest`，可指定歷史版次。**此參數必須常駐於節點上**——載入後仍需能切換，例如已載入 `latest` 但本次測試要指回舊版比對。Loader 因此應保存「單元路徑」與「版本選擇」兩個獨立參數並據以組出路徑，而非僅保存 Query 回傳的完整路徑。
    - **Composition Arc**：下拉選單（`Payload`、`Reference`、`Sublayer`）。
@@ -336,8 +337,14 @@ class "__CLASS__"
    # Solaris Python Script / LOP Callback
    stage = hou.node(".").stage()
    prim_path = "/ROOT/Environment/Props/chair_01"
+
+   # 單元目錄與版本分開保存，版本才能在載入後切換
+   unit_dir = "${PROJECT_ROOT}/publish/assets/props/Chair"
+   version = "latest"            # 或 "v002"
+   entry = "asset_latest.usda" if version == "latest" else "%s/asset.usd" % version
+
    # Expression Variable 必須以反引號包裹字串運算式，否則不會展開
-   asset_usd_path = '`"${PROJECT_ROOT}/publish/assets/props/Chair/asset_latest.usda"`'
+   asset_usd_path = '`"%s/%s"`' % (unit_dir, entry)
    
    # 1. 建立 Prim 並指派 kind
    prim = stage.DefinePrim(prim_path, "Xform")
@@ -363,6 +370,7 @@ class "__CLASS__"
 | :--- | :--- | :--- |
 | **架構架構** | Query（檢索器）與 Load（載入器）兩段分離 | 檢索瀏覽與 DCC 執行解耦，工具跨軟體高復用 |
 | **載入範圍** | 全發布元素皆可載入 | 涵蓋 Asset、SetDressing Assembly、FX Element、Pure USD Unit |
+| **版本選擇** | 節點保存單元目錄與版本兩個參數，據以組出路徑 | 版本得以在載入後切換；僅保存完整路徑則只能重新檢索一次 |
 | **USD 合成弧** | 嚴格維持原生 Composition Arcs | 僅使用 `Payload`、`Reference`、`Sublayer`，絕不搞專有節點 |
 | **擺放路徑** | 自由自訂 Target Prim Path | 擺脫檔名強綁定，完美發揮發布端 `/ROOT` 解耦彈性 |
 | **實例化** | 支援 `instanceable = true`，排除逐實例覆寫但不排除 Class 廣播 | 達成 Stage 原生記憶體共享；需逐顆覆寫者不得勾選，需整類覆寫者改走 Class |
