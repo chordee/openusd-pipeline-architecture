@@ -273,17 +273,26 @@ def Xform "ROOT"
 
 特效模擬產生的快取資料（如高解析度 Pyro 煙火解算的 OpenVDB 序列、數百萬剛體碎塊或流體幾何的 Geo Cache / Alembic / bgeo.sc）動輒數十 GB 甚至數 TB。若將這些巨量二進位檔案直接寫入一般專案主目錄（Project Root），會造成專案儲存空間暴增、備份負擔沉重且降低整體 Pipeline 的 I/O 效率。
 
-因此，Pipeline 嚴格實施「**實體快取空間隔離＋USD 輕量包裹＋Entry 專案目錄發布**」的三層架構：
+因此，Pipeline 嚴格實施「**工作 scratch＋durable cache promotion＋USD 輕量包裹＋Entry 專案目錄發布**」的四階段架構：
 
 ```text
 ┌────────────────────────────────────────────────────────┐
-│   【獨立規劃之高速快取磁區 / 儲存空間】                  │
+│   【工作 Scratch：可重算、可清理，不得被正式發布引用】   │
 │   /mnt/fx_scratch/caches/ExplosionHero/v002/          │
 │   ├── vdb/density.<0001-0120>.vdb (數百 GB)            │
 │   └── geo/debris.<0001-0120>.bgeo.sc (巨量幾何快取)    │
 └──────────────────────────┬─────────────────────────────┘
                            │
-                 透過 USD 輕量封裝包裹
+                  完整性驗證＋原子 Promotion
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│   【Durable Cache：版本化、不可變、受備份與保留政策保護】│
+│   studio-cache://fx/ExplosionHero/v002/                │
+│   ├── vdb/density.<0001-0120>.vdb                       │
+│   └── geo/debris.<0001-0120>.usd                        │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                  透過 USD 輕量封裝包裹
                  ├── VDB 序列: OpenVDBAsset / Volume Schema
                  └── Geo 序列: USD Value Clips (輕量純文字/微元數據)
                            │
@@ -301,7 +310,9 @@ def Xform "ROOT"
 
 ### 1. 實體快取輸出至獨立規劃空間
 - 特效師在 Houdini 中執行大規模模擬（Sim）時，輸出路徑指向專為大流量、高速寫入規劃的快取磁區（如高效能 NVMe Scratch 儲存或專用快取伺服器）。
-- 這些巨量二進位檔案**不在正規專案目錄內**，可獨立套用短期快照或專屬清理策略（Scratch Retention Policy）。
+- 工作 scratch 可獨立套用短期快照或清理策略，但**任何正式發布 USD 都不得引用它**。
+- 發布前先驗證影格完整性、檔案大小與 checksum，再把核准序列原子推進至版本化的 durable cache storage。Durable 位置可不在 `${PROJECT_ROOT}`，但必須唯讀、可備份，且保留期至少覆蓋專案交付與封存政策。
+- Tracking DB 同時記錄 logical cache identifier、實體映射、checksum 清單與影格範圍；只有 promotion 與登記完成後，才允許產生正式 USD entry。
 
 ### 2. 利用 OpenUSD 組合弧將外部序列包裹為單一 USD
 
@@ -315,6 +326,9 @@ def Xform "ROOT"
 #usda 1.0
 (
     defaultPrim = "ROOT"
+    expressionVariables = {
+        string CACHE_ROOT = "/mnt/durable_cache"
+    }
 )
 
 def Xform "ROOT"
@@ -333,10 +347,10 @@ def Xform "ROOT"
             {
                 token fieldName = "density"        # VDB 檔案內的 grid 名稱
 
-                # filePath 逐格切換，指向獨立快取空間中的序列檔案
+                # filePath 逐格切換，只指向 durable cache，不得指向工作 scratch
                 asset filePath.timeSamples = {
-                    1: @/mnt/fx_scratch/caches/ExplosionHero/v002/vdb/density.0001.vdb@,
-                    2: @/mnt/fx_scratch/caches/ExplosionHero/v002/vdb/density.0002.vdb@
+                    1: @`"${CACHE_ROOT}/fx/ExplosionHero/v002/vdb/density.0001.vdb"`@,
+                    2: @`"${CACHE_ROOT}/fx/ExplosionHero/v002/vdb/density.0002.vdb"`@
                 }
             }
         }
@@ -345,8 +359,8 @@ def Xform "ROOT"
 ```
 
 > [!WARNING]
-> **快取路徑不可依賴 Expression Variable**
-> `filePath` 是 asset 型**屬性值**而非組合弧，不適用 Composition 階段的 `${PROJECT_ROOT}` 展開（詳見 [發布封裝篇 §6.2](usd-publish-packaging.md)）。快取磁區的路徑差異應由 Output Processor 於輸出時寫入已解析的絕對路徑，或交由 Asset Resolver 的 search path 治理，不可在此留下未展開的運算式。
+> **快取路徑必須可遷移，且只能解析至 durable storage**
+> 本規範的 OpenUSD 24.08+ 基線支援 asset-valued attribute 中的 Variable Expression，因此 `OpenVDBAsset.filePath` 可使用 `${CACHE_ROOT}`。部署的 Hydra／renderer 仍須以整合測試確認；若舊版不支援，改用 Asset Resolver logical identifier，而非退回指向工作 scratch 的絕對路徑。
 
 #### B. 幾何快取序列包裹：USD Value Clips
 對於隨時間逐格變更拓撲或頂點的巨量剛體/布料/流體幾何快取（Geo Cache），使用 OpenUSD 原生的 **`Value Clips`** 機制：
@@ -370,7 +384,7 @@ def Xform "ROOT"
             clips = {
                 dictionary default = {
                     # --- Template 模式必填欄位 ---
-                    string templateAssetPath = "/mnt/fx_scratch/caches/ExplosionHero/v002/geo/debris.####.usd"
+                    string templateAssetPath = "studio-cache://fx/ExplosionHero/v002/geo/debris.####.usd"
                     double templateStartTime = 1
                     double templateEndTime   = 120
                     double templateStride    = 1
@@ -398,9 +412,10 @@ def Xform "ROOT"
 > - **Explicit 模式**：`asset[] assetPaths` + `double2[] times` + `double2[] active`。適用於非連號或不規則時間對應。
 > - 兩種模式**不可同時出現在同一個 clip set** 中；`assetPaths` 的型別是 `asset[]`，`times` 與 `active` 是 `double2[]`，切勿誤寫為 `double2`。
 > - `primPath` 與 `manifestAssetPath` 兩種模式皆為必要；缺少 manifest 會迫使 USD 開啟全部 clip 檔案以探查屬性，嚴重拖慢 Stage 開啟速度。
+> - `studio-cache://` 為本架構示意的 Resolver logical scheme，必須映射到 durable cache；工作室亦可採集中掛載的 `${CACHE_ROOT}` 實體路徑，但不得把 scratch 路徑寫入正式 clip metadata。
 
 ### 3. FX Element Entry 正式發布與專案註冊
-當龐大實體快取被包裹為輕量的 `layers/v002/volume_pyro.usd` 與 `layers/v002/debris_clip.usd` 後：
+當龐大實體快取完成 durable promotion，並被包裹為輕量的 `layers/v002/volume_pyro.usd` 與 `layers/v002/debris_clip.usd` 後：
 - **Pipeline 發布流程介入**：Pipeline 發布工具生成最終的總裝圖層 `v002/element.usd`，並更新指向它的 `element_latest.usda`。
 - **寫入專案所屬資料夾**：這些總裝與輕量包裹圖層（總共僅數十 KB 到數 MB）**正式發布進專案標準資料夾**：
   `${PROJECT_ROOT}/publish/assets/fx/ExplosionHero/`

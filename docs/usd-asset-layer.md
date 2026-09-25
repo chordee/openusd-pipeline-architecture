@@ -60,7 +60,7 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 
        ▼ 組裝與展開後在 Stage 的結構 ▼
 
-/ROOT (Xform, kind = component)          <-- 其上不承載任何屬性
+/ROOT (Xform, kind = component)          <-- 不承載根 Transform；collection／binding 依下述契約
 ├── Model/                               <-- 分支名固定；由 model variant 決定引用哪一包
 │   └── Body (Mesh)                      <-- 幾何零材質、零綁定
 │         └── material:binding           <-- 由 Look 包以 over 寫入
@@ -364,9 +364,9 @@ def Xform "ROOT"
 
 ### 1. 為什麼這條鐵律是整套覆寫機制的地基
 
-OpenUSD 的材質綁定解析規則是：**先找該 Prim 自身的 direct binding，找不到才往 ancestor 層層上溯**。這意味著——
+OpenUSD 的材質綁定解析預設規則是：**先找該 Prim 自身的 direct binding，找不到才往 ancestor 層層上溯**。這意味著——
 
-> **descendant 的 direct binding 恆強於 ancestor 的 inherited binding，且此規則與圖層強弱（Layer Strength）完全無關。**
+> **descendant 的 direct binding 強於 ancestor 的預設（`weakerThanDescendants`）binding，且此規則與圖層強弱（Layer Strength）完全無關。**唯一的標準例外是 ancestor 的 material binding relationship 明確設為 `bindMaterialAs = "strongerThanDescendants"`。
 
 因此只要幾何層在 Mesh 上寫了 direct binding，上游無論站在多強的圖層、用多高的權限，在 ancestor Prim 上寫的 binding 都會**靜默失效**——不報錯、不警告，只是畫面沒變。這正是多數 Pipeline 材質覆寫「寫了卻沒反應」的根因。
 
@@ -411,9 +411,14 @@ over "Table_01" (
     uniform token collection:allGeom:expansionRule = "expandPrims"
     rel collection:allGeom:includes = </ROOT/Environment/Props/Table_01>
 
-    rel material:binding:collection:allGeom = </ROOT/Lighting/Materials/M_Table_Darker>
-    # 關鍵：預設為 weakerThanDescendants，必須顯式改為 strongerThanDescendants
-    uniform token material:binding:collection:allGeom:bindMaterialAs = "strongerThanDescendants"
+    # Collection binding 必須同時指向 Material 與 Collection；
+    # bindMaterialAs 是 relationship metadata，不是獨立 attribute。
+    rel material:binding:collection:allGeom = [
+        </ROOT/Lighting/Materials/M_Table_Darker>,
+        </ROOT/Environment/Props/Table_01.collection:allGeom>
+    ] (
+        bindMaterialAs = "strongerThanDescendants"
+    )
 }
 ```
 
@@ -516,9 +521,12 @@ over "Table_01" (
     uniform token collection:allGeom:expansionRule = "expandPrims"
     rel collection:allGeom:includes = </ROOT/Environment/Props/Table_01>
 
-    rel material:binding:collection:allGeom = </ROOT/Lighting/Materials/M_Table_Darker>
-    # 關鍵：預設為 weakerThanDescendants，必須顯式改為 strongerThanDescendants
-    uniform token material:binding:collection:allGeom:bindMaterialAs = "strongerThanDescendants"
+    rel material:binding:collection:allGeom = [
+        </ROOT/Lighting/Materials/M_Table_Darker>,
+        </ROOT/Environment/Props/Table_01.collection:allGeom>
+    ] (
+        bindMaterialAs = "strongerThanDescendants"
+    )
 }
 ```
 
@@ -530,7 +538,7 @@ over "Table_01" (
 
 ### 7. 與 `instanceable` 的關係
 
-`instanceable = true` 的 Prim，其內部（Prototype）**不可被 author 任何 opinion**。但本契約將全部綁定收斂在**實例根 Prim**上，而實例根位於 Prototype 之外，因此 Lighting 與 Loader 的整體外觀覆寫**不受 instancing 限制**。
+`instanceable = true` 的 Prim，其 instance proxy descendants **不可被逐實例直接 author opinion**。實例根本身仍可承載 Transform、Visibility、Primvar，以及影響 Prototype 組合的 Inherits／Specializes 等意見；因此整顆實例的控制與 Class 廣播仍可使用。不同的有效 composition arc／variant 組合可能拆分成不同 Prototype，需以共享率換取廣播能力。
 
 > [!WARNING]
 > **需在部署版本實測確認**：ancestor 綁定能否正確傳遞至 Instance Proxy 底下的 Mesh，屬於 `UsdShadeMaterialBindingAPI` 的解析行為細節。導入前務必在工作室實際使用的 OpenUSD 版本上驗證，不可預設可用。

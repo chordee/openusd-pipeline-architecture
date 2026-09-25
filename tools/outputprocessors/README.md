@@ -18,7 +18,7 @@
    - 這由 `portablereferences.py` 負責處理。
 2. **包外參照（External References）**：
    - 引用專案全域目錄或其他發布單元（如引用全域道具庫）時，若硬編碼本機絕對路徑會導致專案遷移或交付客戶時全面壞鏈。
-   - 必須透過 OpenUSD 的 `expressionVariables` 機制將專案目錄前綴改寫為變數形式（如 `@${PROJECT_ROOT}/publish/assets/...@`）。
+   - 必須透過 OpenUSD 的 `expressionVariables` 機制將專案目錄前綴改寫為合法的字串運算式（如 ``@`"${PROJECT_ROOT}/publish/assets/..."`@``；直接寫 `@${PROJECT_ROOT}/...@` 不會展開）。
    - 這由 `projectrootvariable.py` 負責處理。
 3. **發布後設資料追蹤（Metadata Auditing）**：
    - 在輸出的每個 USD Layer Metadata (`customLayerData`) 中自動注入來源 `.hip` 檔案路徑、輸出時間與作業人員，確保資產履歷可追溯。

@@ -182,9 +182,9 @@ over "ROOT"
     {
         def DomeLight "SkyDome"
         {
-            # 注意：asset 型「屬性值」不適用 Composition 階段的 Expression Variable，
-            # 一律由 Output Processor 於輸出時寫入已解析的絕對路徑。詳見發布封裝篇 §6.2。
-            asset inputs:texture:file = @/projects/show_A/assets/hdri/sunset.exr@
+            # OpenUSD 24.08+ 支援 asset-valued attribute 的 Variable Expression；
+            # 舊版部署須改由 Asset Resolver logical identifier 處理。詳見發布封裝篇 §6.2。
+            asset inputs:texture:file = @`"${PROJECT_ROOT}/assets/hdri/sunset.exr"`@
             float inputs:intensity = 1.2
         }
         def RectLight "KeyLight"
@@ -782,9 +782,9 @@ over "ROOT"
 ## 10. 架構優勢與防坑指南
 
 ### Pipeline 架構優勢
-1. **多人並行協作零衝突（Zero File Lock）**：
+1. **多人並行時降低同檔衝突（Reduced File Lock Contention）**：
    - 燈光組內燈光師 A 負責 `char_lighting_patch.usd`，燈光師 B 負責 `env_shader_tweak.usd`。
-   - 兩人各自發佈獨立小檔，僅在 `overrides.usd` 註冊 sublayer，完全不產生 Git 衝突或檔案鎖爭奪。
+   - 兩人各自發佈獨立小檔，可避免內容層互相覆寫；但 `overrides.usd` 的 sublayer 清單仍是共享寫入點，必須由發布服務序列化、合併或以 CAS 檢查更新，不能宣稱完全零衝突。
 2. **安全版本回滾（Clean Rollback）**：
    - 若某個修補效果出錯，只需發布新版的 `overrides.usd` 容器、將該 sublayer 自清單移除，即可完全復原，**不傷害底層快取、也不需重新解算任何內容**。
    - 被移除的修補檔本身仍完整保留於原處，日後隨時可重新掛回。

@@ -102,8 +102,8 @@
 | 檢查項 | 判定條件 | 級別 | 規範來源 |
 | :--- | :--- | :---: | :--- |
 | **`/ROOT` 已被定義** | 發布包合成後的 `/ROOT` 為 `IsDefined() == True` | 攔阻 | [`/ROOT` 鐵律](usd-publish-packaging.md) |
-| **`/ROOT` 未被部門污染** | Sub 物件包的 `/ROOT` 上無 `kind`、`variantSets` 或非白名單屬性（白名單僅含 `collection`） | 攔阻 | 同上 |
-| **`/ROOT` 無 `xformOp`** | 發布單元的根恆為 identity；角色的 `SkelRoot` 為唯一型別例外 | 攔阻 | 同上 |
+| **`/ROOT` 未被部門污染** | 靜態 Sub 物件包的 `/ROOT` 上無 `kind`、`variantSets` 或非白名單屬性（白名單僅含 `collection`）；根運動時序包改依下一項檢查 | 攔阻 | 同上 |
+| **根 Transform 所有權正確** | 靜態來源單元的 `/ROOT` 無 `xformOp`；`propAnim`、Camera 等根運動單元可帶 `xformOp`，但不得與消費端重複烘入同一段運動 | 攔阻 | 同上 |
 | **Shot 部門圖層未污染 `/ROOT`** | 部門圖層在 `/ROOT` 上無任何屬性或元數據意見 | 攔阻 | 同上 |
 | **`kind` 階層狀況** | 列出所有掉出 Model Hierarchy 的 model 及其斷點 | **報告** | [`usdkind` 治理](usd-asset-layer.md) |
 | **已聲明能力未失效** | 已指定 `drawMode` 等 Model 能力的 Prim，其 Model Hierarchy 實際有效 | 攔阻 | 同上 |
@@ -144,7 +144,7 @@
 | **幾何數值符合專案單位** | 外包／第三方 Asset 的實際尺度已換算驗證 | 攔阻 | 同上 |
 | **時序單元已宣告範圍** | 時序發布單元已宣告 `startTimeCode` / `endTimeCode` 且涵蓋手把影格 | 攔阻 | 同上 |
 | **Camera 焦距單位正確** | `focalLength` / aperture 以「scene unit 的十分之一」計 | 攔阻 | 同上 |
-| **包裝圖層 Metadata 一致** | `*_latest.usda` 的全部 Layer Metadata 與其包裹的版本層逐項相同 | 攔阻 | [`latest` 實現機制](usd-publish-packaging.md) |
+| **包裝圖層入口 Metadata 一致** | `*_latest.usda` 的 stage-level 入口 metadata 與版本層一致；wrapper 自有的 `subLayers`、文件與審計欄位依契約排除 | 攔阻 | [`latest` 實現機制](usd-publish-packaging.md) |
 | **包裝圖層為明文格式** | `*_latest.usda` 實際編碼為 ASCII 而非 Crate（副檔名與內容相符） | 攔阻 | 同上 |
 
 ### 5. 路徑與封裝邊界
@@ -157,6 +157,8 @@
 | **Expression 語法合法** | 變數引用以反引號包裹字串運算式，而非字面路徑 | 攔阻 | 同上 |
 | **Implicit Layer 未外溢** | 自動具現化的圖層全數收斂於輸出子目錄內 | 攔阻 | [Implicit Layer 治理](usd-solaris-implicit-layer.md) |
 | **無壞鏈 Sublayer** | 所有 Sublayer 引用皆可解析 | 攔阻 | 同上 |
+| **正式產物未引用工作 Scratch** | 所有 VDB、Value Clips、貼圖與幾何快取皆解析至 durable、版本化儲存；不得命中可清理的工作 scratch | 攔阻 | [FX Cache Promotion](usd-fx-layer.md) |
+| **外部實體依賴完整** | durable cache 的 checksum、檔案大小、影格範圍與 Tracking DB 登記一致 | 攔阻 | 同上 |
 | **進版格式合規** | 版本目錄為 `v###` 三位數零填充 | 攔阻 | [同構包裝單元](usd-publish-packaging.md) |
 | **內部檔名未摻雜物件名** | 包內檔名為 `asset.usd` / `element.usd` 等固定名稱 | 攔阻 | 同上 |
 | **分類目錄未兼任包裝單元** | 含 `*_latest.usda` 的目錄，其子目錄不得再含 `*_latest.usda` | 攔阻 | [發布根目錄分類](usd-publish-packaging.md) |
@@ -169,6 +171,8 @@
 | 檢查項 | 判定條件 | 關卡 | 級別 | 規範來源 |
 | :--- | :--- | :---: | :---: | :--- |
 | **鎖定清單遞移完整** | 解析過程命中的每個 `*_latest.usda` 皆已入帳 | 送算前 | 攔阻 | [逆向鎖定機制](usd-publish-packaging.md) |
+| **鎖定遍歷條件一致** | 快照記錄並重用 resolver context、variant selections、population mask、load rules 與影格範圍；render-required payload 已載入，clip／asset dependencies 已掃描 | 送算前 | 攔阻 | 同上 |
+| **鎖定鍵值可遷移** | Manifest 使用 unit ID 或正規化專案相對 logical path，不以展開後絕對路徑或 `${PROJECT_ROOT}` 字面式作 runtime key | 送算前 | 攔阻 | 同上 |
 | **鎖定情境下清單存在** | `Render` / `Delivery` 情境下鎖定清單必須存在，不得回落 `latest` | 送算前 | 攔阻 | 同上 |
 | **指定的 RenderSettings 存在** | 提交參數或 `renderSettingsPrimPath` 所指 Prim 確實存在且可解析 | 送算前 | 攔阻 | [Render 層](usd-shot-layers.md) |
 | **製作資料未寫死** | Lighting 發布版本內未寫死解析度與影格範圍 | 發布前 | 攔阻 | 同上 |

@@ -17,9 +17,9 @@
 >    - **包外引用 → 專案 Expression Variable（``@`"${PROJECT_ROOT}/..."`@``）**：所有引用專案目錄的絕對路徑，在輸出時由 **Houdini Solaris Output Processor** 自動改寫為 Stage Expression Variable（如 `${PROJECT_ROOT}`），並於 Layer Metadata 中預設宣告。未來專案目錄搬遷或交付客戶時，**只需在頂層重新指定變數或以 Wrapper Layer 包裹，即可一口氣全局替換所有層的路徑**，零檔案修改。
 > 4. **Pure USD 單元**：發布目標純粹為 USD，內容與結構放寬限制，專供靈活應付額外自訂操作與特殊工具鏈。
 > 5. **Stage Metadata 全專案一致**：`metersPerUnit`、`upAxis`、`timeCodesPerSecond` 必須全專案統一且於每個發布單元入口層明確宣告。**USD 對三者完全不做自動轉換**——被引用層的宣告會被忽略，尺度與座標系錯誤不會報錯，只會靜默錯到底。
-> 6. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口。全平臺**統一採用 `subLayers` 包裝圖層**（不使用 Symlink），必須完整複製版本層的全部 Layer Metadata，並一律以 **`.usda` 明文格式**寫出（如 `asset_latest.usda`）——包裝圖層是每次進版都被重寫的**指標**而非內容，格式須確定且可目視稽核。
+> 6. **全元素進版維持 `latest`**：除獨立貼圖與幾何二進位快取外，所有元素每次進版（`v001`, `v002`...）均自動維護一個指向最新版的 `latest` 入口。全平臺**統一採用 `subLayers` 包裝圖層**（不使用 Symlink），必須鏡射版本層中會決定 Stage 行為的入口 metadata，並一律以 **`.usda` 明文格式**寫出（如 `asset_latest.usda`）——包裝圖層是每次進版都被重寫的**指標**而非內容，格式須確定且可目視稽核。
 > 7. **不選用 VariantSet 控版的架構取捨**：使用 VariantSet 控版會破壞歷史版本的唯讀性（每次加版需回溯修改上層主檔）；改採獨立目錄＋`latest` 指標，能保證各歷史版本在**位元組層級**的不可變性（Immutability）。惟**合成結果**因跨包引用 `latest` 仍會漂移，歷史確定性須倚賴 Asset Resolver 鎖定。
-> 8. **Asset Resolver 逆向鎖定（Version Pinning）**：日常製作引用 `latest` 享受自動更新；農場算圖或定剪交付時，由自訂 Asset Resolver 讀取審批快照，動態將 `latest` 鎖定為具體歷史版本，保障 100% 可重現性。
+> 8. **Asset Resolver 逆向鎖定（Version Pinning）**：日常製作引用 `latest` 享受自動更新；農場算圖或定剪交付時，由自訂 Asset Resolver 讀取審批快照，動態將 `latest` 鎖定為具體歷史版本，保障 USD 組合依賴的確定性。貼圖、快取、Shader、OCIO 與渲染器版本仍須各自封存。
 > 9. **暫存輸出與發布後移轉註冊（Staging & Atomic Promotion）**：所有 USD 元件在發布時，一律先輸出至獨立的**暫存資料夾（Staging / Scratch Directory）**；直到所有檔案寫入、QC 驗證與依賴校驗完全跑完，Pipeline 才以原子操作搬移至專案正式流程結構內並完成資料庫註冊，徹底杜絕半成品外溢污染專案。
 
 ---
@@ -141,8 +141,8 @@ def PointInstancer "ForestTrees"
 > 1. **全 Pipeline 一律以 `/ROOT` 為根**：總裝層與各 sub 物件包**一致採用 `/ROOT`**，不另立命名。此為既有的 [`/ROOT` 解耦哲學](usd-asset-layer.md)之延伸——全工作室只有一套根節點約定，所有自動化工具得以無條件鎖定 `/ROOT`，無須分支判斷。**唯一例外為鏡頭的渲染設定 `/Render`**，其刻意置於 `/ROOT` 之外，理由詳見 [Shot Layers 篇 §4](usd-shot-layers.md)。
 > 2. **sub 物件以 Reference 嫁接**：每個 sub 物件包（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）皆為**自成一體的封裝單元**，內部以 `def Xform "ROOT"` 定義自身的根，並在其下經營自身分支。部門只對自己的包負責，**無須、亦不得**知悉總裝層的存在。
 > 3. **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與各 sub 物件包的嫁接決策，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）宣告**。sub 物件包內**嚴禁出現 `kind`、嚴禁出現 `variantSets`**——這兩者定義的是該單元在全域流程中的身分與形態組合，屬 Pipeline 職權。
-> 4. **嚴禁在 `/ROOT` 寫入非白名單意見**：sub 物件包除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。白名單僅含一項——**`UsdCollectionAPI` 的 collection**，因其為「單元對自身內容的自述」，且經 Reference 嫁接後路徑會自動重映射至掛載位置。
-> 5. **`xformOp` 一律嚴禁，`SkelRoot` 為唯一型別例外**：發布單元的根若帶有 transform，消費端擺放時將與自身的 `xformOp` **疊加成雙重變換**。Asset 的根必須恆為 identity，擺放是消費端的職權。唯一的型別例外是角色的 `/ROOT` 為 `SkelRoot`——那是 Hydra 解算 Skinning 的邊界，型別本身即要求在該位置。
+> 4. **靜態來源 sub 物件包嚴禁在 `/ROOT` 寫入非白名單意見**：除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。白名單僅含一項——**`UsdCollectionAPI` 的 collection**，因其為「單元對自身內容的自述」，且經 Reference 嫁接後路徑會自動重映射至掛載位置。根運動時序包依下一條所有權規則例外處理。
+> 5. **根節點 Transform 採所有權制**：Asset、Set、FX Element 等可被消費端自由擺放的靜態來源單元，其 `/ROOT` 必須為 identity，不得帶 `xformOp`；擺放是消費端的職權。`propAnim`、Camera 等以根節點承載運動本身的時序單元可在 `/ROOT` 寫入 `xformOp`，但消費端不得再烘入同一段運動。`SkelRoot` 是 Hydra skinning 的解算邊界，是否允許根 Transform 仍取決於資料所有權，並非由型別自動豁免。
 > 6. **`over` 不會建立 Prim**：`over "ROOT"` 僅適用於純覆寫用途的圖層（Shot 部門圖層、`overrides` 容器、`latest` 包裝層）。若一個發布包內完全沒有任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。
 
 > [!WARNING]
@@ -156,7 +156,7 @@ def PointInstancer "ForestTrees"
 | 圖層角色 | 產生者 | `/ROOT` 寫法 | 說明 |
 | :--- | :--- | :--- | :--- |
 | **版次總裝層**（`v###/asset.usd`、`v###/element.usd`） | Pipeline | `def Xform "ROOT" ( kind = "..." ; variantSets ; references )` | 總裝的根，獨佔 `kind` 與 `variantSets`，以 Reference 嫁接各 sub 物件包 |
-| **Asset / FX sub 物件包**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `def Xform "ROOT"`（零 `kind`、零 `variantSets`、零 `xformOp`） | 自身封裝包的根，只經營自身分支；`/ROOT` 上僅得宣告 `collection` |
+| **Asset / FX sub 物件包**（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`、`material.usd`…） | 部門輸出 | `def Xform "ROOT"`（零 `kind`、零 `variantSets`、零 `xformOp`） | 靜態來源包的根，只經營自身分支；`/ROOT` 上僅得宣告 `collection` |
 | **Shot 總裝層**（`shot.usd`） | Pipeline | `def Xform "ROOT"` | 鏡頭層的根 |
 | **Shot 部門圖層**（`environment.usd`、`anim.usd`、`fx.usd`、`lighting.usd`） | 部門輸出 | `over "ROOT"` | 以 Sublayer 疊入鏡頭，純覆寫，各自只經營 `/ROOT/<部門分支>` |
 | **`latest` 包裝層**（`asset_latest.usda`、`element_latest.usda`） | Pipeline | `over "ROOT"` 或留空 | 純指標層，不帶入任何場景意見 |
@@ -170,7 +170,7 @@ def PointInstancer "ForestTrees"
 > - **VariantSet 得以收攏至總裝層**：`subLayers` 無法寫在 variant 區塊內，Reference 則可，使變體封裝完全由 Pipeline 掌管，部門只需單純交付各自的內容包。
 > - **意見強弱語意不變**：同一 Prim 上的多筆 `references` 依清單順序定強弱（越前面越強），與原先 `subLayers` 完全一致。
 >
-> 發布前 QC 必檢三項：**（a）** 每個發布包合成後的 `/ROOT` 皆為 `IsDefined() == True`；**（b）** sub 物件包的 `/ROOT` 上不得出現 `kind`、`variantSets`、`xformOp` 或任何非白名單屬性（白名單僅含 `collection`）；**（c）** Shot 部門圖層不得在 `/ROOT` 上殘留任何屬性或元數據意見。
+> 發布前 QC 必檢三項：**(a)** 每個可獨立消費的發布包合成後，其 `/ROOT` 皆為 `IsDefined() == True`；純 Shot patch layer 則必須在指定的 `shot.usd` context 中驗證命中目標；**(b)** 靜態 sub 物件包的 `/ROOT` 上不得出現 `kind`、`variantSets`、`xformOp` 或任何非白名單屬性（白名單僅含 `collection`），時序單元另依根 Transform 所有權規則驗證；**(c)** Shot 部門圖層不得在 `/ROOT` 上殘留任何屬性或元數據意見。
 
 ### 範例 B：FX Element 發布包目錄結構（以 `ExplosionHero` 為例）
 FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
@@ -204,7 +204,7 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 > **FX Element 進版連動機制與龐大快取隔離**
 > - **只有 element entry 會有 latest**：全元素目錄下唯有頂層的 `element_latest.usda` 作為對外發布與掛載指標；底下的 `layers/`、`materials/` 等 sub 單元**一律不設獨立 latest**。
 > - **Sub 單元進版推進 Element Entry 進版**：特效師每次重新解算體積（生成新版體積圖層）或更新專用著色器（`materials/v002/`），Pipeline 直接推進 `element.usd` 整體進版（生成 `v002/element.usd`），內部以相對路徑精準鎖定各 sub 單元版本，並自動維護頂層 `element_latest.usda` 指向 `v002/element.usd`。
-> - **龐大快取空間隔離與 USD 輕量包裹**：特效解算的重型二進位快取（Geo Cache 或數百 GB 的 OpenVDB 序列）體量龐大，**實體檔案輸出至獨立規劃的高速快取空間（如專用快取伺服器或 scratch 磁區），不直接存放在專案目錄內**。發布時透過 **`Value Clips`**（幾何）或 **`OpenVDBAsset / Volume`** Schema 包裹為單一輕量 `.usd` 圖層，最終的 FX Element Entry 依然正規發布進專案目錄（`publish/assets/fx/...`）並於系統註冊。詳見：[USD FX Layer 鏡頭特效層架構設計](usd-fx-layer.md)。
+> - **龐大快取空間隔離與 USD 輕量包裹**：特效解算先寫入高速工作 scratch；正式發布前，必須將核准的 Geo Cache／OpenVDB 序列原子推進至版本化、不可變且受備份／保留政策保護的 durable cache storage。正式 USD 只能指向 durable 路徑，不得依賴可清理的工作 scratch。發布時再以 **`Value Clips`**（幾何）或 **`OpenVDBAsset / Volume`** Schema 包裹為輕量 `.usd` 圖層，最終的 FX Element Entry 正規發布進專案目錄（`publish/assets/fx/...`）並於系統註冊。詳見：[USD FX Layer 鏡頭特效層架構設計](usd-fx-layer.md)。
 
 ### 範例 C：角色動畫發布包目錄結構
 ```text
@@ -271,18 +271,19 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 │  【階段三：原子移轉至專案正式流程結構】               │
 │  mv /mnt/scratch/.../Chair/v002                        │
 │   --> ${PROJECT_ROOT}/publish/assets/props/Chair/v002/ │
-│  自動更新維護 ${PROJECT_ROOT}/.../asset_latest.usda    │
 └──────────────────────────┬─────────────────────────────┘
                            │
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │  【階段四：正式註冊（Tracking Database Registration）】 │
 │  - 向 Production DB / ShotGrid 註冊該版本已發布        │
+│  - 以 compare-and-swap 原子更新 asset_latest.usda      │
 │  - 觸發下游通知或自動轉檔 Hook                          │
 └────────────────────────────────────────────────────────┘
 ```
 
 1. **階段一：暫存輸出（Staging Output）**：
+   - 開始輸出前先由 Tracking DB／版本服務以 lock 或 sequence 配發唯一版號與 publish attempt ID；不得以「掃描目錄後加一」配置版號。
    - 所有 USD ROP 節點、背景算圖工作或發布腳本，輸出的目標目錄一律為隔離的暫存路徑（如本機快取或高速 Scratch 目錄）。
    - 正式專案目錄在此階段完全不受任何未完成寫入的 I/O 影響。
 2. **階段二：完整性與安全性檢驗（Validation）**：
@@ -298,9 +299,10 @@ FX 元素同樣嚴格遵守與 Asset 完全相同的同構進版原則：
 
 3. **階段三：原子移轉（Atomic Promotion / Move）**：
    - 唯有在發布流程所有邏輯**完全跑完並驗證通過後**，發布引擎才將暫存目錄以檔案系統原子操作（`move` / `rename`）移轉至專案所屬的正式資料夾結構中。
-   - 同步更新頂層的 `_latest.usda` 入口指標，並將該版本目錄設為唯讀（Read-Only）。
+   - 將該版本目錄設為唯讀（Read-Only）；此階段只保證版本內容不會以半成品曝光，不代表資料庫與 `latest` 已完成跨系統交易。
 4. **階段四：專案註冊（System Registration）**：
-   - 移轉就緒後，正式在專案管理系統（Tracking / Asset DB）中完成註冊，對下游廣播此新版正式可用。
+   - 移轉就緒後，在專案管理系統將 attempt 標記為 ready，再以「目前 latest 仍等於本次開始時觀察值」為條件 compare-and-swap 更新 `_latest.usda`。若條件不成立，保留已發布版本但不得覆蓋較新的 latest，並回報併發衝突。
+   - 檔案系統與資料庫無法形成單一原子交易時，使用可重試的狀態機／outbox 與 reconciliation job；只有註冊和 latest 都完成後才對下游廣播。
 
 ---
 
@@ -746,13 +748,13 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 > 本專案的參考實作 [`projectrootvariable.py`](../tools/outputprocessors/projectrootvariable.py) 產出的即為此合法形式，變數名統一為 **`PROJECT_ROOT`**。
 
 > [!WARNING]
-> **適用範圍限於 Composition Arcs**
-> Expression Variable 的展開時機發生在**合成（Composition）階段**，因此其適用對象為 `subLayers`、`references`、`payload` 等組合弧的 asset path，以及 variant selection。
+> **適用範圍取決於 OpenUSD 版本；本規範基線為 24.08 以上**
+> OpenUSD 24.08 以上的 Variable Expression 可用於 `subLayers`、`references`、`payload` 等組合弧、variant selection，以及 asset-valued attributes／metadata。若部署版本早於此基線，必須以實測能力矩陣決定 fallback，不得將舊版限制寫成 USD 的永久規則。
 >
-> 對於一般的 **asset 型屬性值**（如 `DomeLight` 的 `inputs:texture:file`、`OpenVDBAsset` 的 `filePath`、Shader 的貼圖路徑），是否支援 Expression **隨 OpenUSD 版本而異**，不可預設可用。Pipeline 應遵守：
-> - **優先以 Output Processor 於輸出時直接寫入已解析的絕對路徑**，而非留下 Expression。
-> - 若確有需求在屬性值上使用變數，**必須在工作室實際部署的 OpenUSD 版本上實測驗證**後才納入規範。
-> - 貼圖與快取類的外部路徑，建議改以獨立的 Asset Resolver 或 search path 機制處理，與 Composition 層的 `${PROJECT_ROOT}` 分開治理。
+> 對一般 **asset 型屬性值**（如 `DomeLight.inputs:texture:file`、`OpenVDBAsset.filePath`、Shader 貼圖路徑），Pipeline 應遵守：
+> - 部署基線支援時，優先保留 Expression 或 Resolver logical identifier，避免硬編碼工作室掛載點。
+> - CI 必須在工作室實際部署的 OpenUSD／Hydra／renderer 組合上驗證解析結果；第三方 renderer 是否完整支援仍屬整合能力，而非只看 USD Core。
+> - 舊版環境不支援時，使用 Asset Resolver logical identifier；只有受集中掛載契約管理、且交付時會重寫或封裝的路徑，才能退回絕對路徑。
 
 #### 傳統硬編碼絕對路徑的致命缺陷
 在過去，引用專案外部 Asset 庫（如全域場景陳設或跨部門快取）時，若直接硬編碼全域絕對路徑（如 `@/projects/show_A/publish/...@`）：
@@ -837,14 +839,14 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 選用包裝圖層而非 Symlink 的三項理由：
 
 1. **跨平臺無條件可用**：純 USD 官方原生機制，不需要任何作業系統底層權限（Windows 建立 Symlink 通常需要 UAC 或開發者模式）。Symlink 跨 SMB/CIFS 的行為則取決於伺服器設定與 Windows 用戶端策略，無法保證。
-2. **Asset Resolver 得以攔截**：包裝圖層是一個**真實存在的 Layer**，Resolver 看得見、攔得住。Symlink 在 AR 解析時很可能直接被 realpath 為 `v003/asset.usd`，Resolver **根本沒有機會介入**——[逆向鎖定機制](#10-asset-resolver-的逆向鎖定機制version-pinning)將因此失效。
-3. **行為單一**：兩種實作在 Resolver 眼中是完全不同的攔截點，並存會使同一套鎖定邏輯無法涵蓋。
+2. **提供穩定的 logical identifier**：包裝圖層讓 `asset_latest.usda` 成為跨平臺一致、可稽核的真實入口。Resolver 能在 identifier／resolve 階段以該名稱套用鎖定規則，不必依賴各作業系統與 SMB 對 Symlink 的不同處理。
+3. **行為單一**：Symlink 是否在自訂 Resolver 介入前被 canonicalize，取決於 resolver implementation；本架構不宣稱所有 Resolver 都無法攔截 Symlink，而是刻意排除這個環境差異，統一採真實 wrapper layer。
 
 > [!NOTE]
 > **Hardlink 亦不適用於 `latest`**
-> Hardlink 雖然同樣免權限、零 metadata 損失，但與 Symlink 一樣**無法被 Resolver 攔截**（解析後即為實體檔案），且存在「寫穿」污染歷史版本的風險。它適用於貼圖等大體積資料的增量去重，不適用於版本入口指標。
+> Hardlink 沒有獨立的 logical pointer 語意，且存在「寫穿」污染歷史版本的風險；不同路徑也可能 canonicalize 為同一檔案身分。它適用於受控的內容去重，不適用於可變的版本入口指標。
 
-### 2. 包裝圖層必須完整複製版本層的 Layer Metadata
+### 2. 包裝圖層必須鏡射版本層的 Stage 入口 Metadata
 
 > [!CAUTION]
 > **Layer Metadata 不會透過 `subLayers` 向上傳遞**
@@ -854,13 +856,13 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 >
 > 更隱蔽的是 **`timeCodesPerSecond` 不一致**：若版本層宣告 `25` 而包裝層未宣告（預設 `24`），USD 會依兩者比值對 sublayer 施加**自動時間縮放**。動畫不會壞掉，只是整體速率偏移 `24/25`——這種錯誤極難歸因。
 
-因此發布工具產生包裝圖層時，**必須逐項複製版本層的全部 Layer Metadata**：
+因此發布工具產生包裝圖層時，**必須逐項鏡射會決定 Stage 行為的入口 metadata**，而不是照抄所有 layer fields：
 
 ```usda
 # /projects/show_A/publish/assets/props/Chair/asset_latest.usda
 #usda 1.0
 (
-    # 以下 metadata 必須與 v003/asset.usd 完全一致，缺一不可
+    # 以下 Stage 入口 metadata 必須與 v003/asset.usd 一致
     defaultPrim = "ROOT"
     metersPerUnit = 1
     upAxis = "Y"
@@ -878,8 +880,8 @@ over "ROOT"
 ```
 
 > [!TIP]
-> **實作建議：以程式讀取後原樣寫出，不要維護白名單**
-> 發布工具應直接讀取版本層的 `SdfLayer` metadata 逐項轉寫，而非硬編碼一份欄位清單——否則日後新增任何 Layer Metadata（如自訂的發布審計欄位）都會被靜默遺漏。
+> **實作建議：維護明確契約，並對未知入口 metadata fail loud**
+> 必須鏡射的最低集合為 `defaultPrim`、`metersPerUnit`、`upAxis`、`timeCodesPerSecond`、`framesPerSecond`，以及時序單元的 `startTimeCode`／`endTimeCode`；`expressionVariables` 依入口層策略合併。`subLayers`、comment／documentation、wrapper 審計資料等由 wrapper 自己負責，不得從版本層覆蓋。工具若發現未分類的新 metadata，應中止並要求更新契約，而不是靜默遺漏或盲目複製。
 
 
 ### 3. 包裝圖層一律以 `.usda` 明文格式寫出
@@ -898,7 +900,7 @@ over "ROOT"
 由此導出三項實益：
 
 1. **格式不再曖昧**：`.usd` 的實際編碼由內容嗅探決定，同一個副檔名可能是 Crate 也可能是明文。對一個每次進版都被改寫的檔案，格式應當是確定的，而非取決於寫入工具當下的預設值。
-2. **§7.2 的規則變得可目視稽核**：「完整複製版本層的全部 Layer Metadata」是最容易靜默腐爛的一條規則——漏掉 `upAxis` 不會報錯，只會讓 Asset 躺倒。明文格式讓這件事 `cat` 一眼可驗，不需開啟 Stage。
+2. **§7.2 的規則變得可目視稽核**：「依契約鏡射 Stage 入口 metadata」是最容易靜默腐爛的一條規則——漏掉 `upAxis` 不會報錯，只會讓 Asset 躺倒。明文格式讓這件事 `cat` 一眼可驗，不需開啟 Stage。
 3. **不需 USD 環境即可確認指向**：排查「這顆鏡頭究竟吃到哪一版」時，純文字讀取即可得到答案。備份稽核、交付前清點、農場節點上的快速診斷皆然。
 
 代價是版本層與包裝圖層的副檔名不對稱，但這個不對稱**本身就在攜帶資訊**：副檔名即宣告了「這兩者是不同種類的檔案」，避免把指標誤當內容處理。
@@ -916,7 +918,7 @@ over "ROOT"
 | 評估維度 | USD VariantSet 控制版本（權衡後不採用） | `latest` 指標 / Sublayer 模式（選用方案） |
 | :--- | :--- | :--- |
 | **歷史發布不可變性<br>(Immutability)** | **需回溯修改**。<br>發布 `v003` 時，必須重新開啟並編輯上層主檔案，將 `v003` 註冊進 variant 清單，歷史目錄無法設為完全唯讀。 | **位元組層級凍結**。<br>`v001` 與 `v002` 所在的資料夾一旦發布便轉為 Read-Only，其檔案內容永不改動。<br>*（合成結果因跨包 `latest` 仍會漂移，詳見下節）* |
-| **檔案鎖與並發發布** | **可能衝突**。<br>多人同時發布不同分支時，會同時爭搶寫入同一個包含 VariantSet 的主檔。 | **零衝突**。<br>新版本寫入獨立的新目錄，僅在最後一步以原子操作更新 `latest` 指向。 |
+| **檔案鎖與並發發布** | **可能衝突**。<br>多人同時發布不同分支時，會同時爭搶寫入同一個包含 VariantSet 的主檔。 | **衝突面較小，但仍需交易控制**。<br>版本內容寫入獨立目錄；版號配置、資料庫註冊與 `latest` 更新仍須 lock／sequence／compare-and-swap，原子 rename 只能防止半檔，不能防止 lost update。 |
 | **Stage 記憶體開銷** | **累積膨脹**。<br>VariantSet 會將數十個歷史版本的定義都載入記憶體結構中，版本越多 Stage 解析負擔越大。 | **極致輕量**。<br>Stage 僅解析 `latest` 指向的那一個單一版本。 |
 | **維護成本** | **連鎖更新**。<br>上游 Asset 每次加版，下游必須全部重新簽入以適應新的 Variant 選項。 | **局部自理**。<br>每個 Asset 只需維護自身當前的 `latest` 指標。 |
 
@@ -998,7 +1000,7 @@ sets/LivingRoom/v003/set.usd
 
 ### 1. 攔截點：重寫路徑字串，而非解析圖層內容
 
-Resolver 攔截的是 **`ArResolver::Resolve()` 收到的路徑字串**。當它看到 `…/Chair/asset_latest.usda` 時，直接回傳 `…/Chair/v002/asset.usd` 的實體路徑——**完全不需要開啟或解析包裝圖層的內容**。
+Resolver 以 `CreateIdentifier()` 產生的 logical identifier 與綁定的 `ArResolverContext` 為判斷基礎，並在 `Resolve()` 將 `…/Chair/asset_latest.usda` 映射至 `…/Chair/v002/asset.usd`。Variable Expression 會在 asset path anchoring／resolution 前求值，因此 runtime lookup 不應假設仍可取得原始的 `` `${PROJECT_ROOT}` `` 字串；包裝圖層內容無須為每次鎖定而改寫。
 
 ```text
 Composition 要求解析  @…/Chair/asset_latest.usda@
@@ -1011,12 +1013,14 @@ Composition 要求解析  @…/Chair/asset_latest.usda@
 ```
 
 > [!IMPORTANT]
-> **這是 `latest` 必須採用包裝圖層而非 Symlink 的根本原因**
-> 包裝圖層讓 `asset_latest.usda` 成為一個**真實存在的路徑**，Resolver 得以在 `Resolve()` 攔截它。若改用 Symlink，AR 在解析時很可能直接將其 realpath 為 `v003/asset.usd`，Resolver **根本看不到 `latest` 這個字串**，逆向鎖定完全失效。詳見 [§7 `latest` 實現機制](#7-latest-動態入口的實現機制)。
+> **`latest` 使用包裝圖層，是為了穩定且跨平臺的 logical identifier**
+> 自訂 Resolver 理論上可自行定義 Symlink／filesystem path 的 identifier 行為；但不同作業系統、SMB 與 resolver implementation 的 canonicalization 時機不一致。真實的 `asset_latest.usda` wrapper 讓 authored identifier、稽核入口與 fallback 行為在所有環境中一致。詳見 [§7 `latest` 實現機制](#7-latest-動態入口的實現機制)。
 
 ### 2. 情境傳遞：使用 `ArResolverContext`，而非環境變數
 
 `Work` 與 `Render` 的區分應透過 OpenUSD 原生的 **`ArResolverContext`** 攜帶——它可綁定至特定 Stage、支援巢狀與堆疊，且生命週期與 Stage 一致。
+
+Resolver 的快取鍵必須同時包含正規化後的 logical identifier 與有效 context；不得讓 `Work` 與 `Render` 共用同一筆解析結果。`Render`／`Delivery` context 在任務生命週期內視為不可變；`Work` 的 `latest` 對應更新後，則必須透過 resolver 的 context refresh／change notice 機制使既有 Stage 失效重解，或明確要求重開 Stage。只更新 wrapper 檔案而不處理 resolver cache，不能保證互動工作階段看到新版。
 
 > [!WARNING]
 > **不要以環境變數傳遞情境**
@@ -1050,6 +1054,8 @@ Composition 要求解析  @…/Chair/asset_latest.usda@
 > 綁定角色鎖在 `v002` 之後，它內部引用的幾何材質 Asset 仍是 `asset_latest`——建模一進版，畫面照樣改變。**凡解析過程中命中 `*_latest.usda` 的節點，全部都要入帳。**
 >
 > 包內以相對路徑鎖定的 sub 物件（如 `v002/asset.usd` 內的 `@../modelDefault/v002/…@`）本來就已凍結，無須記錄。
+>
+> **完整性不能只靠 `Stage.GetUsedLayers()`**：unloaded payload 不會出現在已使用圖層集合中，Value Clips 又按需求延遲開啟。建立快照時必須使用與正式渲染相同的 resolver context、variant selections、population mask 與 load rules，載入全部 render-required payload，並額外掃描 clip metadata 與 asset-valued dependencies。這些 traversal 條件也要寫入快照，否則「完整」無法重現或稽核。
 
 > [!CAUTION]
 > **二、鎖定情境下找不到清單，必須 fail loud**
@@ -1064,8 +1070,8 @@ Composition 要求解析  @…/Chair/asset_latest.usda@
 > 若等到農場節點開始渲染才去讀取當時的 `latest`，則提交到實際執行之間的空窗期內，上游任何一次進版都會被吃進去——排隊愈久風險愈大，而這與不做鎖定並無二致。
 
 > [!WARNING]
-> **四、路徑鍵值應保留 `${PROJECT_ROOT}` 變數形式**
-> 若清單以**已展開的絕對路徑**為鍵，專案目錄一經搬遷或交付客戶，全部歷史鎖定清單即同時失效——這與 [Expression Variable 機制](#6-路徑引用雙重標準與-stage-expression-variable-專案路徑替換)的設計初衷直接矛盾。保留變數形式，鎖定清單才能隨專案一起遷移。
+> **四、鎖定清單使用穩定的 logical key，不使用展開後絕對路徑**
+> Variable Expression 會在 asset path 進入解析流程時求值，`Resolve()` 不應依賴仍能看見原始的 `${PROJECT_ROOT}` 字面字串。鎖定清單的 key 應使用正規化的專案相對 logical path（如 `publish/assets/props/Chair/asset_latest.usda`）或註冊系統的 unit ID；原始 authored expression 可另存為審計資料。如此專案搬遷時只需改 context 中的根目錄映射，manifest 本身不失效。
 
 > [!NOTE]
 > **鎖定機制保證的是 USD 組合結果的確定性，不是畫面的完全重現**
@@ -1133,8 +1139,8 @@ def Xform "ROOT" (
 | **包外 Composition Arcs** | 必須改寫為 Stage Expression Variable（``@`"${PROJECT_ROOT}/..."`@``） | 掃描 SdfLayerDependencies，**路徑解析後不得逸出 Package Root**（包內向上跳層如 `@../modelDefault/...@` 為合規） |
 | **Pure USD 單元** | 內容不限，專供自訂與特殊操作 | 僅驗證路徑與封裝邊界，放寬 Schema 限制 |
 | **進版格式** | `v###` 三位數零填充目錄 | `v001`, `v002`, `v003`... 保持歷史唯讀 |
-| **`latest` 實現** | 全平臺統一為 USD Sublayer 包裝圖層 | 不使用 Symlink／Hardlink——二者無法被 Asset Resolver 攔截 |
-| **包裝圖層 Metadata** | 必須完整複製版本層的全部 Layer Metadata | Layer Metadata 不透過 `subLayers` 傳遞；遺漏將導致 `upAxis` 回落預設值、`timeCodesPerSecond` 不一致引發隱式時間縮放 |
+| **`latest` 實現** | 全平臺統一為 USD Sublayer 包裝圖層 | 以真實 wrapper 提供穩定、可稽核的 logical identifier，避免 Symlink／Hardlink 在不同平臺與 Resolver 實作下的 canonicalization 差異 |
+| **包裝圖層入口 Metadata** | 必須依明確契約鏡射版本層的 Stage 入口 metadata | Stage metadata 不透過 `subLayers` 傳遞；遺漏將導致 `upAxis` 回落預設值、`timeCodesPerSecond` 不一致引發隱式時間縮放；`subLayers` 等 wrapper 自有欄位不得照抄 |
 | **版本控管機制** | 獨立目錄進版搭配 `latest` 指向 | 位元組層級不可變；合成結果因跨包 `latest` 漂移，須由 Resolver 鎖定 |
 | **生產期引用** | 預設引用 `*_latest.usda` | 享受無感即時更新 |
 | **渲染/發布鎖定** | 透過 Asset Resolver 於 `Resolve()` 重寫 `*_latest.usda` 路徑；情境以 `ArResolverContext` 攜帶 | 鎖定清單須遞移涵蓋依賴樹；鎖定情境下找不到清單須 fail loud |

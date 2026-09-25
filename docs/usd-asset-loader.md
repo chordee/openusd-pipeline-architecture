@@ -19,7 +19,7 @@
 >    - 允許藝術家自由指定載入進來的擺放層級與命名（除了 `Sublayer` 外），充分利用發布端 `/ROOT` 解耦優勢。
 > 5. **Instanceable 原生實例化選項**：
 >    - 高密度道具可勾選 `instanceable = true`，享受 USD Core 內部 Stage 結構共享。
->    - **代價**：Instance 內部不可 author 任何 opinion，等同放棄一切內部覆寫能力（含 Class 廣播）。記憶體效益與可覆寫性無法兼得。
+>    - **代價**：Instance Proxy 不可被逐實例直接覆寫；若需修改內部內容，必須放棄 instanceable，或改以掛在實例根的 Inherits／Specializes 等 composition arc 廣播至一組實例。不同的有效弧與 variant 組合可能拆分 Prototype，記憶體效益並非免費。
 > 6. **預設 Class Inherits 多重標籤分類機制**：
 >    - 預設注入 `/__CLASS__/{專案註冊名稱}`，並允許藝術家追加或自訂 Class 標籤，達成跨物件的廣播式覆寫與分類管理。
 >    - **廣播意見一律往下走**，明確指向 Asset 內部目標 Prim，嚴禁直接寫在 Class 根 Prim 上（否則整顆 Asset 的材質層次將被抹平）。
@@ -237,14 +237,15 @@ class "__CLASS__"
 > **因應原則**：Loader 或 QC 工具須提供「廣播命中率檢查」——列出實際套用到的實例數與未命中的清單。
 
 > [!CAUTION]
-> **四、與 `instanceable` 完全互斥**
-> `instanceable = true` 的 Prim，其內部為 Instance Proxy，**不可 author 任何 opinion**。Class 往下走的 `over` 全數落在 Prototype 內部，**完全無效**。
+> **四、與 `instanceable` 的關係：可廣播、不可逐實例直改**
+> `instanceable = true` 的 Prim，其 instance proxy descendants 不可被逐實例 `over`；既有的這類 local descendant opinions 也會被忽略。但消費端可在實例根加入 Inherits／Specializes arc，再編輯被指向的 Class，使 Class 內容成為 Prototype 組合的一部分並影響整組實例。
 >
-> 而本篇 §4 正好推薦高密度道具啟用 `instanceable`，兩者直接衝突。必須擇一：
-> - **需要 Class 往下廣播** → 該實例**不得**標記 `instanceable`。
-> - **需要 instancing 記憶體效益** → 廣播只能停留在實例根（整顆換材質），或改於 Asset 端以 `look` variant 解決。
+> 因此必須區分：
+> - **只改單一實例的內部 Mesh** → 該實例必須取消 `instanceable`。
+> - **改同一標籤群組的全部實例** → 可使用 Class 往下廣播。
+> - **只改實例根可繼承的整體狀態** → 可直接在實例根處理，不必進入 Instance Proxy。
 >
-> 另須注意：`inherits` 本身是組合弧，**會參與 Prototype 的識別**。§5.2 所鼓勵的「自由追加多重標籤」，每一種不同的標籤組合都會產生一份獨立 Prototype，直接侵蝕 instancing 的共享效益。Loader 應在介面上提示此代價。
+> `inherits` 會參與 Prototype 的 instancing key。空標籤未必拆分實際 Prototype，但一旦不同標籤組合帶入不同有效意見，共享通常就會分組；Loader 應顯示或診斷實際 Prototype 數，而不是承諾固定成本。
 
 * **零侵入性**：燈光師不需要在場景中遍歷 100 把椅子逐一寫入 override，只需針對頂層 Class 定義一次，所有實例即刻生效。
 * **高內聚分類**：Class 在 USD 中不佔用空間實體，也不干擾階層的 Transform 幾何運算，是純粹的語意標籤。
@@ -271,7 +272,7 @@ stage.CreateClassPrim("/__CLASS__")     # 指示符為 class，IsAbstract() == T
 >
 > `class` 的抽象性在 Flatten 後依然保留，因此發布包中的 Class 不會汙染下游。
 
-### 5. 穿透 Instanceable：`inherit` 是唯一的覆寫途徑
+### 5. 穿透 Instanceable：以 `inherit` 廣播共同內部意見
 
 設為 `instanceable = true` 的 Prim，其 descendant 在命名空間中是 **Instance Proxy**——**唯讀，無法被 `over`**：
 
@@ -300,8 +301,8 @@ class "__CLASS__"
 實測結果：所有繼承 `wooden_props` 的椅子，其 `Model/Frame` 皆轉為 `invisible`，而同層的 `Model/Seat` 完全不受影響——即使這些椅子全都是 Instanceable。
 
 > [!IMPORTANT]
-> **這是 Instanceable Asset 唯一的內部覆寫途徑**
-> 下游若需要調整 Instanceable Asset 的內部結構，唯一的合法手段就是編輯它所繼承的 Class。放棄 `instanceable` 以換取可覆寫性，代價是喪失整個 Asset 的實例化記憶體效益——絕大多數情境下，改用 Class 廣播才是正解。
+> **這是本架構對「一組實例共享內部覆寫」採用的標準途徑**
+> 它不是逐實例 override：所有具有相同有效 Inherits 意見的實例都會受到影響。若只需改一顆，應取消該顆的 `instanceable`；若需求可表達為 Asset 既有 variant，優先使用 variant，避免為一次性意見增加 Prototype 分組。
 
 > [!CAUTION]
 > **標籤不是免費的：攜帶意見的標籤會使原型分裂**
