@@ -182,8 +182,7 @@ over "ROOT"
     {
         def DomeLight "SkyDome"
         {
-            # OpenUSD 24.08+ 支援 asset-valued attribute 的 Variable Expression；
-            # 舊版部署須改由 Asset Resolver logical identifier 處理。詳見發布封裝篇 §6.2。
+            # 需要 OpenUSD 24.08+；本架構直接在 asset-valued attribute 使用 Variable Expression。
             asset inputs:texture:file = @`"${PROJECT_ROOT}/assets/hdri/sunset.exr"`@
             float inputs:intensity = 1.2
         }

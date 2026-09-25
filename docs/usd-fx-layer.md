@@ -360,7 +360,7 @@ def Xform "ROOT"
 
 > [!WARNING]
 > **快取路徑必須可遷移，且只能解析至 durable storage**
-> 本規範的 OpenUSD 24.08+ 基線支援 asset-valued attribute 中的 Variable Expression，因此 `OpenVDBAsset.filePath` 可使用 `${CACHE_ROOT}`。部署的 Hydra／renderer 仍須以整合測試確認；若舊版不支援，改用 Asset Resolver logical identifier，而非退回指向工作 scratch 的絕對路徑。
+> 本規範僅支援 OpenUSD 24.08 以上，並直接在 asset-valued attribute 中使用 Variable Expression，因此 `OpenVDBAsset.filePath` 必須使用 `${CACHE_ROOT}`。部署的 Hydra／renderer 仍須以整合測試確認；低於此版本不在本架構支援範圍內。
 
 #### B. 幾何快取序列包裹：USD Value Clips
 對於隨時間逐格變更拓撲或頂點的巨量剛體/布料/流體幾何快取（Geo Cache），使用 OpenUSD 原生的 **`Value Clips`** 機制：

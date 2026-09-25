@@ -748,13 +748,12 @@ rig/Teacher_rig/            → char.usd     綁定角色（Rigging 交付）
 > 本專案的參考實作 [`projectrootvariable.py`](../tools/outputprocessors/projectrootvariable.py) 產出的即為此合法形式，變數名統一為 **`PROJECT_ROOT`**。
 
 > [!WARNING]
-> **適用範圍取決於 OpenUSD 版本；本規範基線為 24.08 以上**
-> OpenUSD 24.08 以上的 Variable Expression 可用於 `subLayers`、`references`、`payload` 等組合弧、variant selection，以及 asset-valued attributes／metadata。若部署版本早於此基線，必須以實測能力矩陣決定 fallback，不得將舊版限制寫成 USD 的永久規則。
+> **本規範僅支援 OpenUSD 24.08 以上**
+> Variable Expression 用於 `subLayers`、`references`、`payload` 等組合弧、variant selection，以及 asset-valued attributes／metadata。本文後續實作均以 OpenUSD 24.08 以上為前提；低於此版本不在本架構支援範圍內。
 >
 > 對一般 **asset 型屬性值**（如 `DomeLight.inputs:texture:file`、`OpenVDBAsset.filePath`、Shader 貼圖路徑），Pipeline 應遵守：
-> - 部署基線支援時，優先保留 Expression 或 Resolver logical identifier，避免硬編碼工作室掛載點。
+> - 一律保留 Variable Expression，避免硬編碼工作室掛載點。
 > - CI 必須在工作室實際部署的 OpenUSD／Hydra／renderer 組合上驗證解析結果；第三方 renderer 是否完整支援仍屬整合能力，而非只看 USD Core。
-> - 舊版環境不支援時，使用 Asset Resolver logical identifier；只有受集中掛載契約管理、且交付時會重寫或封裝的路徑，才能退回絕對路徑。
 
 #### 傳統硬編碼絕對路徑的致命缺陷
 在過去，引用專案外部 Asset 庫（如全域場景陳設或跨部門快取）時，若直接硬編碼全域絕對路徑（如 `@/projects/show_A/publish/...@`）：
