@@ -129,3 +129,14 @@
   - **`char_splitter.py`**：將合成後的角色 Stage 拆為 `skel`（`Skeleton`、`BlendShape` 本體、蒙皮綁定）與 `anim`（`SkelAnimation` 時序）兩個 sub 單元，並處理綁定的命名空間繼承、`skel:joints` 重映射、非預設 `skinningMethod` 等會靜默出錯的環節。
   - 僅依賴 `pxr`，不綁定任何 DCC；附含重新合成驗證的單元測試。
 
+
+---
+
+## 📄 授權（License）
+
+本專案（文件與工具程式）採 **[MIT License](LICENSE)** 釋出。
+
+選用 MIT 而非 share-alike 類授權，是為了配合本專案的目的：**讓各工作室直接取用、改寫成貼合自身架構的版本**。改寫後的成果不需對外公開，也不必沿用相同授權——各家的 Pipeline 文件本就多屬內部資料。
+
+> [!NOTE]
+> MIT 條文以 `the Software` 指稱授權標的，其定義涵蓋 `associated documentation files`，因此本專案的文件與程式同受其規範。
