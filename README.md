@@ -1,6 +1,6 @@
 # USD：架構設計體系總覽與導讀 (Map of Content)
 
-本目錄匯集了影視與動畫工業級 **OpenUSD 生產 Pipeline 架構設計** 的完整規範。從底層 Asset、場景陳設（Set Dressing）、角色動態（Animation）、特效模擬（FX），到鏡頭圖層堆疊（Shot Layers）、跨部門覆寫（Overrides）、發布封裝（Packaging）與進版鎖定（Versioning & Resolver），建立了一套高內聚、低耦合、極致輕量且具備歷史可重現性的 USD 體系。
+本目錄是影視與動畫 **OpenUSD 生產 Pipeline 架構設計** 的一套落地示範。從底層 Asset、場景陳設（Set Dressing）、角色動態（Animation）、特效模擬（FX），到鏡頭圖層堆疊（Shot Layers）、跨部門覆寫（Overrides）、發布封裝（Packaging）與進版鎖定（Versioning & Resolver），完整走通了一套高內聚、低耦合、極致輕量且具備歷史可重現性的 USD 體系，作為各工作室取用、改寫成貼合自身版本的起點。
 
 ---
 
