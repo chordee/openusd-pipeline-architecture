@@ -542,6 +542,14 @@ over "ROOT"
 /ROOT/Anim/GirlRunning
 ```
 
+> [!CAUTION]
+> **在單元落點上擺放時，`xformOpOrder` 必須附加，不可重寫**
+> 上列落點（如 `/ROOT/Anim/BoyWalking`）是鏡頭端擺放單元的位置。若該單元的 `/ROOT` **自身已帶 `xformOp`**（`propAnim`、Camera，以及走位寫在根節點的 `charAnim`——見[根節點 Transform 所有權制](usd-publish-packaging.md)），則在此處寫入 `xformOpOrder` 會**整份取代** Reference 帶來的那一份，單元自身的運動隨之靜默歸零。
+>
+> `xformOpOrder` 是 uniform 且非 list op，Reference 弧不提供保護——它使意見較弱，但該屬性是單一值，較強者勝出即全取代。實測數據與完整說明見 [Animation Layer 篇：角色走位寫在哪裡](usd-animation-layer.md)。
+>
+> 因此擺放工具必須**讀取現有 order 後追加**自己的 op。單元的 `/ROOT` 為 identity 時（Asset、Set、`char`、走位採 root joint 的 `charAnim`）無此風險。
+
 > [!IMPORTANT]
 > **`base` 以 Reference 嫁接單元，不以 Sublayer**
 > Sublayer **不做路徑重映射**：單元若以 Sublayer 疊入，就必須自己把內容寫在 `/ROOT/Anim/<UnitName>` 這個最終路徑上——等於把落點硬編碼進單元，單元從此必須知悉消費端的命名空間。

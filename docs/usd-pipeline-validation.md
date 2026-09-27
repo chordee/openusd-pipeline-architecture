@@ -103,7 +103,8 @@
 | :--- | :--- | :---: | :--- |
 | **`/ROOT` 已被定義** | 發布包合成後的 `/ROOT` 為 `IsDefined() == True` | 攔阻 | [`/ROOT` 鐵律](usd-publish-packaging.md) |
 | **`/ROOT` 未被部門污染** | 靜態 Sub 物件包的 `/ROOT` 上無 `kind`、`variantSets` 或非白名單屬性（白名單僅含 `collection`）；根運動時序包改依下一項檢查 | 攔阻 | 同上 |
-| **根 Transform 所有權正確** | 靜態來源單元的 `/ROOT` 無 `xformOp`；`propAnim`、Camera 等根運動單元可帶 `xformOp`，但不得與消費端重複烘入同一段運動 | 攔阻 | 同上 |
+| **根 Transform 所有權正確** | 靜態來源單元的 `/ROOT` 無 `xformOp`，**含綁定角色 `char` 的 `SkelRoot`**；`propAnim`、Camera 等根運動單元可帶 `xformOp`，但不得與消費端重複烘入同一段運動 | 攔阻 | 同上 |
+| **角色走位未重複計入** | `charAnim` 單元的 `/ROOT` 帶 `xformOp` 且 root joint 亦有位移時，列出供發布者確認二者並非同一段運動——並用本身合法（運動相乘），重複計入才是錯誤 | **報告** | [角色走位位置](usd-animation-layer.md) |
 | **Shot 部門圖層未污染 `/ROOT`** | 部門圖層在 `/ROOT` 上無任何屬性或元數據意見 | 攔阻 | 同上 |
 | **`kind` 階層狀況** | 列出所有掉出 Model Hierarchy 的 model 及其斷點 | **報告** | [`usdkind` 治理](usd-asset-layer.md) |
 | **已聲明能力未失效** | 已指定 `drawMode` 等 Model 能力的 Prim，其 Model Hierarchy 實際有效 | 攔阻 | 同上 |

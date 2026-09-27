@@ -112,7 +112,7 @@ def "ROOT" (
 > **`animationSource` 為何下探至 `Skel` 而非寫在 `/ROOT`**
 > `skel:*` 屬於 `SkelBindingAPI`，寫在 `/ROOT` 上會違反 [`/ROOT` 鐵律](usd-publish-packaging.md)——該處白名單僅含 `collection`。下探至 `Skel` 既合規，效果亦相同（綁定關係本就是命名空間繼承的，寫在 Skeleton 自身是最直接的位置）。
 >
-> 單元的 `/ROOT` 因此**除了 Reference 之外零寫入**：無屬性、無 `kind`、無 `variantSets`、無 `apiSchemas`。
+> 單元的 `/ROOT` 因此除了 Reference 之外**幾乎零寫入**：無 `kind`、無 `variantSets`、無 `apiSchemas`、無 `skel:*`。唯一的例外是走位若採下述選項 B，則 `xformOp` 與 `xformOpOrder` 會寫在 `/ROOT` 上。
 
 #### 二、部門 Master 的 `base` 如何嫁接（`anim_base.usd`）
 
@@ -151,6 +151,50 @@ over "ROOT"
 
 單元內寫的 `</ROOT/AnimData>` 在此解析為 `/ROOT/Anim/BoyWalking/AnimData`——**單元始終無須知悉自己的掛載位置**。
 
+
+### 角色走位寫在哪裡：兩種都成立，且相乘而非互斥
+
+角色的整體走位（world motion，與骨架內部的形變無關）有兩個合法位置：
+
+| | 走位位置 | 單元的 `/ROOT` |
+| :--- | :--- | :--- |
+| **A** | root joint 的 `SkelAnimation.translations` | 恆為 identity |
+| **B** | `/ROOT`（`SkelRoot`）的 `xformOp` | 帶 `xformOp` 與 `xformOpOrder` |
+
+兩者在實務上都常見，本架構**不擇一強制**——A 讓走位與骨架動態同處一份 `SkelAnimation`，便於整段重定向；B 讓走位可被下游單獨覆寫而不觸及骨架資料。兩者也可**同時使用**，此時運動相乘（見下）。
+
+> [!CAUTION]
+> **兩者相乘，因此「同一段運動寫兩次」才是錯，並存本身不是**
+> 實測（root joint 與 `SkelRoot` 各自於第 24 幀位移，單點蒙皮）：
+>
+> | 情境 | 蒙皮後（skel space） | 世界座標 @24 |
+> | :--- | :--- | :--- |
+> | 僅 A：root joint `(0,0,10)` | `(0,0,10)` | `(0,0,10)` |
+> | 僅 B：`SkelRoot` `(0,0,10)` | `(0,0,0)` | `(0,0,10)` |
+> | 兩者皆 `(0,0,10)` | `(0,0,10)` | **`(0,0,20)`** |
+> | A＝`(3,0,0)`、B＝`(0,0,10)` | `(3,0,0)` | `(3,0,10)` |
+>
+> 第三列是錯的，第四列不是——兩者相乘本身是**正當機制**：`in-place` 循環動畫放骨架、世界路徑放 `SkelRoot`，正是靠它成立。USD 無從分辨這兩種情形，它只是照實合成。
+>
+> 因此規則不是「不得並存」，而是兩條：
+> 1. **同一段運動只能出現一次。**
+> 2. **單元必須讓下游知道 `/ROOT` 的 `xformOp` 代表什麼**（整段走位？in-place 動畫的世界路徑？），例如記於發布後設資料。否則鏡頭端無從判斷那段 transform 能否覆寫。
+
+> [!CAUTION]
+> **選項 B 的走位會被鏡頭端的擺放靜默清除**
+> `xformOpOrder` 是 **uniform 且非 list op**：消費端在 `/ROOT/Anim/<unit>` 上寫入自己的 `xformOpOrder`，會**整份取代** Reference 帶來的那一份，動畫隨之歸零。Reference 弧不提供任何保護——它讓意見較弱，但 `xformOpOrder` 是單一值，較強者勝出即全取代。
+>
+> 實測（charAnim 於 `/ROOT` 寫入 24 幀位移至 `(0,0,10)`，經 Reference 落於 `/ROOT/Anim/BoyWalking`，鏡頭端再加一段 `(5,0,0)` 擺放）：
+>
+> | 鏡頭端做法 | 合成後的 `xformOpOrder` | 第 24 幀位移 | 動畫 |
+> | :--- | :--- | :--- | :---: |
+> | 不擺放 | `[anim]` | `(0, 0, 10)` | 保留 |
+> | **附加** op（讀取現有 order 後追加） | `[anim, place]` | `(5, 0, 10)` | 保留 |
+> | **重寫** order（只列自己的 op） | `[place]` | `(5, 0, 0)` | **靜默丟失** |
+>
+> 因此採用 B 的專案，消費端的擺放工具**必須附加而非重寫** `xformOpOrder`。選項 A 沒有這個風險——`/ROOT` 為 identity，消費端可自由寫入。
+
+---
 
 ## 2. 元素類型二：幾何 Transform 動畫（Rigid / Prop Animation）
 

@@ -732,6 +732,8 @@ def SkelRoot "ROOT" (
 > 這是全 Pipeline 唯一不使用 `def Xform "ROOT"` 的發布單元。原因是 **`SkelRoot` 是 Hydra 解算 Skinning 的邊界**——不在 `SkelRoot` 底下的 Mesh，即使完整套用了 `SkelBindingAPI` 也不會產生變形。將邊界置於 `/ROOT` 可確保角色無論被引用至鏡頭何處，其變形恆常有效。
 >
 > 合成上無虞：總裝層的 Local 型別意見強於各包經 Reference 帶入的 `Xform`，composed 型別即為 `SkelRoot`。但此型別競爭須為工具鏈所知，不可誤判為衝突。
+>
+> **破例只破例型別，不豁免根 Transform**：綁定角色交付的是 bind pose，走位屬動畫、擺放屬鏡頭，兩者皆不屬於它。因此此處的 `SkelRoot` 與其他靜態來源單元一樣**恆為 identity，不得帶 `xformOp`**（見[根節點 Transform 所有權制](usd-publish-packaging.md)）。
 
 > [!TIP]
 > **綁定落在 `Geometry` 而非角色的 `/ROOT`**

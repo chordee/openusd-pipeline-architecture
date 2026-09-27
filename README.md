@@ -41,7 +41,7 @@
 - **解耦哲學**：Asset 內部不硬編碼特定名稱（如 `/Chair`），而是在被引用端（Consumer）消費時，由外部 Stage 自由指派語意路徑（如 `/ROOT/Environment/Props/OfficeChair_01`）。
 - **Sub 物件以 Reference 嫁接**：`modelDefault/`、`lookDefault/` 等 sub 物件包各為自成一體的封裝單元，由 Pipeline 在總裝層以 `references` 嫁接至 `/ROOT`；清單順序即意見強弱。
 - **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與嫁接決策一律僅由總裝層宣告，sub 物件包**嚴禁出現**。靜態來源 sub 物件包在 `/ROOT` 的白名單**僅含 `collection`**（單元對自身內容的自述）；根運動時序包另依下一條所有權規則處理。
-- **根節點 Transform 採所有權制**：可被消費端自由擺放的靜態來源單元（Asset、Set、FX Element 等），其發布根不得帶 `xformOp`，必須恆為 identity；擺放由消費端負責。以根節點承載運動本身的時序單元（如 `propAnim`、Camera）則可在根寫入 `xformOp`，但消費端不得再重複烘入同一段運動。`SkelRoot` 是角色解算邊界，是否帶 Transform 仍依同一所有權規則判定，並非僅憑型別自動例外。
+- **根節點 Transform 採所有權制**：可被消費端自由擺放的靜態來源單元（Asset、Set、FX Element 等），其發布根不得帶 `xformOp`，必須恆為 identity；擺放由消費端負責。以根節點承載運動本身的時序單元（如 `propAnim`、Camera）則可在根寫入 `xformOp`，但消費端不得再重複烘入同一段運動。`SkelRoot` 是角色解算邊界，型別破例不豁免本規則：綁定角色（`char`）交付 bind pose，其根恆為 identity；`charAnim` 的走位可寫於 root joint 或根節點，二者並用時運動相乘（如 in-place 循環搭配世界路徑），惟同一段運動不得重複計入。
 
 ### 2. Sublayer 強弱順序與意見貫穿（LIVRPS / Layer Stacking）
 - 鏡頭頂層 `subLayers` 順序決定意見權重（Index 越小意見越強）：

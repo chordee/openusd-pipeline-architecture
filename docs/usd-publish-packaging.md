@@ -142,7 +142,7 @@ def PointInstancer "ForestTrees"
 > 2. **sub 物件以 Reference 嫁接**：每個 sub 物件包（`modelDefault.usd`、`lookDefault.usd`、`volume_pyro.usd`…）皆為**自成一體的封裝單元**，內部以 `def Xform "ROOT"` 定義自身的根，並在其下經營自身分支。部門只對自己的包負責，**無須、亦不得**知悉總裝層的存在。
 > 3. **結構性宣告由 Pipeline 獨佔**：`kind`、`variantSets` 與各 sub 物件包的嫁接決策，**一律僅由 Pipeline 產生的總裝層（`v###/asset.usd`、`v###/element.usd`、`shot.usd`）宣告**。sub 物件包內**嚴禁出現 `kind`、嚴禁出現 `variantSets`**——這兩者定義的是該單元在全域流程中的身分與形態組合，屬 Pipeline 職權。
 > 4. **靜態來源 sub 物件包嚴禁在 `/ROOT` 寫入非白名單意見**：除了定義自身的根與分支之外，**不得在 `/ROOT` 上寫入任何屬性或元數據**。白名單僅含一項——**`UsdCollectionAPI` 的 collection**，因其為「單元對自身內容的自述」，且經 Reference 嫁接後路徑會自動重映射至掛載位置。根運動時序包依下一條所有權規則例外處理。
-> 5. **根節點 Transform 採所有權制**：Asset、Set、FX Element 等可被消費端自由擺放的靜態來源單元，其 `/ROOT` 必須為 identity，不得帶 `xformOp`；擺放是消費端的職權。`propAnim`、Camera 等以根節點承載運動本身的時序單元可在 `/ROOT` 寫入 `xformOp`，但消費端不得再烘入同一段運動。`SkelRoot` 是 Hydra skinning 的解算邊界，是否允許根 Transform 仍取決於資料所有權，並非由型別自動豁免。
+> 5. **根節點 Transform 採所有權制**：Asset、Set、FX Element 等可被消費端自由擺放的靜態來源單元，其 `/ROOT` 必須為 identity，不得帶 `xformOp`；擺放是消費端的職權。`propAnim`、Camera 等以根節點承載運動本身的時序單元可在 `/ROOT` 寫入 `xformOp`，但消費端不得再烘入同一段運動。`SkelRoot` 是 Hydra skinning 的解算邊界，但**型別破例不豁免本規則**：綁定角色（`char`）交付 bind pose，屬靜態來源單元，其 `SkelRoot` 恆為 identity；`charAnim` 屬時序單元，走位可寫於 root joint 或 `/ROOT`，二者亦可並用（運動相乘，如 in-place 循環搭配世界路徑），惟同一段運動不得重複計入。
 > 6. **`over` 不會建立 Prim**：`over "ROOT"` 僅適用於純覆寫用途的圖層（Shot 部門圖層、`overrides` 容器、`latest` 包裝層）。若一個發布包內完全沒有任何 `def`，合成後 `/ROOT` 將**從未被定義**——`UsdPrim.IsDefined()` 回傳 false，預設 Stage 遍歷述詞會直接跳過，`defaultPrim` 亦解析不到有效 Prim，整個發布包在下游等同空殼。
 
 > [!WARNING]
