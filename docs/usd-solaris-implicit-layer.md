@@ -119,7 +119,7 @@ USD ROP (Output Processor)
 
 既然節點圖難以預測，另一種在 Pipeline TD 之間常見且強大的手段是：**利用 Houdini Solaris 的自訂 Output Processor**。
 
-在工業級 Pipeline 中，自訂 Output Processor 肩負兩大核心任務：
+在本架構中，自訂 Output Processor 肩負兩大核心任務：
 
 1. **路徑合法性守衛（The Safety Net）**：
    - 逐一比對每個圖層的目標磁碟路徑：是否位在當前任務所允許的發布資料夾底下的 `./layers/` 子目錄？
@@ -136,7 +136,7 @@ USD ROP (Output Processor)
 
 ### 3. 最佳實踐：三層縱深防禦體系 (Three-Tier Defense Architecture)
 
-因此，工業級 Pipeline 的最佳解法絕非單靠終端的 Output Processor 攔截，而是建立「**源頭教育 → 流程前置檢視 → 終端守衛**」的三層縱深防禦體系：
+因此，可靠的解法絕非單靠終端的 Output Processor 攔截，而是建立「**源頭教育 → 流程前置檢視 → 終端守衛**」的三層縱深防禦體系：
 
 ```
 [第一道防線：製作人員教育 (源頭治理)]

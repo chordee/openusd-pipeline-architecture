@@ -113,7 +113,7 @@
 
 ## 🛠️ Pipeline 工具與參考實作庫
 
-本專案不僅提供理論架構，亦提供工業級的實作工具腳本，供工作室直接引入或作為開發基準：
+本專案不僅提供理論架構，亦提供可直接運行的實作工具腳本，供工作室直接引入或作為開發基準：
 
 - **[Houdini Solaris Output Processors 工具庫](tools/outputprocessors/README.md)**：
   - **`portablereferences.py`**：自動辨識 Package Root 邊界，將包內向上跳層（`@../modelDefault/...@`）及子目錄參照改寫為相對路徑，並寫入發布追蹤後設資料。

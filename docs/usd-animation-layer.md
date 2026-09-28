@@ -2,7 +2,7 @@
 
 在鏡頭（Shot）的 USD 堆疊中，**Animation Layer（`anim.usd`）** 位於 `/ROOT/Anim`，權重高於 Environment、低於 FX 與 Lighting。
 
-雖然 Animation Layer 呈現了整個鏡頭最複雜生動的表演（角色走動、表情、道具互動、鏡頭運動），但在工業級 USD Pipeline 中，**Animation Layer 實際輸出的硬碟佔用量極小（通常僅數 MB）**。這得益於 USD 將動態資料與實體幾何徹底解耦的設計。
+雖然 Animation Layer 呈現了整個鏡頭最複雜生動的表演（角色走動、表情、道具互動、鏡頭運動），但 **Animation Layer 實際輸出的硬碟佔用量極小（通常僅數 MB）**。這得益於 USD 將動態資料與實體幾何徹底解耦的設計。
 
 > [!IMPORTANT]
 > **30 秒核心架構觀念**

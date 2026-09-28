@@ -85,7 +85,7 @@ Asset 架構的核心目標是「**模型與外觀解耦、統一命名空間、
 
 ## 2. 核心設計哲學：為什麼使用 `/ROOT` 而非 Asset 名稱？
 
-在傳統 Asset 製作中，直覺常會將根節點命名為該 Asset 的名稱（如 `/Chair` 或 `/SedanCar`）。但在工業級 USD Pipeline 中，**Asset 內部一律以 `/ROOT` 為根節點**，關鍵原因如下：
+在傳統 Asset 製作中，直覺常會將根節點命名為該 Asset 的名稱（如 `/Chair` 或 `/SedanCar`）。但本架構**一律以 `/ROOT` 作為 Asset 內部的根節點**，關鍵原因如下：
 
 ### 1. 同一 Asset 在不同專案與情境下名稱各異（Cross-Project & Contextual Renaming）
 * **跨專案共用**：同一個三維模型 Asset，在專案 A 可能被註冊為 `KitchenChair`，在專案 B 叫做 `OfficeChair`，在科幻專案被改稱為 `ControlRoomSeat`。
@@ -179,7 +179,7 @@ def Mesh "Body_Proxy" (
 
 雖然 `purpose` 提供了代理切換機制，但 **`purpose` 是全域性（Global）的**——在 Houdini Solaris 或 USDView 中切換為 Proxy，整個 Stage 的所有物件都會同時切換，無法精細化控制單一焦點或背景 Asset。
 
-**減輕 Viewport 壓力的最主要且強大的工業級手段，是利用 USD `UsdGeomModelAPI` 的 `drawMode`**：
+**減輕 Viewport 壓力的最主要且強大的手段，是利用 USD `UsdGeomModelAPI` 的 `drawMode`**：
 
 ```usda
 # 於鏡頭或組裝層中，針對特定 Component 或 Assembly 指定 drawMode
