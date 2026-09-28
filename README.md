@@ -2,6 +2,16 @@
 
 本目錄是影視與動畫 **OpenUSD 生產 Pipeline 架構設計** 的一套落地示範。從底層 Asset、場景陳設（Set Dressing）、角色動態（Animation）、特效模擬（FX），到鏡頭圖層堆疊（Shot Layers）、跨部門覆寫（Overrides）、發布封裝（Packaging）與進版鎖定（Versioning & Resolver），完整走通了一套高內聚、低耦合、極致輕量且具備歷史可重現性的 USD 體系。
 
+## English Overview
+
+This repository presents an implementation-oriented reference architecture for building an OpenUSD production pipeline for animation and visual effects. It covers asset packaging, set dressing, skeletal and transform animation, FX caches, shot composition, departmental overrides, lighting, version pinning through Asset Resolver contexts, and pipeline validation.
+
+The architecture is designed around stable publishing boundaries, lightweight composition, explicit ownership of scene opinions, and reproducible historical versions. The repository also includes reference tools for Houdini Solaris output processing, USD layer inspection, character animation splitting, and point-cache splitting.
+
+This is an opinionated production example rather than a universal USD specification. Projects should adapt its conventions to their own DCC applications, renderers, tracking systems, and storage infrastructure. Variable Expression examples require OpenUSD 24.08 or later.
+
+The complete documentation is currently written in Traditional Chinese.
+
 ---
 
 ## 🗺️ 架構全景導讀地圖 (Pipeline Architecture Map)
