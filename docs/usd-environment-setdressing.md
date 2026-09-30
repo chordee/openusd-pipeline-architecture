@@ -1,6 +1,6 @@
 # USD：Environment 與 Set Dressing 場景陳設架構設計
 
-在鏡頭（Shot）的四大基礎層中，**Environment Layer（`environment.usd`）** 是最底層的世界舞台（`/ROOT/Environment`）。
+在鏡頭（Shot）的四大基礎層中，**Environment Layer（`environment.usd`）** 是最底層的環境空間（`/ROOT/Environment`）。
 
 Environment 圖層的核心成員並非直接建立的幾何多邊形，而是由「**主要 Asset 配置（Layout）**」與「**各式場景陳設（Set Dressing）**」組合而成。
 

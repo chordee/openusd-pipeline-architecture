@@ -196,7 +196,7 @@
       <!-- Layer 4: Env -->
       <rect x="14" y="150" width="400" height="36" rx="4" fill="#022c22" stroke="#6ee7b7" stroke-opacity="0.6" />
       <text class="text-mono" x="24" y="165" fill="#f0fdf4">Index 3: environment.usd</text>
-      <text class="text-dim" x="190" y="165">【最弱 Sublayer / 舞台基底】</text>
+      <text class="text-dim" x="190" y="165">【最弱 Sublayer / 環境基底】</text>
       <text class="text-body" x="24" y="179">/ROOT/Environment 靜態背景、地形、建築與 Set Dressing 道具陳設</text>
 
       <!-- Camera Unit: Stage Reference -->

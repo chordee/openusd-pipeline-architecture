@@ -39,7 +39,7 @@
         @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/fx/Fx_master/fx_latest.usda"`@,
         # [2] 中等：角色骨架動態、攝影機與道具動畫
         @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/anim/Anim_master/anim_latest.usda"`@,
-        # [3] 最弱：世界舞台、建築與 Set Dressing
+        # [3] 最弱：環境空間、建築與 Set Dressing
         @`"${PROJECT_ROOT}/publish/shots/sq01/sh010/environment/Environment_master/environment_latest.usda"`@
     ]
 )
@@ -77,7 +77,7 @@ def Xform "ROOT" (
 | **Index 0 (最強)** | `lighting.usd` | 最強 (最高仲裁權) | Pipeline 最後一棒，具全場最終覆寫權（修整瑕疵、調光綁定） |
 | **Index 1 (次強)** | `fx.usd` | 次強 | 可非破壞性接管/隱藏角色幾何，疊加體積、布料與破碎模擬 |
 | **Index 2 (中等)** | `anim.usd` | 中等 | 接管環境道具 Transform，驅動骨架角色表演與鏡頭時序動畫 |
-| **Index 3 (最弱)** | `environment.usd` | 最弱 (基礎舞台) | 提供純幾何世界舞台，作為動畫角色定位基準與 FX 模擬碰撞體 |
+| **Index 3 (最弱)** | `environment.usd` | 最弱 (環境基底) | 提供純幾何環境空間，作為動畫角色定位基準與 FX 模擬碰撞體 |
 
 1. **Lighting 最強**：Pipeline 最後一棒，需具備修正任何瑕疵的能力（例如覆寫局部材質、排除特定光源、隱藏穿幫物件）。
 2. **FX 強於 Animation**：FX 需能非破壞性地隱藏動畫角色幾何（接管為破碎模型）或在角色身上疊加動態效果（泥漿、血跡）。
@@ -89,10 +89,10 @@ def Xform "ROOT" (
 
 每個部門的 Layer 檔案均各自獨立發佈，內部均以 `/ROOT` 為根，並建立該部門專屬的 Primitive 分支：
 
-### 1. Environment Layer (`environment.usd`) —— 最弱（舞台基底）
+### 1. Environment Layer (`environment.usd`) —— 最弱（環境基底）
 > 📖 詳細架構請見：[USD Environment 與 Set Dressing 場景陳設架構設計](usd-environment-setdressing.md)、[USD Asset Layer 架構設計](usd-asset-layer.md)
 
-承載整體靜態舞台空間。內部透過 Reference / Payload 引用 Component Asset，自身不帶龐大多邊形快取：
+承載整體靜態環境空間。內部透過 Reference / Payload 引用 Component Asset，自身不帶龐大多邊形快取：
 ```usda
 #usda 1.0
 (

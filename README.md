@@ -28,7 +28,7 @@ The complete documentation is currently written in Traditional Chinese.
 | :--- | :--- | :--- |
 | **[USD Shot Layers 鏡頭分層與覆寫架構](docs/usd-shot-layers.md)** | 鏡頭總成、強弱權重、覆寫機制與渲染設定 | 四大部門圖層順序（`L > FX > A > E`）、`Master = Overrides + Base`、跨部門稀疏覆寫、`/Render` 命名空間 |
 | **[USD Asset Layer 架構設計](docs/usd-asset-layer.md)** | 單一發布 Asset 內部結構 | 模型/材質雙包 Reference 嫁接、`ModelDefault`/`Look`、雙維度 VariantSet、`/ROOT` 解耦哲學 |
-| **[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)** | 世界舞台與場景陳設組裝 | Layout 與 Set Dressing 組合、虛擬組裝（零幾何實體）、`PointInstancer` 點雲數據消耗 |
+| **[USD Environment 與 Set Dressing 場景陳設架構設計](docs/usd-environment-setdressing.md)** | 環境空間與場景陳設組裝 | Layout 與 Set Dressing 組合、虛擬組裝（零幾何實體）、`PointInstancer` 點雲數據消耗 |
 | **[USD Animation Layer 動態架構設計](docs/usd-animation-layer.md)** | 角色骨架與道具時序動態 | 角色拆為幾何材質與綁定兩個發布單元、`SkelRoot` 底下三分支（`Geometry` + `Skel` + `AnimData`）、數 MB 極致輕量儲存 |
 | **[USD FX Layer 鏡頭特效層架構設計](docs/usd-fx-layer.md)** | 特效元素封裝與掛載機制 | `/ROOT/FX/<element_name>`、元素自身以 `/ROOT` 為基底、Payload 延遲載入體積與點雲 |
 | **[USD Lighting Layer 燈光層架構與最終仲裁權](docs/usd-lighting-layer.md)** | 最強層的權限行使、光源連結與跨鏡頭複用 | 能在上游修正者一律退回上游、`lightLink` / `shadowLink` 以排除而非列舉、Light Rig 發布為 Pure USD 單元 |
